@@ -1,0 +1,135 @@
+/* =================================
+   ESTILOS GENERALES Y MOBILE FIRST
+   ================================= */
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    margin: 0;
+    padding: 20px;
+    background-color: #f4f7f6;
+    color: #333;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: calc(100vh - 40px); /* 100% de la altura menos el padding */
+}
+
+.container {
+    background-color: white;
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    width: 90%; /* Ocupa el 90% del ancho en móviles */
+    max-width: 500px; /* Pero nunca más de 500px de ancho */
+    text-align: center;
+}
+
+/* Títulos */
+h1, h2 {
+    color: #2c3e50;
+    border-bottom: 2px solid #3498db;
+    padding-bottom: 10px;
+    margin-top: 0;
+}
+
+/* Formularios y Botones */
+input[type="date"],
+input[type="text"],
+input[type="password"],
+select {
+    width: calc(100% - 22px);
+    padding: 12px;
+    margin-bottom: 15px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    font-size: 16px;
+}
+
+button {
+    padding: 12px 20px;
+    border: none;
+    color: white;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: bold;
+    transition: opacity 0.3s;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+button:hover {
+    opacity: 0.85;
+}
+
+button:disabled {
+    background-color: #bdc3c7 !important;
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+.btn-principal { background-color: #3498db; }
+.btn-entrada { background-color: #2ecc71; }
+.btn-salida { background-color: #e74c3c; }
+
+/* Botones pequeños para acciones en tablas */
+.action-btn { font-size: 12px; padding: 8px 12px; width: auto; margin-right: 5px; }
+.btn-reset { background-color: #f39c12; }
+.btn-delete { background-color: #e74c3c; }
+
+/* Botón de cerrar sesión */
+.logout-btn {
+    background: none;
+    border: none;
+    color: #3498db;
+    cursor: pointer;
+    text-decoration: underline;
+    width: auto;
+    padding: 10px;
+    float: right;
+    font-size: 14px;
+}
+
+/* Tablas */
+.table-container {
+    overflow-x: auto; /* Permite scroll horizontal en móviles si la tabla no cabe */
+}
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+}
+th, td {
+    border: 1px solid #ddd;
+    padding: 12px;
+    text-align: left;
+    vertical-align: middle;
+}
+th { background-color: #ecf0f1; }
+.photo-thumbnail { width: 50px; height: 50px; object-fit: cover; border-radius: 50%; }
+
+/* Mensajes de estado */
+.status-message { font-weight: bold; margin-top: 10px; padding: 10px; border-radius: 4px; }
+.success { color: #27ae60; background-color: #e9f7ef; }
+.error { color: #c0392b; background-color: #f9ebea; }
+
+/* Modal de la cámara */
+.modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.6); justify-content: center; align-items: center; }
+#video { width: 100%; max-width: 320px; border-radius: 8px; transform: scaleX(-1); }
+
+/* =================================
+   MEDIA QUERY PARA PANTALLAS GRANDES
+   ================================= */
+@media (min-width: 768px) {
+    .container {
+        padding: 40px;
+        max-width: 900px; /* Hacemos el contenedor más grande en escritorio */
+    }
+
+    button {
+        width: auto; /* Los botones ya no ocupan todo el ancho */
+    }
+
+    form button[type="submit"] {
+        width: 100%; /* Excepto el botón principal de los formularios */
+    }
+}

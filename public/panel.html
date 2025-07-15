@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Fichaje</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Control de Asistencia</h1>
+        <p id="welcome"></p>
+        <button id="btnEntrada" class="btn-fichar" onclick="iniciarFichaje('entrada')">Registrar ENTRADA</button>
+        <button id="btnSalida" class="btn-fichar" onclick="iniciarFichaje('salida')">Registrar SALIDA</button>
+        <p id="statusMessage" style="font-weight: bold;"></p>
+        <button onclick="logout()">Cerrar Sesión</button>
+    </div>
+
+    <!-- Modal para la cámara -->
+    <div id="cameraModal" class="modal">
+        <div class="modal-content">
+            <h2>Sonríe para la foto</h2>
+            <video id="video" autoplay playsinline></video>
+            <p>Tomando foto en 3 segundos...</p>
+        </div>
+    </div>
+    <canvas id="canvas" style="display:none;"></canvas> <!-- Canvas oculto para procesar la imagen -->
+
+    <script>
+        const token = localStorage.getItem('token');
+        if (!token) window.location.href = '/index.html';
+
+        const [btnEntrada, btnSalida, welcomeP, statusMessageP] = [document.getElementById('btnEntrada'), document.getElementById('btnSalida'), document.getElementById('welcome'), document.getElementById('statusMessage')];
+        const [cameraModal, video, canvas] = [document.getElementById('cameraModal'), document.getElementById('video'), document.getElementById('canvas')];
+        let stream; // Variable global para el stream de la cámara
+        
+        try { welcomeP.textContent = `Hola, ${JSON.parse(atob(token.split('.')[1])).nombre}`; } catch (e) { logout(); }
+
+        // == Lógica de la Cámara ==
+        async function iniciarFichaje(tipo) {
+            cameraModal.style.display = 'flex';
+            try {
+                // Pedir acceso a la cámara frontal
+                stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+                video.srcObject = stream;
+                
+                // Esperar 3 segundos y tomar la foto
+                setTimeout(() => tomarFotoYFichar(tipo), 3000);
+
+            } catch (err) {
+                console.error("Error al acceder a la cámara:", err);
+                alert('No se pudo acceder a la cámara. Asegúrate de dar permiso.');
+                cameraModal.style.display = 'none';
+            }
+        }
+
+        function tomarFotoYFichar(tipo) {
+            const context = canvas.getContext('2d');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            // Detener la cámara
+            stream.getTracks().forEach(track => track.stop());
+            cameraModal.style.display = 'none';
+
+            // Convertir el canvas a un archivo (Blob) y enviarlo
+            canvas.toBlob(blob => {
+                const formData = new FormData();
+                formData.append('tipo', tipo);
+                formData.append('foto', blob, 'fichaje.jpeg');
+                
+                enviarFichaje(formData);
+            }, 'image/jpeg');
+        }
+
+        async function enviarFichaje(formData) {
+            statusMessageP.textContent = 'Enviando registro...';
+            try {
+                const res = await fetch('/api/fichar', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` },
+                    body: formData
+                });
+                const data = await res.json();
+                statusMessageP.textContent = data.message;
+                if (res.ok) inicializarPanel(); // Recargar estado de botones
+
+            } catch (error) {
+                statusMessageP.textContent = "Error de conexión al fichar.";
+            } finally {
+                setTimeout(() => statusMessageP.textContent = '', 5000);
+            }
+        }
+
+        // == Lógica de Estado de Botones (como antes) ==
+        async function inicializarPanel() {
+            try {
+                const res = await fetch('/api/estado', { headers: { 'Authorization': `Bearer ${token}` } });
+                if (!res.ok) { if (res.status === 401 || res.status === 403) logout(); return; }
+                const data = await res.json();
+                actualizarBotones(data.estado);
+            } catch (error) { console.error("Error al inicializar panel:", error); }
+        }
+
+        function actualizarBotones(estado) {
+            btnEntrada.disabled = (estado === 'entrada');
+            btnSalida.disabled = (estado !== 'entrada');
+        }
+
+        function logout() { localStorage.removeItem('token'); window.location.href = '/index.html'; }
+
+        // Ejecutar al cargar
+        inicializarPanel();
+    </script>
+</body>
+</html>

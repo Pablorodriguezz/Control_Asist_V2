@@ -1,0 +1,15 @@
+# Dependencias de Node
+node_modules
+
+# Archivos de entorno (si los tuvieras)
+.env
+
+# Archivos de base de datos local y subidas locales
+# No queremos subir nuestra base de datos de prueba
+asistencia.db
+asistencia.db-journal
+public/uploads/
+
+# Archivos del sistema operativo
+.DS_Store
+Thumbs.db
