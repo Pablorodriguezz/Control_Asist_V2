@@ -1,16 +1,8 @@
 {
   "$schema": "https://railway.app/railway.schema.json",
-  "build": {
-    "builder": "NIXPACKS"
-  },
+  "build": { "builder": "NIXPACKS" },
   "deploy": {
     "startCommand": "npm start",
-    "healthcheckPath": "/",
-    "healthcheckTimeout": 100,
-    "volumes": [
-      {
-        "mountPoint": "/data"
-      }
-    ]
+    "volumes": [ { "mountPoint": "/data" } ]
   }
 }
