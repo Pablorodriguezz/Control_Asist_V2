@@ -30,7 +30,9 @@
         <section>
             <h2>Informe Mensual por Trabajador</h2>
             <div>
-                <select id="selectUsuario" required></select>
+                <select id="selectUsuario" required>
+                    <option value="">-- Selecciona un trabajador --</option>
+                </select>
                 <input type="month" id="selectMes" required />
                 <button onclick="generarInformeMensual()">Generar Informe</button>
                 <button id="btnExportar" style="display: none" onclick="exportarCSV()">Exportar a CSV</button>
@@ -63,6 +65,33 @@
                     <option value="admin">Administrador</option>
                 </select>
                 <button type="submit" class="btn-create">Crear Usuario</button>
+            </form>
+        </section>
+        <hr />
+        
+        <!-- SECCIÓN 5: CREAR FICHAJE MANUAL -->
+        <section>
+            <h2>Crear Fichaje Manual</h2>
+            <form id="manualAttendanceForm">
+                <label for="manualUsuario">Trabajador:</label>
+                <select id="manualUsuario" required>
+                    <option value="">-- Selecciona un trabajador --</option>
+                </select>
+
+                <label for="manualFechaHora">Fecha y Hora del Fichaje:</label>
+                <input type="datetime-local" id="manualFechaHora" required />
+                
+                <label for="manualTipo">Tipo de Fichaje:</label>
+                <select id="manualTipo" required>
+                    <option value="" disabled selected>-- Selecciona tipo --</option>
+                    <option value="entrada">Entrada</option>
+                    <option value="salida">Salida</option>
+                </select>
+
+                <label for="manualMotivo">Motivo (ej: olvido, error del sistema):</label>
+                <textarea id="manualMotivo" placeholder="Es obligatorio explicar por qué se crea este fichaje." required></textarea>
+
+                <button type="submit">Crear Fichaje Manual</button>
             </form>
         </section>
     </div>
@@ -102,9 +131,10 @@
                         
                         let indicadorEditado = '';
                         if (row.es_modificado) {
-                            const fechaOriginal = new Date(row.fecha_hora_original).toLocaleString("es-ES");
+                            const fechaOriginal = row.fecha_hora_original ? new Date(row.fecha_hora_original).toLocaleString("es-ES") : 'N/A';
                             const motivo = row.motivo_modificacion ? row.motivo_modificacion.replace(/"/g, '"') : 'N/A';
-                            indicadorEditado = `<span title="Editado. Original: ${fechaOriginal}. Motivo: ${motivo}" style="cursor: help; color: #f39c12; font-weight: bold;"> ✏️</span>`;
+                            const title = row.fecha_hora_original ? `Editado. Original: ${fechaOriginal}. Motivo: ${motivo}` : `Registro manual. Motivo: ${motivo}`;
+                            indicadorEditado = `<span title="${title}" style="cursor: help; color: #f39c12; font-weight: bold;"> ✏️</span>`;
                         }
 
                         tr.innerHTML = `
@@ -244,21 +274,27 @@
             });
         }
 
-        async function poblarSelectorUsuarios() {
+        async function poblarSelectorUsuarios(selectorId) {
+            const selectElement = document.getElementById(selectorId);
             try {
                 const res = await fetch('/api/usuarios', { headers: { 'Authorization': `Bearer ${token}` } });
                 if (!res.ok) throw new Error('No se pudo poblar el selector de usuarios');
                 const usuarios = await res.json();
-                selectUsuario.innerHTML = '<option value="">-- Selecciona un trabajador --</option>';
+                
+                const defaultOptionHTML = selectElement.querySelector('option[value=""]').outerHTML;
+                selectElement.innerHTML = defaultOptionHTML;
+                
                 usuarios.forEach(user => {
                     if (user.rol === 'empleado') {
                         const option = document.createElement('option');
                         option.value = user.id;
                         option.textContent = user.nombre;
-                        selectUsuario.appendChild(option);
+                        selectElement.appendChild(option);
                     }
                 });
-            } catch (error) { console.error("Error en poblarSelectorUsuarios:", error); }
+            } catch (error) { 
+                console.error(`Error en poblarSelectorUsuarios para #${selectorId}:`, error); 
+            }
         }
 
         async function generarInformeMensual() {
@@ -363,13 +399,44 @@
             } catch (error) { Swal.fire('Error', error.message, 'error'); }
         });
 
+        document.getElementById("manualAttendanceForm").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const usuarioId = document.getElementById('manualUsuario').value;
+            const fechaHora = document.getElementById('manualFechaHora').value;
+            const tipo = document.getElementById('manualTipo').value;
+            const motivo = document.getElementById('manualMotivo').value;
+            if (!usuarioId || !fechaHora || !tipo || !motivo) {
+                Swal.fire('Error', 'Por favor, completa todos los campos del formulario.', 'error');
+                return;
+            }
+            try {
+                const res = await fetch('/api/fichaje-manual', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({ usuarioId, fechaHora, tipo, motivo })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.message);
+                Swal.fire({ title: '¡Éxito!', text: data.message, icon: 'success', timer: 2000, showConfirmButton: false });
+                e.target.reset();
+                getReport();
+            } catch (error) {
+                Swal.fire('Error', `No se pudo crear el fichaje: ${error.message}`, 'error');
+            }
+        });
+
         function inicializarPagina() {
             document.getElementById("fecha").valueAsDate = new Date();
             const hoy = new Date();
+            const offset = hoy.getTimezoneOffset();
+            const hoyLocal = new Date(hoy.getTime() - (offset*60*1000));
+            document.getElementById('manualFechaHora').value = hoyLocal.toISOString().slice(0, 16);
             selectMes.value = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`;
+            
             getReport();
             loadUsers();
-            poblarSelectorUsuarios();
+            poblarSelectorUsuarios('selectUsuario');
+            poblarSelectorUsuarios('manualUsuario');
         }
 
         // --- EJECUCIÓN INICIAL ---

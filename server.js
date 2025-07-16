@@ -1,5 +1,5 @@
 // =================================================================
-// SERVIDOR PARA LA APLICACIÓN DE CONTROL DE ASISTENCIA (VERSIÓN CON EDICIÓN Y ELIMINACIÓN DE FICHAJES)
+// SERVIDOR PARA LA APLICACIÓN DE CONTROL DE ASISTENCIA (VERSIÓN CON GESTIÓN MANUAL DE FICHAJES)
 // =================================================================
 
 // 1. IMPORTACIÓN DE MÓDULOS
@@ -219,7 +219,7 @@ app.put('/api/registros/:id', authenticateToken, (req, res) => {
     });
 });
 
-// --- **NUEVA RUTA** ADMIN: ELIMINAR REGISTRO DE FICHAJE ---
+// --- RUTA ADMIN: ELIMINAR REGISTRO DE FICHAJE ---
 app.delete('/api/registros/:id', authenticateToken, (req, res) => {
     if (req.user.rol !== 'admin') {
         return res.status(403).json({ message: 'Acceso denegado. Se requiere rol de administrador.' });
@@ -238,6 +238,51 @@ app.delete('/api/registros/:id', authenticateToken, (req, res) => {
             return res.status(404).json({ message: 'Registro no encontrado. No se pudo eliminar.' });
         }
         res.json({ message: 'El registro de fichaje ha sido eliminado correctamente.' });
+    });
+});
+
+// --- **NUEVA RUTA** ADMIN: CREAR FICHAJE MANUAL ---
+app.post('/api/fichaje-manual', authenticateToken, (req, res) => {
+    if (req.user.rol !== 'admin') {
+        return res.status(403).json({ message: 'Acceso denegado.' });
+    }
+
+    const { usuarioId, fechaHora, tipo, motivo } = req.body;
+    const adminId = req.user.id;
+
+    if (!usuarioId || !fechaHora || !tipo || !motivo || motivo.trim() === '') {
+        return res.status(400).json({ message: 'Todos los campos son obligatorios: trabajador, fecha/hora, tipo y motivo.' });
+    }
+
+    const sql = `
+        INSERT INTO registros (
+            usuario_id, 
+            fecha_hora, 
+            tipo, 
+            foto_path, 
+            es_modificado, 
+            fecha_hora_original, 
+            modificado_por_admin_id, 
+            fecha_modificacion, 
+            motivo_modificacion
+        ) VALUES (?, ?, ?, ?, 1, NULL, ?, ?, ?)`;
+
+    const params = [
+        usuarioId,
+        new Date(fechaHora).toISOString(),
+        tipo,
+        null,
+        adminId,
+        new Date().toISOString(),
+        `Creación manual: ${motivo}`
+    ];
+
+    db.run(sql, params, function(err) {
+        if (err) {
+            console.error("Error al crear fichaje manual:", err.message);
+            return res.status(500).json({ message: 'Error al guardar el fichaje en la base de datos.' });
+        }
+        res.status(201).json({ message: 'Fichaje manual creado con éxito.' });
     });
 });
 

@@ -32,6 +32,14 @@ h1, h2 {
 }
 
 /* Formularios y Botones */
+label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+    text-align: left;
+    color: #555;
+}
+
 input[type="date"],
 input[type="text"],
 input[type="password"],
@@ -59,7 +67,6 @@ button {
     transition: all 0.2s;
     width: 100%;
     box-sizing: border-box;
-    /* --- CAMBIO 1: Color de fondo azul por defecto --- */
     background-color: #3498db;
 }
 
@@ -68,7 +75,6 @@ button:hover {
 }
 
 button:disabled {
-    /* --- CAMBIO 2: El estado deshabilitado ahora es un azul más claro --- */
     background-color: #85c1e9 !important;
     cursor: not-allowed;
     opacity: 0.7;
