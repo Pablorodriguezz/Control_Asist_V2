@@ -1,5 +1,5 @@
 // =================================================================
-// SERVIDOR PARA LA APLICACIÓN DE CONTROL DE ASISTENCIA (VERSIÓN CON EDICIÓN DE FICHAJES)
+// SERVIDOR PARA LA APLICACIÓN DE CONTROL DE ASISTENCIA (VERSIÓN CON EDICIÓN Y ELIMINACIÓN DE FICHAJES)
 // =================================================================
 
 // 1. IMPORTACIÓN DE MÓDULOS
@@ -106,7 +106,6 @@ app.get('/api/informe', authenticateToken, (req, res) => {
     const { fecha } = req.query;
     if (!fecha) return res.status(400).json({ message: 'Se requiere una fecha.' });
     
-    // **MODIFICACIÓN**: Añadimos los campos de auditoría a la consulta
     const sql = `
         SELECT 
             r.id, u.nombre, r.fecha_hora, r.tipo, r.foto_path, 
@@ -172,7 +171,7 @@ app.delete('/api/usuarios/:id', authenticateToken, (req, res) => {
     });
 });
 
-// --- **NUEVA RUTA** ADMIN: EDITAR REGISTRO DE FICHAJE ---
+// --- RUTA ADMIN: EDITAR REGISTRO DE FICHAJE ---
 app.put('/api/registros/:id', authenticateToken, (req, res) => {
     if (req.user.rol !== 'admin') {
         return res.status(403).json({ message: 'Acceso denegado.' });
@@ -220,6 +219,27 @@ app.put('/api/registros/:id', authenticateToken, (req, res) => {
     });
 });
 
+// --- **NUEVA RUTA** ADMIN: ELIMINAR REGISTRO DE FICHAJE ---
+app.delete('/api/registros/:id', authenticateToken, (req, res) => {
+    if (req.user.rol !== 'admin') {
+        return res.status(403).json({ message: 'Acceso denegado. Se requiere rol de administrador.' });
+    }
+
+    const registroId = req.params.id;
+    const sql = 'DELETE FROM registros WHERE id = ?';
+
+    db.run(sql, [registroId], function(err) {
+        if (err) {
+            console.error("Error al eliminar el registro:", err.message);
+            return res.status(500).json({ message: 'Error interno del servidor al intentar eliminar.' });
+        }
+        
+        if (this.changes === 0) {
+            return res.status(404).json({ message: 'Registro no encontrado. No se pudo eliminar.' });
+        }
+        res.json({ message: 'El registro de fichaje ha sido eliminado correctamente.' });
+    });
+});
 
 // --- RUTAS DE INFORMES (ADMIN) ---
 app.get('/api/informe-mensual', authenticateToken, (req, res) => {
@@ -290,7 +310,6 @@ app.get('/api/exportar-csv', authenticateToken, (req, res) => {
 // =================================================================
 // INICIO DEL SERVIDOR
 // =================================================================
-// **MODIFICACIÓN**: Añadimos '0.0.0.0' para que sea accesible en la red local
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`Servidor corriendo y accesible en la red en el puerto ${PORT}`);
 });

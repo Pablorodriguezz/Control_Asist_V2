@@ -114,6 +114,7 @@
                             <td>${fotoHtml}</td>
                             <td>
                                 <button class="action-btn btn-reset" onclick="abrirModalEdicion(${row.id}, '${row.fecha_hora}', '${row.nombre}')">Editar</button>
+                                <button class="action-btn btn-delete" onclick="eliminarRegistro(${row.id}, '${row.nombre}', '${fechaHora}')">Eliminar</button>
                             </td>`;
                         tbody.appendChild(tr);
                     });
@@ -165,6 +166,34 @@
                     Swal.fire('Error', `No se pudo actualizar: ${error.message}`, 'error');
                 }
             }
+        }
+
+        async function eliminarRegistro(registroId, nombreUsuario, fechaHoraFormateada) {
+            Swal.fire({
+                title: `¿Estás seguro?`,
+                html: `Se eliminará permanentemente el fichaje de <strong>${nombreUsuario}</strong> de la fecha <strong>${fechaHoraFormateada}</strong>. <br><br><strong>¡Esta acción no se puede revertir!</strong>`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                cancelButtonColor: '#3085d6',
+                confirmButtonText: 'Sí, ¡eliminar!',
+                cancelButtonText: 'Cancelar'
+            }).then(async (result) => {
+                if (result.isConfirmed) {
+                    try {
+                        const res = await fetch(`/api/registros/${registroId}`, {
+                            method: 'DELETE',
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                        const data = await res.json();
+                        if (!res.ok) throw new Error(data.message);
+                        Swal.fire('¡Eliminado!', 'El registro ha sido eliminado con éxito.', 'success');
+                        getReport();
+                    } catch (error) {
+                        Swal.fire('Error', `No se pudo eliminar el registro: ${error.message}`, 'error');
+                    }
+                }
+            });
         }
 
         async function loadUsers() {
@@ -251,8 +280,7 @@
                 const periodos = await res.json();
                 const informeSemanas = {};
                 let totalHorasMesSegundos = 0;
-                const LIMITE_HORAS_SEMANALES_SEC = 40 * 3600;
-
+                
                 for (const periodo of periodos) {
                     const fecha = new Date(periodo.entrada);
                     const numeroSemana = getWeekNumber(fecha);
@@ -271,7 +299,7 @@
                     const semana = informeSemanas[numSemana];
                     const totalSegundosSemana = semana.totalSegundos;
                     let horasExtraSegundos = 0;
-                    if (totalSegundosSemana > (semana.dias.size * 8 * 3600)) { // Un cálculo más preciso
+                    if (totalSegundosSemana > (semana.dias.size * 8 * 3600)) { 
                         horasExtraSegundos = totalSegundosSemana - (semana.dias.size * 8 * 3600);
                     }
                     totalHorasExtraMesSegundos += horasExtraSegundos;
