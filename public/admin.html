@@ -32,7 +32,8 @@
             <div>
                 <select id="selectUsuario" required></select>
                 <input type="month" id="selectMes" required />
-                <button onclick="generarInformeMensual()">Generar Informe</button>
+                <!-- <-- MEJORA: Se añade un ID para poder deshabilitar el botón fácilmente -->
+                <button id="btnGenerarInforme" onclick="generarInformeMensual()">Generar Informe</button>
                 <button id="btnExportar" style="display: none" onclick="exportarCSV()">Exportar a CSV</button>
             </div>
             <div id="informeMensualContainer" style="margin-top: 20px;"></div>
@@ -86,11 +87,11 @@
         async function getReport() {
             const fecha = document.getElementById("fecha").value;
             if (!fecha) return;
+            const tbody = document.querySelector("#reportTable tbody");
             try {
                 const res = await fetch(`/api/informe?fecha=${fecha}`, { headers: { Authorization: `Bearer ${token}` } });
                 if (!res.ok) throw new Error('Error al cargar informe diario');
                 const data = await res.json();
-                const tbody = document.querySelector("#reportTable tbody");
                 tbody.innerHTML = "";
                 if (data.length === 0) {
                     tbody.innerHTML = '<tr><td colspan="5">No hay registros para esta fecha.</td></tr>';
@@ -120,7 +121,7 @@
                 }
             } catch (error) { 
                 console.error("Error en getReport:", error); 
-                document.querySelector("#reportTable tbody").innerHTML = '<tr><td colspan="5">Error al cargar datos.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="5">Error al cargar datos.</td></tr>';
             }
         }
 
@@ -168,18 +169,22 @@
         }
 
         async function loadUsers() {
+            const tbody = document.querySelector("#usersTable tbody");
             try {
                 const res = await fetch("/api/usuarios", { headers: { Authorization: `Bearer ${token}` } });
                 if (!res.ok) throw new Error("No se pudo cargar la lista de usuarios.");
                 const users = await res.json();
-                const tbody = document.querySelector("#usersTable tbody");
                 tbody.innerHTML = "";
                 users.forEach(user => {
                     const tr = document.createElement("tr");
                     tr.innerHTML = `<td>${user.nombre}</td><td>${user.usuario}</td><td>${user.rol}</td><td><button class="action-btn btn-reset" onclick="resetPassword(${user.id}, '${user.nombre}')">Resetear</button><button class="action-btn btn-delete" onclick="deleteUser(${user.id}, '${user.nombre}')">Eliminar</button></td>`;
                     tbody.appendChild(tr);
                 });
-            } catch (error) { console.error("Error en loadUsers:", error); }
+            } catch (error) { 
+                console.error("Error en loadUsers:", error);
+                // <-- MEJORA: Mostrar un error visual al usuario si la petición falla.
+                tbody.innerHTML = '<tr><td colspan="4">Error al cargar la lista de usuarios.</td></tr>';
+            }
         }
 
         async function resetPassword(userId, userName) {
@@ -210,6 +215,7 @@
                         if (!res.ok) throw new Error(data.message);
                         Swal.fire('¡Eliminado!', 'El usuario ha sido eliminado.', 'success');
                         loadUsers();
+                        poblarSelectorUsuarios(); // <-- MEJORA: Actualizar también el selector al eliminar un usuario
                     } catch (error) { Swal.fire('Error', error.message, 'error'); }
                 }
             });
@@ -240,6 +246,9 @@
             const [anio, mes] = mesValue.split('-');
 
             const container = document.getElementById('informeMensualContainer');
+            // <-- MEJORA: Seleccionamos el botón y lo deshabilitamos para evitar doble clic.
+            const btnGenerar = document.getElementById('btnGenerarInforme');
+            btnGenerar.disabled = true;
             container.innerHTML = 'Generando informe...';
             btnExportar.style.display = 'none';
 
@@ -251,8 +260,7 @@
                 const periodos = await res.json();
                 const informeSemanas = {};
                 let totalHorasMesSegundos = 0;
-                const LIMITE_HORAS_SEMANALES_SEC = 40 * 3600;
-
+                
                 for (const periodo of periodos) {
                     const fecha = new Date(periodo.entrada);
                     const numeroSemana = getWeekNumber(fecha);
@@ -271,7 +279,7 @@
                     const semana = informeSemanas[numSemana];
                     const totalSegundosSemana = semana.totalSegundos;
                     let horasExtraSegundos = 0;
-                    if (totalSegundosSemana > (semana.dias.size * 8 * 3600)) { // Un cálculo más preciso
+                    if (totalSegundosSemana > (semana.dias.size * 8 * 3600)) {
                         horasExtraSegundos = totalSegundosSemana - (semana.dias.size * 8 * 3600);
                     }
                     totalHorasExtraMesSegundos += horasExtraSegundos;
@@ -286,6 +294,9 @@
             } catch (error) {
                 Swal.fire('Error', `No se pudo generar el informe: ${error.message}`, 'error');
                 container.innerHTML = '';
+            } finally {
+                // <-- MEJORA: Volvemos a habilitar el botón, tanto si hubo éxito como si hubo error.
+                btnGenerar.disabled = false;
             }
         }
         
@@ -332,6 +343,7 @@
                 Swal.fire({ title: '¡Usuario Creado!', text: data.message, icon: 'success', timer: 2000, showConfirmButton: false });
                 e.target.reset();
                 loadUsers();
+                poblarSelectorUsuarios(); // <-- MEJORA: Actualizar el selector al crear un nuevo usuario
             } catch (error) { Swal.fire('Error', error.message, 'error'); }
         });
 
