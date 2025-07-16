@@ -191,7 +191,7 @@
                     if (!res.ok) throw new Error(data.message);
                     
                     Swal.fire('¡Actualizado!', 'El registro ha sido modificado con éxito.', 'success');
-                    getReport();
+                    getReport(); // Recargamos el informe para ver los cambios
                 } catch (error) {
                     Swal.fire('Error', `No se pudo actualizar: ${error.message}`, 'error');
                 }
@@ -241,9 +241,38 @@
             } catch (error) { console.error("Error en loadUsers:", error); }
         }
 
-        async function resetPassword(userId, userName) { /* ...código sin cambios... */ }
+        async function resetPassword(userId, userName) {
+            const { value: newPassword } = await Swal.fire({
+                title: `Nueva contraseña para ${userName}`, input: 'password', inputLabel: 'Contraseña', inputPlaceholder: 'Introduce la nueva contraseña',
+                showCancelButton: true, confirmButtonText: 'Restablecer', cancelButtonText: 'Cancelar',
+                inputValidator: (value) => !value && '¡Necesitas escribir una contraseña!'
+            });
+            if (newPassword) {
+                try {
+                    const res = await fetch(`/api/usuarios/${userId}/password`, { method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ password: newPassword }) });
+                    const data = await res.json();
+                    if (!res.ok) throw new Error(data.message);
+                    Swal.fire('¡Éxito!', data.message, 'success');
+                } catch (error) { Swal.fire('Error', error.message, 'error'); }
+            }
+        }
 
-        async function deleteUser(userId, userName) { /* ...código sin cambios... */ }
+        async function deleteUser(userId, userName) {
+            Swal.fire({
+                title: `¿Estás seguro de eliminar a ${userName}?`, text: "¡Esta acción no se puede revertir!", icon: 'warning',
+                showCancelButton: true, confirmButtonColor: '#d33', cancelButtonColor: '#3085d6', confirmButtonText: 'Sí, ¡eliminar!', cancelButtonText: 'Cancelar'
+            }).then(async (result) => {
+                if (result.isConfirmed) {
+                    try {
+                        const res = await fetch(`/api/usuarios/${userId}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+                        const data = await res.json();
+                        if (!res.ok) throw new Error(data.message);
+                        Swal.fire('¡Eliminado!', 'El usuario ha sido eliminado.', 'success');
+                        loadUsers();
+                    } catch (error) { Swal.fire('Error', error.message, 'error'); }
+                }
+            });
+        }
 
         async function poblarSelectorUsuarios(selectorId) {
             const selectElement = document.getElementById(selectorId);
@@ -268,14 +297,13 @@
             }
         }
 
-        // --- FUNCIÓN MEJORADA ---
         async function generarInformeMensual() {
             const usuarioId = selectUsuario.value;
             const mesValue = selectMes.value;
             if (!usuarioId) { Swal.fire('Atención', 'Por favor, selecciona un trabajador.', 'info'); return; }
             if (!mesValue) { Swal.fire('Atención', 'Por favor, selecciona un mes.', 'info'); return; }
-            
             const [anio, mes] = mesValue.split('-');
+
             const container = document.getElementById('informeMensualContainer');
             container.innerHTML = 'Generando informe...';
             btnExportar.style.display = 'none';
@@ -283,76 +311,42 @@
             try {
                 const url = `/api/informe-mensual?anio=${anio}&mes=${mes}&usuarioId=${usuarioId}`;
                 const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
-                if (!res.ok) { 
-                    const errData = await res.json().catch(() => ({ message: `Error del servidor: ${res.status}` })); 
-                    throw new Error(errData.message); 
-                }
+                if (!res.ok) { const errData = await res.json().catch(() => ({ message: `Error del servidor: ${res.status}` })); throw new Error(errData.message); }
                 
                 const periodos = await res.json();
-                if (periodos.length === 0) {
-                    container.innerHTML = 'No hay fichajes para este trabajador en el mes seleccionado.';
-                    return;
-                }
-
-                // --- NUEVA LÓGICA DE CÁLCULO ---
-                const LIMITE_HORAS_SEMANALES_SEC = 40 * 3600; // 40 horas
-                const segundosAFormatoHora = (s) => {
-                    if (isNaN(s) || s < 0) s = 0;
-                    const horas = Math.floor(s / 3600);
-                    const minutos = Math.floor((s % 3600) / 60);
-                    const segundos = Math.floor(s % 60);
-                    return `${String(horas).padStart(2, '0')}:${String(minutos).padStart(2, '0')}:${String(segundos).padStart(2, '0')}`;
-                };
-
                 const informeSemanas = {};
+                let totalHorasMesSegundos = 0;
+                
                 for (const periodo of periodos) {
                     const fecha = new Date(periodo.entrada);
                     const numeroSemana = getWeekNumber(fecha);
-                    if (!informeSemanas[numeroSemana]) {
-                        informeSemanas[numeroSemana] = { totalSegundos: 0 };
-                    }
+                    if (!informeSemanas[numeroSemana]) informeSemanas[numeroSemana] = { totalSegundos: 0, dias: new Set() };
                     informeSemanas[numeroSemana].totalSegundos += periodo.duracionSegundos;
+                    informeSemanas[numeroSemana].dias.add(fecha.toLocaleDateString('es-ES'));
+                    totalHorasMesSegundos += periodo.duracionSegundos;
                 }
+
+                let totalHorasExtraMesSegundos = 0;
+                const segundosAFormatoHora = (s) => new Date(s * 1000).toISOString().substr(11, 8);
 
                 let html = `<h3>Informe para ${selectUsuario.options[selectUsuario.selectedIndex].text}</h3>`;
                 html += '<h4>Resumen Semanal:</h4><ul>';
-                
-                let totalHorasMesSegundos = 0;
-                let totalHorasExtraMesSegundos = 0;
-
                 for (const numSemana in informeSemanas) {
-                    const totalSegundosSemana = informeSemanas[numSemana].totalSegundos;
-                    const horasOrdinariasSegundos = Math.min(totalSegundosSemana, LIMITE_HORAS_SEMANALES_SEC);
-                    const horasExtraSegundos = Math.max(0, totalSegundosSemana - LIMITE_HORAS_SEMANALES_SEC);
-                    
-                    totalHorasMesSegundos += totalSegundosSemana;
+                    const semana = informeSemanas[numSemana];
+                    const totalSegundosSemana = semana.totalSegundos;
+                    let horasExtraSegundos = 0;
+                    if (totalSegundosSemana > (semana.dias.size * 8 * 3600)) { 
+                        horasExtraSegundos = totalSegundosSemana - (semana.dias.size * 8 * 3600);
+                    }
                     totalHorasExtraMesSegundos += horasExtraSegundos;
-
-                    html += `<li><strong>Semana ${numSemana}:</strong>
-                                <ul>
-                                    <li>Horas Trabajadas: ${segundosAFormatoHora(totalSegundosSemana)}</li>
-                                    <li style="color: green;">Horas Extra: ${segundosAFormatoHora(horasExtraSegundos)}</li>
-                                </ul>
-                             </li>`;
+                    html += `<li><strong>Semana ${numSemana}:</strong><ul><li>Horas Trabajadas: ${segundosAFormatoHora(totalSegundosSemana)}</li><li>Horas Extra: ${segundosAFormatoHora(horasExtraSegundos)}</li></ul></li>`;
                 }
                 html += '</ul><hr style="margin: 20px 0;">';
-
-                // Resumen mensual
-                const diasLaborables = getDiasLaborables(anio, mes);
-                const horasEsperadasSegundos = diasLaborables * 8 * 3600;
-                const balanceSegundos = totalHorasMesSegundos - horasEsperadasSegundos;
-                const balanceColor = balanceSegundos >= 0 ? 'green' : 'red';
-                const balanceSigno = balanceSegundos >= 0 ? '+' : '';
-
-                html += '<h4>Resumen Mensual:</h4>';
-                html += `<p><strong>Total Horas Trabajadas en el Mes:</strong> ${segundosAFormatoHora(totalHorasMesSegundos)}</p>`;
+                html += `<p><strong>Total Horas en el Mes:</strong> ${segundosAFormatoHora(totalHorasMesSegundos)}</p>`;
                 html += `<p><strong>Total Horas Extra en el Mes:</strong> ${segundosAFormatoHora(totalHorasExtraMesSegundos)}</p>`;
-                html += `<p><strong>Horas Esperadas en el Mes (${diasLaborables} días):</strong> ${segundosAFormatoHora(horasEsperadasSegundos)}</p>`;
-                html += `<p style="font-weight: bold; color: ${balanceColor};"><strong>Balance Mensual:</strong> ${balanceSigno}${segundosAFormatoHora(balanceSegundos)}</p>`;
                 
                 container.innerHTML = html;
-                btnExportar.style.display = 'inline-block';
-
+                if (periodos.length > 0) btnExportar.style.display = 'inline-block';
             } catch (error) {
                 Swal.fire('Error', `No se pudo generar el informe: ${error.message}`, 'error');
                 container.innerHTML = '';
@@ -366,27 +360,70 @@
             return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
         }
 
-        // --- NUEVA FUNCIÓN AUXILIAR ---
-        function getDiasLaborables(anio, mes) {
-            // mes es 1-12
-            let dias = 0;
-            // El día se pone en 0 para obtener el último día del mes anterior
-            const diasEnMes = new Date(anio, mes, 0).getDate(); 
-            for (let dia = 1; dia <= diasEnMes; dia++) {
-                const fecha = new Date(anio, mes - 1, dia);
-                const diaDeLaSemana = fecha.getDay(); // 0 (Domingo) a 6 (Sábado)
-                if (diaDeLaSemana !== 0 && diaDeLaSemana !== 6) {
-                    dias++;
-                }
-            }
-            return dias;
+        async function exportarCSV() {
+            const usuarioId = selectUsuario.value;
+            const [anio, mes] = selectMes.value.split('-');
+            if (!usuarioId) return;
+
+            btnExportar.textContent = 'Exportando...';
+            btnExportar.disabled = true;
+            try {
+                const url = `/api/exportar-csv?anio=${anio}&mes=${mes}&usuarioId=${usuarioId}`;
+                const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
+                if (!res.ok) { const errorData = await res.json().catch(() => ({ message: `Error del servidor: ${res.status}` })); throw new Error(errorData.message); }
+                const blob = await res.blob();
+                const contentDisposition = res.headers.get('content-disposition');
+                let fileName = `informe-${anio}-${mes}.csv`;
+                if (contentDisposition) { const fileNameMatch = contentDisposition.match(/filename="(.+)"/); if (fileNameMatch.length === 2) fileName = fileNameMatch[1]; }
+                const link = document.createElement('a');
+                link.href = window.URL.createObjectURL(blob);
+                link.download = fileName;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                window.URL.revokeObjectURL(link.href);
+            } catch (error) { Swal.fire('Error', `No se pudo exportar el archivo: ${error.message}`, 'error'); } 
+            finally { btnExportar.textContent = 'Exportar a CSV'; btnExportar.disabled = false; }
         }
-
-        async function exportarCSV() { /* ...código sin cambios... */ }
         
-        document.getElementById("createUserForm").addEventListener("submit", async (e) => { /* ...código sin cambios... */ });
+        document.getElementById("createUserForm").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const [nombre, usuario, password, rol] = [e.target.nombre.value, e.target.usuario.value, e.target.password.value, e.target.rol.value];
+            try {
+                const res = await fetch("/api/usuarios", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ nombre, usuario, password, rol }) });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.message);
+                Swal.fire({ title: '¡Usuario Creado!', text: data.message, icon: 'success', timer: 2000, showConfirmButton: false });
+                e.target.reset();
+                loadUsers();
+            } catch (error) { Swal.fire('Error', error.message, 'error'); }
+        });
 
-        document.getElementById("manualAttendanceForm").addEventListener("submit", async (e) => { /* ...código sin cambios... */ });
+        document.getElementById("manualAttendanceForm").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const usuarioId = document.getElementById('manualUsuario').value;
+            const fechaHora = document.getElementById('manualFechaHora').value;
+            const tipo = document.getElementById('manualTipo').value;
+            const motivo = document.getElementById('manualMotivo').value;
+            if (!usuarioId || !fechaHora || !tipo || !motivo) {
+                Swal.fire('Error', 'Por favor, completa todos los campos del formulario.', 'error');
+                return;
+            }
+            try {
+                const res = await fetch('/api/fichaje-manual', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({ usuarioId, fechaHora, tipo, motivo })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.message);
+                Swal.fire({ title: '¡Éxito!', text: data.message, icon: 'success', timer: 2000, showConfirmButton: false });
+                e.target.reset();
+                getReport();
+            } catch (error) {
+                Swal.fire('Error', `No se pudo crear el fichaje: ${error.message}`, 'error');
+            }
+        });
 
         function inicializarPagina() {
             document.getElementById("fecha").valueAsDate = new Date();
