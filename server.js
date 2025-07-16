@@ -13,11 +13,11 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { parseISO, differenceInSeconds, startOfMonth, endOfMonth } = require('date-fns');
 const { Parser } = require('json2csv');
-require('dotenv').config();
+
 // 2. INICIALIZACIÓN Y CONFIGURACIÓN
 const app = express();
 const PORT = process.env.PORT || 3000;
-const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_SECRET = 'tu_secreto_super_secreto_y_largo_y_dificil_de_adivinar_987654';
 
 app.use(cors());
 app.use(express.json());
