@@ -1,17 +1,18 @@
-// database.js (VERSIÓN PARA RAILWAY CON DEPURACIÓN)
+// database.js (VERSIÓN FINAL CON VARIABLE PERSONALIZADA)
 const sqlite3 = require('sqlite3').verbose();
 const bcrypt = require('bcryptjs');
 const path = require('path');
-// prueba
-// Railway nos dará la ruta en una variable de entorno. Si no existe, usamos la carpeta local.
-const dataDir = process.env.RAILWAY_VOLUME_MOUNT_PATH || __dirname;
+
+// ========================================================================
+// USAMOS NUESTRA PROPIA VARIABLE DE ENTORNO PARA FORZAR LA RUTA
+// En Railway, crea una variable de entorno llamada DATABASE_PATH con el valor /data
+// Si la variable no existe (ej. en tu ordenador), usará la carpeta actual.
+// ========================================================================
+const dataDir = process.env.DATABASE_PATH || __dirname;
 const dbPath = path.join(dataDir, 'asistencia.db');
 
-// --- LÍNEA DE DEPURACIÓN AÑADIDA ---
-// Esta línea nos mostrará en los logs de Railway la ruta exacta donde se intenta crear la base de datos.
-// Si todo es correcto, debería mostrar "/data/asistencia.db".
-console.log(`[RAILWAY-VOLUME-CHECK] La ruta de la base de datos es: ${dbPath}`);
-// ------------------------------------
+// El log de depuración ahora usa una etiqueta personalizada para que sea fácil de encontrar
+console.log(`[CUSTOM-VAR-CHECK] La ruta de la base de datos es: ${dbPath}`);
 
 const db = new sqlite3.Database(dbPath, (err) => {
     if (err) {
@@ -21,7 +22,7 @@ const db = new sqlite3.Database(dbPath, (err) => {
     }
 });
 
-// El resto de tu código original se queda exactamente igual
+// El resto del código de inicialización de la base de datos permanece igual
 db.serialize(() => {
     db.run(`CREATE TABLE IF NOT EXISTS usuarios (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
