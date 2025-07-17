@@ -2,7 +2,7 @@
 const sqlite3 = require('sqlite3').verbose();
 const bcrypt = require('bcryptjs');
 const path = require('path');
-
+// prueba
 // Railway nos dará la ruta en una variable de entorno. Si no existe, usamos la carpeta local.
 const dataDir = process.env.RAILWAY_VOLUME_MOUNT_PATH || __dirname;
 const dbPath = path.join(dataDir, 'asistencia.db');
