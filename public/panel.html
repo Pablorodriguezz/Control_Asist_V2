@@ -14,9 +14,6 @@
         <button id="btnSalida" class="btn-fichar" onclick="iniciarFichaje('salida')">Registrar SALIDA</button>
         <p id="statusMessage" style="font-weight: bold;"></p>
 
-        <!-- ===================================== -->
-        <!-- == NUEVA SECCIÓN DE HISTORIAL AÑADIDA == -->
-        <!-- ===================================== -->
         <hr />
         <section class="historial-section">
             <h2>Mi Historial de Fichajes</h2>
@@ -33,20 +30,14 @@
                             <th>Observaciones</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        <!-- Los datos se cargarán aquí con JavaScript -->
-                    </tbody>
+                    <tbody></tbody>
                 </table>
             </div>
         </section>
-        <!-- ===================================== -->
-        <!-- ==   FIN DE LA SECCIÓN AÑADIDA     == -->
-        <!-- ===================================== -->
 
         <button onclick="logout()">Cerrar Sesión</button>
     </div>
 
-    <!-- Modal para la cámara -->
     <div id="cameraModal" class="modal">
         <div class="modal-content">
             <h2>Sonríe para la foto</h2>
@@ -54,7 +45,7 @@
             <p>Tomando foto en 3 segundos...</p>
         </div>
     </div>
-    <canvas id="canvas" style="display:none;"></canvas> <!-- Canvas oculto para procesar la imagen -->
+    <canvas id="canvas" style="display:none;"></canvas>
 
     <script>
         const token = localStorage.getItem('token');
@@ -62,70 +53,49 @@
 
         const [btnEntrada, btnSalida, welcomeP, statusMessageP] = [document.getElementById('btnEntrada'), document.getElementById('btnSalida'), document.getElementById('welcome'), document.getElementById('statusMessage')];
         const [cameraModal, video, canvas] = [document.getElementById('cameraModal'), document.getElementById('video'), document.getElementById('canvas')];
-        let stream; // Variable global para el stream de la cámara
+        let stream;
         
-        // == Lógica del Historial de Fichajes ==
         async function verMisFichajes() {
             const mesValue = document.getElementById('selectMesHistorial').value;
             if (!mesValue) return;
-
             const [anio, mes] = mesValue.split('-');
             const tbody = document.querySelector("#historialTable tbody");
             tbody.innerHTML = '<tr><td colspan="3">Cargando historial...</td></tr>';
-
             try {
                 const url = `/api/mis-registros?anio=${anio}&mes=${mes}`;
                 const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
                 const data = await res.json();
-                
                 if (!res.ok) throw new Error(data.message);
-                
-                tbody.innerHTML = ""; // Limpiar la tabla
-
+                tbody.innerHTML = "";
                 if (data.length === 0) {
                     tbody.innerHTML = '<tr><td colspan="3">No tienes registros para este mes.</td></tr>';
                 } else {
                     data.forEach(registro => {
                         const tr = document.createElement("tr");
                         const fechaHora = new Date(registro.fecha_hora).toLocaleString("es-ES", { dateStyle: "long", timeStyle: "medium" });
-
                         let observaciones = 'Correcto';
                         if (registro.es_modificado) {
                             const fechaOriginal = registro.fecha_hora_original ? new Date(registro.fecha_hora_original).toLocaleString("es-ES") : 'N/A';
                             const motivo = registro.motivo_modificacion || 'N/A';
-                            const title = registro.fecha_hora_original ? `Editado por Admin. Original: ${fechaOriginal}. Motivo: ${motivo}` : `Registro manual creado por Admin. Motivo: ${motivo}`;
+                            const title = registro.fecha_hora_original ? `Editado por Admin. Original: ${fechaOriginal}. Motivo: ${motivo}` : `Registro manual por Admin. Motivo: ${motivo}`;
                             observaciones = `<span title="${title}" style="cursor: help; color: #f39c12; font-weight: bold;">Modificado ✏️</span>`;
                         }
-                        
-                        tr.innerHTML = `
-                            <td>${fechaHora}</td>
-                            <td>${registro.tipo}</td>
-                            <td>${observaciones}</td>
-                        `;
+                        tr.innerHTML = `<td>${fechaHora}</td><td>${registro.tipo}</td><td>${observaciones}</td>`;
                         tbody.appendChild(tr);
                     });
                 }
-            } catch (error) {
-                console.error("Error al ver mis fichajes:", error);
-                tbody.innerHTML = `<tr><td colspan="3" class="error">Error: ${error.message}</td></tr>`;
-            }
+            } catch (error) { tbody.innerHTML = `<tr><td colspan="3" class="error">Error: ${error.message}</td></tr>`; }
         }
 
         try { welcomeP.textContent = `Hola, ${JSON.parse(atob(token.split('.')[1])).nombre}`; } catch (e) { logout(); }
 
-        // == Lógica de la Cámara ==
         async function iniciarFichaje(tipo) {
             cameraModal.style.display = 'flex';
             try {
-                // Pedir acceso a la cámara frontal
                 stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
                 video.srcObject = stream;
-                
-                // Esperar 3 segundos y tomar la foto
                 setTimeout(() => tomarFotoYFichar(tipo), 3000);
-
             } catch (err) {
-                console.error("Error al acceder a la cámara:", err);
                 alert('No se pudo acceder a la cámara. Asegúrate de dar permiso.');
                 cameraModal.style.display = 'none';
             }
@@ -136,17 +106,12 @@
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
             context.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-            // Detener la cámara
             stream.getTracks().forEach(track => track.stop());
             cameraModal.style.display = 'none';
-
-            // Convertir el canvas a un archivo (Blob) y enviarlo
             canvas.toBlob(blob => {
                 const formData = new FormData();
                 formData.append('tipo', tipo);
                 formData.append('foto', blob, 'fichaje.jpeg');
-                
                 enviarFichaje(formData);
             }, 'image/jpeg');
         }
@@ -154,26 +119,17 @@
         async function enviarFichaje(formData) {
             statusMessageP.textContent = 'Enviando registro...';
             try {
-                const res = await fetch('/api/fichar', {
-                    method: 'POST',
-                    headers: { 'Authorization': `Bearer ${token}` },
-                    body: formData
-                });
+                const res = await fetch('/api/fichar', { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: formData });
                 const data = await res.json();
                 statusMessageP.textContent = data.message;
                 if (res.ok) {
-                    inicializarPanel(); // Recargar estado de botones
-                    verMisFichajes();   // Recargar el historial para ver el nuevo fichaje
+                    inicializarPanel();
+                    verMisFichajes();
                 }
-
-            } catch (error) {
-                statusMessageP.textContent = "Error de conexión al fichar.";
-            } finally {
-                setTimeout(() => statusMessageP.textContent = '', 5000);
-            }
+            } catch (error) { statusMessageP.textContent = "Error de conexión."; } 
+            finally { setTimeout(() => statusMessageP.textContent = '', 5000); }
         }
 
-        // == Lógica de Estado de Botones (como antes) ==
         async function inicializarPanel() {
             try {
                 const res = await fetch('/api/estado', { headers: { 'Authorization': `Bearer ${token}` } });
@@ -190,15 +146,12 @@
 
         function logout() { localStorage.removeItem('token'); window.location.href = '/index.html'; }
 
-        // Ejecutar al cargar
         function inicializarPaginaEmpleado() {
-            // Rellenar el selector de mes con el mes actual
             const hoy = new Date();
             const mesActual = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`;
             document.getElementById('selectMesHistorial').value = mesActual;
-
-            inicializarPanel(); // Carga el estado de los botones
-            verMisFichajes();   // Carga el historial del mes actual
+            inicializarPanel();
+            verMisFichajes();
         }
 
         inicializarPaginaEmpleado();

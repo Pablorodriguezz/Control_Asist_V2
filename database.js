@@ -1,59 +1,69 @@
-// database.js (VERSIÓN PARA RAILWAY)
-const sqlite3 = require('sqlite3').verbose();
+// database.js (VERSIÓN PARA POSTGRESQL EN RAILWAY)
+const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
-const path = require('path');
 
-// Railway nos dará la ruta en una variable de entorno. Si no existe, usamos la carpeta local.
-const dataDir = process.env.RAILWAY_VOLUME_MOUNT_PATH || __dirname;
-const dbPath = path.join(dataDir, 'asistencia.db');
-
-const db = new sqlite3.Database(dbPath, (err) => {
-    if (err) {
-        console.error("Error al abrir la base de datos:", err.message);
-    } else {
-        console.log(`Conectado a la base de datos en: ${dbPath}`);
+// Railway proporciona automáticamente la URL de conexión en esta variable de entorno
+const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: {
+        rejectUnauthorized: false // Requerido para conexiones a bases de datos en la nube como la de Railway
     }
 });
 
-// El resto de tu código original se queda exactamente igual
-db.serialize(() => {
-    db.run(`CREATE TABLE IF NOT EXISTS usuarios (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        nombre TEXT NOT NULL,
-        usuario TEXT UNIQUE NOT NULL,
-        password TEXT NOT NULL,
-        rol TEXT NOT NULL CHECK(rol IN ('empleado', 'admin'))
-    )`);
+console.log('Conectando a la base de datos PostgreSQL...');
 
-    db.run(`CREATE TABLE IF NOT EXISTS registros (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    usuario_id INTEGER,
-    fecha_hora DATETIME NOT NULL,
-    tipo TEXT NOT NULL CHECK(tipo IN ('entrada', 'salida')),
-    foto_path TEXT,
-    
-    -- Nuevos campos para la auditoría --
-    es_modificado BOOLEAN DEFAULT 0,
-    fecha_hora_original DATETIME,
-    modificado_por_admin_id INTEGER,
-    fecha_modificacion DATETIME,
-    motivo_modificacion TEXT,
+const initializeDatabase = async () => {
+    try {
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS usuarios (
+                id SERIAL PRIMARY KEY,
+                nombre TEXT NOT NULL,
+                usuario TEXT UNIQUE NOT NULL,
+                password TEXT NOT NULL,
+                rol TEXT NOT NULL CHECK(rol IN ('empleado', 'admin'))
+            );
+        `);
 
-    FOREIGN KEY (usuario_id) REFERENCES usuarios (id) ON DELETE CASCADE,
-    FOREIGN KEY (modificado_por_admin_id) REFERENCES usuarios (id)
-)`);
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS registros (
+                id SERIAL PRIMARY KEY,
+                usuario_id INTEGER REFERENCES usuarios(id) ON DELETE CASCADE,
+                fecha_hora TIMESTAMPTZ NOT NULL,
+                tipo TEXT NOT NULL CHECK(tipo IN ('entrada', 'salida')),
+                foto_path TEXT,
+                es_modificado BOOLEAN DEFAULT FALSE,
+                fecha_hora_original TIMESTAMPTZ,
+                modificado_por_admin_id INTEGER REFERENCES usuarios(id),
+                fecha_modificacion TIMESTAMPTZ,
+                motivo_modificacion TEXT
+            );
+        `);
+        
+        console.log('Tablas "usuarios" y "registros" verificadas/creadas.');
 
-    const adminUser = 'admin';
-    const adminPass = 'admin123';
-    db.get('SELECT * FROM usuarios WHERE usuario = ?', [adminUser], (err, row) => {
-        if (!row) {
-            bcrypt.hash(adminPass, 10, (err, hash) => {
-                db.run('INSERT INTO usuarios (nombre, usuario, password, rol) VALUES (?, ?, ?, ?)',
-                    ['Administrador', adminUser, hash, 'admin']
-                );
-            });
+        // Crear usuario admin si no existe
+        const adminUser = 'admin';
+        const adminPass = 'admin123';
+        const res = await pool.query('SELECT * FROM usuarios WHERE usuario = $1', [adminUser]);
+
+        if (res.rowCount === 0) {
+            const hash = await bcrypt.hash(adminPass, 10);
+            await pool.query(
+                'INSERT INTO usuarios (nombre, usuario, password, rol) VALUES ($1, $2, $3, $4)',
+                ['Administrador', adminUser, hash, 'admin']
+            );
+            console.log('Usuario administrador creado.');
         }
-    });
-});
 
-module.exports = db;
+    } catch (err) {
+        console.error('Error al inicializar la base de datos:', err.stack);
+    }
+};
+
+// Ejecutar la inicialización
+initializeDatabase();
+
+// Exportamos el pool para poder hacer consultas desde server.js
+module.exports = {
+    query: (text, params) => pool.query(text, params),
+};

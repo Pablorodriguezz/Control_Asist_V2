@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Panel de Administrador</title>
     <link rel="stylesheet" href="style.css" />
-    <!-- LIBRERÍA DE NOTIFICACIONES BONITAS -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </head>
 <body>
@@ -13,7 +12,6 @@
         <button class="logout-btn" onclick="logout()">Cerrar Sesión</button>
         <h1>Panel de Administración</h1>
 
-        <!-- SECCIÓN 1: INFORME DE ASISTENCIA DIARIO -->
         <section>
             <h2>Informe de Asistencia Diario</h2>
             <input type="date" id="fecha" onchange="getReport()" />
@@ -26,7 +24,6 @@
         </section>
         <hr />
 
-        <!-- SECCIÓN 2: INFORME MENSUAL POR TRABAJADOR -->
         <section>
             <h2>Informe Mensual por Trabajador</h2>
             <div>
@@ -41,7 +38,6 @@
         </section>
         <hr />
 
-        <!-- SECCIÓN 3: GESTIÓN DE USUARIOS -->
         <section>
             <h2>Gestión de Usuarios</h2>
             <div class="table-container">
@@ -53,7 +49,6 @@
         </section>
         <hr />
 
-        <!-- SECCIÓN 4: CREAR NUEVO USUARIO -->
         <section>
             <h2>Crear Nuevo Usuario</h2>
             <form id="createUserForm">
@@ -69,7 +64,6 @@
         </section>
         <hr />
         
-        <!-- SECCIÓN 5: CREAR FICHAJE MANUAL -->
         <section>
             <h2>Crear Fichaje Manual</h2>
             <form id="manualAttendanceForm">
@@ -77,35 +71,27 @@
                 <select id="manualUsuario" required>
                     <option value="">-- Selecciona un trabajador --</option>
                 </select>
-
                 <label for="manualFechaHora">Fecha y Hora del Fichaje:</label>
                 <input type="datetime-local" id="manualFechaHora" required />
-                
                 <label for="manualTipo">Tipo de Fichaje:</label>
                 <select id="manualTipo" required>
                     <option value="" disabled selected>-- Selecciona tipo --</option>
                     <option value="entrada">Entrada</option>
                     <option value="salida">Salida</option>
                 </select>
-
                 <label for="manualMotivo">Motivo (ej: olvido, error del sistema):</label>
                 <textarea id="manualMotivo" placeholder="Es obligatorio explicar por qué se crea este fichaje." required></textarea>
-
                 <button type="submit">Crear Fichaje Manual</button>
             </form>
         </section>
     </div>
 
     <script>
-        // --- INICIALIZACIÓN Y VARIABLES GLOBALES ---
         const token = localStorage.getItem("token");
         if (!token) window.location.href = "/index.html";
-
         const selectUsuario = document.getElementById('selectUsuario');
         const selectMes = document.getElementById('selectMes');
         const btnExportar = document.getElementById('btnExportar');
-
-        // --- DEFINICIÓN DE FUNCIONES ---
         
         function logout() {
             localStorage.removeItem("token");
@@ -128,7 +114,6 @@
                         const tr = document.createElement("tr");
                         const fechaHora = new Date(row.fecha_hora).toLocaleString("es-ES", { dateStyle: "short", timeStyle: "medium" });
                         const fotoHtml = row.foto_path ? `<a href="${row.foto_path}" target="_blank"><img src="${row.foto_path}" alt="Foto fichaje" class="photo-thumbnail"></a>` : "Sin foto";
-                        
                         let indicadorEditado = '';
                         if (row.es_modificado) {
                             const fechaOriginal = row.fecha_hora_original ? new Date(row.fecha_hora_original).toLocaleString("es-ES") : 'N/A';
@@ -136,92 +121,50 @@
                             const title = row.fecha_hora_original ? `Editado. Original: ${fechaOriginal}. Motivo: ${motivo}` : `Registro manual. Motivo: ${motivo}`;
                             indicadorEditado = `<span title="${title}" style="cursor: help; color: #f39c12; font-weight: bold;"> ✏️</span>`;
                         }
-
-                        tr.innerHTML = `
-                            <td>${row.nombre}</td>
-                            <td>${fechaHora}${indicadorEditado}</td>
-                            <td>${row.tipo}</td>
-                            <td>${fotoHtml}</td>
-                            <td>
-                                <button class="action-btn btn-reset" onclick="abrirModalEdicion(${row.id}, '${row.fecha_hora}', '${row.nombre}')">Editar</button>
-                                <button class="action-btn btn-delete" onclick="eliminarRegistro(${row.id}, '${row.nombre}', '${fechaHora}')">Eliminar</button>
-                            </td>`;
+                        tr.innerHTML = `<td>${row.nombre}</td><td>${fechaHora}${indicadorEditado}</td><td>${row.tipo}</td><td>${fotoHtml}</td><td><button class="action-btn btn-reset" onclick="abrirModalEdicion(${row.id}, '${row.fecha_hora}', '${row.nombre}')">Editar</button><button class="action-btn btn-delete" onclick="eliminarRegistro(${row.id}, '${row.nombre}', '${fechaHora}')">Eliminar</button></td>`;
                         tbody.appendChild(tr);
                     });
                 }
-            } catch (error) { 
-                console.error("Error en getReport:", error); 
-                document.querySelector("#reportTable tbody").innerHTML = '<tr><td colspan="5">Error al cargar datos.</td></tr>';
-            }
+            } catch (error) { document.querySelector("#reportTable tbody").innerHTML = '<tr><td colspan="5">Error al cargar datos.</td></tr>'; }
         }
 
         async function abrirModalEdicion(registroId, fechaHoraActual, nombreUsuario) {
             const fechaParaInput = new Date(fechaHoraActual).toISOString().slice(0, 16);
-
             const { value: formValues } = await Swal.fire({
                 title: `Editar fichaje de ${nombreUsuario}`,
-                html:
-                    `<p style="margin-bottom: 1rem;">Fecha y Hora Actual: ${new Date(fechaHoraActual).toLocaleString()}</p>` +
-                    `<label for="swal-input-fecha">Nueva Fecha y Hora:</label>` +
-                    `<input id="swal-input-fecha" type="datetime-local" value="${fechaParaInput}" class="swal2-input" style="width: auto; margin-top: 0.5rem;">` +
-                    `<textarea id="swal-input-motivo" class="swal2-textarea" placeholder="Motivo de la edición (obligatorio)" style="margin-top: 1rem;"></textarea>`,
-                focusConfirm: false,
-                showCancelButton: true,
-                confirmButtonText: 'Guardar Cambios',
-                cancelButtonText: 'Cancelar',
+                html: `<p style="margin-bottom: 1rem;">Fecha y Hora Actual: ${new Date(fechaHoraActual).toLocaleString()}</p><label for="swal-input-fecha">Nueva Fecha y Hora:</label><input id="swal-input-fecha" type="datetime-local" value="${fechaParaInput}" class="swal2-input" style="width: auto; margin-top: 0.5rem;"><textarea id="swal-input-motivo" class="swal2-textarea" placeholder="Motivo de la edición (obligatorio)" style="margin-top: 1rem;"></textarea>`,
+                focusConfirm: false, showCancelButton: true, confirmButtonText: 'Guardar Cambios', cancelButtonText: 'Cancelar',
                 preConfirm: () => {
                     const nuevaFechaHora = document.getElementById('swal-input-fecha').value;
                     const motivo = document.getElementById('swal-input-motivo').value.trim();
-                    if (!nuevaFechaHora || !motivo) {
-                        Swal.showValidationMessage('Por favor, completa la nueva fecha/hora y el motivo.');
-                        return false;
-                    }
+                    if (!nuevaFechaHora || !motivo) { Swal.showValidationMessage('Por favor, completa la nueva fecha/hora y el motivo.'); return false; }
                     return { nuevaFechaHora, motivo };
                 }
             });
-
             if (formValues) {
                 try {
-                    const res = await fetch(`/api/registros/${registroId}`, {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                        body: JSON.stringify(formValues)
-                    });
+                    const res = await fetch(`/api/registros/${registroId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify(formValues) });
                     const data = await res.json();
                     if (!res.ok) throw new Error(data.message);
-                    
                     Swal.fire('¡Actualizado!', 'El registro ha sido modificado con éxito.', 'success');
-                    getReport(); // Recargamos el informe para ver los cambios
-                } catch (error) {
-                    Swal.fire('Error', `No se pudo actualizar: ${error.message}`, 'error');
-                }
+                    getReport();
+                } catch (error) { Swal.fire('Error', `No se pudo actualizar: ${error.message}`, 'error'); }
             }
         }
 
         async function eliminarRegistro(registroId, nombreUsuario, fechaHoraFormateada) {
             Swal.fire({
-                title: `¿Estás seguro?`,
-                html: `Se eliminará permanentemente el fichaje de <strong>${nombreUsuario}</strong> de la fecha <strong>${fechaHoraFormateada}</strong>. <br><br><strong>¡Esta acción no se puede revertir!</strong>`,
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonColor: '#d33',
-                cancelButtonColor: '#3085d6',
-                confirmButtonText: 'Sí, ¡eliminar!',
-                cancelButtonText: 'Cancelar'
+                title: `¿Estás seguro?`, html: `Se eliminará permanentemente el fichaje de <strong>${nombreUsuario}</strong> de la fecha <strong>${fechaHoraFormateada}</strong>. <br><br><strong>¡Esta acción no se puede revertir!</strong>`,
+                icon: 'warning', showCancelButton: true, confirmButtonColor: '#d33', cancelButtonColor: '#3085d6', confirmButtonText: 'Sí, ¡eliminar!', cancelButtonText: 'Cancelar'
             }).then(async (result) => {
                 if (result.isConfirmed) {
                     try {
-                        const res = await fetch(`/api/registros/${registroId}`, {
-                            method: 'DELETE',
-                            headers: { 'Authorization': `Bearer ${token}` }
-                        });
+                        const res = await fetch(`/api/registros/${registroId}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
                         const data = await res.json();
                         if (!res.ok) throw new Error(data.message);
-                        Swal.fire('¡Eliminado!', 'El registro ha sido eliminado con éxito.', 'success');
+                        Swal.fire('¡Eliminado!', 'El registro ha sido eliminado.', 'success');
                         getReport();
-                    } catch (error) {
-                        Swal.fire('Error', `No se pudo eliminar el registro: ${error.message}`, 'error');
-                    }
+                    } catch (error) { Swal.fire('Error', `No se pudo eliminar: ${error.message}`, 'error'); }
                 }
             });
         }
@@ -269,6 +212,8 @@
                         if (!res.ok) throw new Error(data.message);
                         Swal.fire('¡Eliminado!', 'El usuario ha sido eliminado.', 'success');
                         loadUsers();
+                        poblarSelectorUsuarios('selectUsuario');
+                        poblarSelectorUsuarios('manualUsuario');
                     } catch (error) { Swal.fire('Error', error.message, 'error'); }
                 }
             });
@@ -278,12 +223,9 @@
             const selectElement = document.getElementById(selectorId);
             try {
                 const res = await fetch('/api/usuarios', { headers: { 'Authorization': `Bearer ${token}` } });
-                if (!res.ok) throw new Error('No se pudo poblar el selector de usuarios');
                 const usuarios = await res.json();
-                
                 const defaultOptionHTML = selectElement.querySelector('option[value=""]').outerHTML;
                 selectElement.innerHTML = defaultOptionHTML;
-                
                 usuarios.forEach(user => {
                     if (user.rol === 'empleado') {
                         const option = document.createElement('option');
@@ -292,67 +234,41 @@
                         selectElement.appendChild(option);
                     }
                 });
-            } catch (error) { 
-                console.error(`Error en poblarSelectorUsuarios para #${selectorId}:`, error); 
-            }
+            } catch (error) { console.error(`Error en poblarSelectorUsuarios para #${selectorId}:`, error); }
         }
 
-        // ==============================================================
-        // == ESTA ES LA FUNCIÓN CORREGIDA PARA EL INFORME MENSUAL ==
-        // ==============================================================
         async function generarInformeMensual() {
             const usuarioId = selectUsuario.value;
             const mesValue = selectMes.value;
-            if (!usuarioId) { Swal.fire('Atención', 'Por favor, selecciona un trabajador.', 'info'); return; }
-            if (!mesValue) { Swal.fire('Atención', 'Por favor, selecciona un mes.', 'info'); return; }
+            if (!usuarioId) { Swal.fire('Atención', 'Selecciona un trabajador.', 'info'); return; }
+            if (!mesValue) { Swal.fire('Atención', 'Selecciona un mes.', 'info'); return; }
             const [anio, mes] = mesValue.split('-');
-
             const container = document.getElementById('informeMensualContainer');
             container.innerHTML = 'Generando informe...';
             btnExportar.style.display = 'none';
-
             try {
                 const url = `/api/informe-mensual?anio=${anio}&mes=${mes}&usuarioId=${usuarioId}`;
                 const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
-                if (!res.ok) {
-                    const errData = await res.json().catch(() => ({ message: `Error del servidor: ${res.status}` }));
-                    throw new Error(errData.message);
-                }
-                
-                // La variable ahora se llama 'informe' y es un objeto, no 'periodos' (un array)
+                if (!res.ok) { const errData = await res.json().catch(() => ({ message: `Error: ${res.status}` })); throw new Error(errData.message); }
                 const informe = await res.json();
                 const segundosAFormatoHora = (s) => new Date((s || 0) * 1000).toISOString().substr(11, 8);
-
                 let html = `<h3>Informe para ${selectUsuario.options[selectUsuario.selectedIndex].text}</h3>`;
-                
                 if (Object.keys(informe.resumenSemanas).length === 0) {
                      html += '<p>No hay datos de trabajo para el mes seleccionado.</p>';
                      container.innerHTML = html;
                      return;
                 }
-
                 html += '<h4>Resumen Semanal:</h4><ul>';
-                // Ya no recorremos 'periodos', sino las claves del objeto 'informe.resumenSemanas'
                 for (const numSemana in informe.resumenSemanas) {
                     const semana = informe.resumenSemanas[numSemana];
-                    html += `<li><strong>Semana ${numSemana}:</strong>
-                                <ul>
-                                    <li>Horas Trabajadas: ${segundosAFormatoHora(semana.totalSegundos)}</li>
-                                    <li>Horas Extra (sobre 40h/sem): ${segundosAFormatoHora(semana.horasExtraSegundos)}</li>
-                                </ul>
-                             </li>`;
+                    html += `<li><strong>Semana ${numSemana}:</strong><ul><li>Horas Trabajadas: ${segundosAFormatoHora(semana.totalSegundos)}</li><li>Horas Extra (sobre 40h/sem): ${segundosAFormatoHora(semana.horasExtraSegundos)}</li></ul></li>`;
                 }
                 html += '</ul><hr style="margin: 20px 0;">';
                 html += `<p><strong>Total Horas en el Mes:</strong> ${segundosAFormatoHora(informe.totalHorasMesSegundos)}</p>`;
                 html += `<p><strong>Total Horas Extra en el Mes:</strong> ${segundosAFormatoHora(informe.totalHorasExtraMesSegundos)}</p>`;
-                
                 container.innerHTML = html;
-                if (informe.totalHorasMesSegundos > 0) {
-                    btnExportar.style.display = 'inline-block';
-                }
-
+                if (informe.totalHorasMesSegundos > 0) btnExportar.style.display = 'inline-block';
             } catch (error) {
-                // Aquí se captura el error "periodos is not iterable" si el código antiguo se usa por error
                 Swal.fire('Error', `No se pudo generar el informe: ${error.message}`, 'error');
                 container.innerHTML = '';
             }
@@ -362,13 +278,12 @@
             const usuarioId = selectUsuario.value;
             const [anio, mes] = selectMes.value.split('-');
             if (!usuarioId) return;
-
             btnExportar.textContent = 'Exportando...';
             btnExportar.disabled = true;
             try {
                 const url = `/api/exportar-csv?anio=${anio}&mes=${mes}&usuarioId=${usuarioId}`;
                 const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
-                if (!res.ok) { const errorData = await res.json().catch(() => ({ message: `Error del servidor: ${res.status}` })); throw new Error(errorData.message); }
+                if (!res.ok) { const errorData = await res.json().catch(() => ({ message: `Error: ${res.status}` })); throw new Error(errorData.message); }
                 const blob = await res.blob();
                 const contentDisposition = res.headers.get('content-disposition');
                 let fileName = `informe-${anio}-${mes}.csv`;
@@ -380,7 +295,7 @@
                 link.click();
                 document.body.removeChild(link);
                 window.URL.revokeObjectURL(link.href);
-            } catch (error) { Swal.fire('Error', `No se pudo exportar el archivo: ${error.message}`, 'error'); } 
+            } catch (error) { Swal.fire('Error', `No se pudo exportar: ${error.message}`, 'error'); } 
             finally { btnExportar.textContent = 'Exportar a CSV'; btnExportar.disabled = false; }
         }
         
@@ -394,6 +309,8 @@
                 Swal.fire({ title: '¡Usuario Creado!', text: data.message, icon: 'success', timer: 2000, showConfirmButton: false });
                 e.target.reset();
                 loadUsers();
+                poblarSelectorUsuarios('selectUsuario');
+                poblarSelectorUsuarios('manualUsuario');
             } catch (error) { Swal.fire('Error', error.message, 'error'); }
         });
 
@@ -403,24 +320,15 @@
             const fechaHora = document.getElementById('manualFechaHora').value;
             const tipo = document.getElementById('manualTipo').value;
             const motivo = document.getElementById('manualMotivo').value;
-            if (!usuarioId || !fechaHora || !tipo || !motivo) {
-                Swal.fire('Error', 'Por favor, completa todos los campos del formulario.', 'error');
-                return;
-            }
+            if (!usuarioId || !fechaHora || !tipo || !motivo) { Swal.fire('Error', 'Completa todos los campos.', 'error'); return; }
             try {
-                const res = await fetch('/api/fichaje-manual', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                    body: JSON.stringify({ usuarioId, fechaHora, tipo, motivo })
-                });
+                const res = await fetch('/api/fichaje-manual', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ usuarioId, fechaHora, tipo, motivo }) });
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.message);
                 Swal.fire({ title: '¡Éxito!', text: data.message, icon: 'success', timer: 2000, showConfirmButton: false });
                 e.target.reset();
                 getReport();
-            } catch (error) {
-                Swal.fire('Error', `No se pudo crear el fichaje: ${error.message}`, 'error');
-            }
+            } catch (error) { Swal.fire('Error', `No se pudo crear el fichaje: ${error.message}`, 'error'); }
         });
 
         function inicializarPagina() {
@@ -430,14 +338,12 @@
             const hoyLocal = new Date(hoy.getTime() - (offset*60*1000));
             document.getElementById('manualFechaHora').value = hoyLocal.toISOString().slice(0, 16);
             selectMes.value = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`;
-            
             getReport();
             loadUsers();
             poblarSelectorUsuarios('selectUsuario');
             poblarSelectorUsuarios('manualUsuario');
         }
 
-        // --- EJECUCIÓN INICIAL ---
         inicializarPagina();
     </script>
 </body>
