@@ -13,12 +13,8 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { Parser } = require('json2csv');
 
-// =========================================================================
-// == CAMBIO CLAVE: IMPORTACIÓN ROBUSTA DE LIBRERÍAS DE FECHAS ==
-// =========================================================================
-const dateFns = require('date-fns');
-const dateFnsTz = require('date-fns-tz');
-// =========================================================================
+// NUEVA LIBRERÍA DE FECHAS: LUXON
+const { DateTime, Interval } = require('luxon');
 
 
 // 2. INICIALIZACIÓN Y CONFIGURACIÓN
@@ -126,8 +122,8 @@ app.get('/api/mis-registros', authenticateToken, (req, res) => {
     }
 
     try {
-        const fechaInicio = dateFns.startOfMonth(new Date(anio, mes - 1, 1));
-        const fechaFin = dateFns.endOfMonth(fechaInicio);
+        const fechaInicio = DateTime.fromObject({ year: anio, month: mes, day: 1 }).startOf('month');
+        const fechaFin = fechaInicio.endOf('month');
         
         const sql = `
             SELECT 
@@ -141,7 +137,7 @@ app.get('/api/mis-registros', authenticateToken, (req, res) => {
             ORDER BY fecha_hora DESC
         `;
 
-        db.all(sql, [usuarioId, fechaInicio.toISOString(), fechaFin.toISOString()], (err, rows) => {
+        db.all(sql, [usuarioId, fechaInicio.toUTC().toISO(), fechaFin.toUTC().toISO()], (err, rows) => {
             if (err) {
                 console.error("Error en /api/mis-registros:", err.message);
                 return res.status(500).json({ message: 'Error al obtener tus registros.' });
@@ -178,6 +174,7 @@ app.get('/api/informe', authenticateToken, (req, res) => {
 });
 
 // --- RUTAS DE GESTIÓN DE USUARIOS (ADMIN) ---
+// (Estas rutas no usan fechas, por lo que no cambian)
 app.get('/api/usuarios', authenticateToken, (req, res) => {
     if (req.user.rol !== 'admin') return res.status(403).json({ message: 'Acceso denegado.' });
     db.all("SELECT id, nombre, usuario, rol FROM usuarios ORDER BY nombre", [], (err, rows) => {
@@ -185,7 +182,6 @@ app.get('/api/usuarios', authenticateToken, (req, res) => {
         res.json(rows);
     });
 });
-
 app.post('/api/usuarios', authenticateToken, (req, res) => {
     if (req.user.rol !== 'admin') return res.status(403).json({ message: 'Acceso denegado.' });
     const { nombre, usuario, password, rol } = req.body;
@@ -201,7 +197,6 @@ app.post('/api/usuarios', authenticateToken, (req, res) => {
         });
     });
 });
-
 app.put('/api/usuarios/:id/password', authenticateToken, (req, res) => {
     if (req.user.rol !== 'admin') return res.status(403).json({ message: 'Acceso denegado.' });
     const { password } = req.body;
@@ -215,7 +210,6 @@ app.put('/api/usuarios/:id/password', authenticateToken, (req, res) => {
         });
     });
 });
-
 app.delete('/api/usuarios/:id', authenticateToken, (req, res) => {
     if (req.user.rol !== 'admin') return res.status(403).json({ message: 'Acceso denegado.' });
     if (parseInt(req.params.id, 10) === req.user.id) return res.status(400).json({ message: 'No puedes eliminar tu propia cuenta.' });
@@ -225,45 +219,17 @@ app.delete('/api/usuarios/:id', authenticateToken, (req, res) => {
         res.json({ message: 'Usuario eliminado.' });
     });
 });
-
-// --- RUTA ADMIN: EDITAR REGISTRO DE FICHAJE ---
 app.put('/api/registros/:id', authenticateToken, (req, res) => {
-    if (req.user.rol !== 'admin') {
-        return res.status(403).json({ message: 'Acceso denegado.' });
-    }
-
+    if (req.user.rol !== 'admin') return res.status(403).json({ message: 'Acceso denegado.' });
     const registroId = req.params.id;
     const { nuevaFechaHora, motivo } = req.body;
     const adminId = req.user.id;
-
-    if (!nuevaFechaHora || !motivo || motivo.trim() === '') {
-        return res.status(400).json({ message: 'Se requiere la nueva fecha/hora y un motivo.' });
-    }
-
+    if (!nuevaFechaHora || !motivo || motivo.trim() === '') return res.status(400).json({ message: 'Se requiere la nueva fecha/hora y un motivo.' });
     db.get('SELECT fecha_hora FROM registros WHERE id = ?', [registroId], (err, registroOriginal) => {
         if (err) return res.status(500).json({ message: 'Error en base de datos.' });
         if (!registroOriginal) return res.status(404).json({ message: 'Registro no encontrado.' });
-
-        const sql = `
-            UPDATE registros 
-            SET 
-                fecha_hora = ?, 
-                es_modificado = 1,
-                fecha_hora_original = ?,
-                modificado_por_admin_id = ?,
-                fecha_modificacion = ?,
-                motivo_modificacion = ?
-            WHERE id = ?`;
-        
-        const params = [
-            new Date(nuevaFechaHora).toISOString(),
-            registroOriginal.fecha_hora,
-            adminId,
-            new Date().toISOString(),
-            motivo,
-            registroId
-        ];
-
+        const sql = `UPDATE registros SET fecha_hora = ?, es_modificado = 1, fecha_hora_original = ?, modificado_por_admin_id = ?, fecha_modificacion = ?, motivo_modificacion = ? WHERE id = ?`;
+        const params = [ new Date(nuevaFechaHora).toISOString(), registroOriginal.fecha_hora, adminId, new Date().toISOString(), motivo, registroId ];
         db.run(sql, params, function(err) {
             if (err) {
                 console.error("Error al actualizar el registro:", err.message);
@@ -273,69 +239,30 @@ app.put('/api/registros/:id', authenticateToken, (req, res) => {
         });
     });
 });
-
-// --- RUTA ADMIN: ELIMINAR REGISTRO DE FICHAJE ---
 app.delete('/api/registros/:id', authenticateToken, (req, res) => {
-    if (req.user.rol !== 'admin') {
-        return res.status(403).json({ message: 'Acceso denegado. Se requiere rol de administrador.' });
-    }
-
+    if (req.user.rol !== 'admin') return res.status(403).json({ message: 'Acceso denegado.' });
     const registroId = req.params.id;
     const sql = 'DELETE FROM registros WHERE id = ?';
-
     db.run(sql, [registroId], function(err) {
         if (err) {
             console.error("Error al eliminar el registro:", err.message);
-            return res.status(500).json({ message: 'Error interno del servidor al intentar eliminar.' });
+            return res.status(500).json({ message: 'Error interno del servidor.' });
         }
-        
-        if (this.changes === 0) {
-            return res.status(404).json({ message: 'Registro no encontrado. No se pudo eliminar.' });
-        }
-        res.json({ message: 'El registro de fichaje ha sido eliminado correctamente.' });
+        if (this.changes === 0) return res.status(404).json({ message: 'Registro no encontrado.' });
+        res.json({ message: 'El registro de fichaje ha sido eliminado.' });
     });
 });
-
-// --- RUTA ADMIN: CREAR FICHAJE MANUAL ---
 app.post('/api/fichaje-manual', authenticateToken, (req, res) => {
-    if (req.user.rol !== 'admin') {
-        return res.status(403).json({ message: 'Acceso denegado.' });
-    }
-
+    if (req.user.rol !== 'admin') return res.status(403).json({ message: 'Acceso denegado.' });
     const { usuarioId, fechaHora, tipo, motivo } = req.body;
     const adminId = req.user.id;
-
-    if (!usuarioId || !fechaHora || !tipo || !motivo || motivo.trim() === '') {
-        return res.status(400).json({ message: 'Todos los campos son obligatorios: trabajador, fecha/hora, tipo y motivo.' });
-    }
-
-    const sql = `
-        INSERT INTO registros (
-            usuario_id, 
-            fecha_hora, 
-            tipo, 
-            foto_path, 
-            es_modificado, 
-            fecha_hora_original, 
-            modificado_por_admin_id, 
-            fecha_modificacion, 
-            motivo_modificacion
-        ) VALUES (?, ?, ?, ?, 1, NULL, ?, ?, ?)`;
-
-    const params = [
-        usuarioId,
-        new Date(fechaHora).toISOString(),
-        tipo,
-        null,
-        adminId,
-        new Date().toISOString(),
-        `Creación manual: ${motivo}`
-    ];
-
+    if (!usuarioId || !fechaHora || !tipo || !motivo || motivo.trim() === '') return res.status(400).json({ message: 'Todos los campos son obligatorios.' });
+    const sql = `INSERT INTO registros (usuario_id, fecha_hora, tipo, foto_path, es_modificado, fecha_hora_original, modificado_por_admin_id, fecha_modificacion, motivo_modificacion) VALUES (?, ?, ?, ?, 1, NULL, ?, ?, ?)`;
+    const params = [ usuarioId, new Date(fechaHora).toISOString(), tipo, null, adminId, new Date().toISOString(), `Creación manual: ${motivo}` ];
     db.run(sql, params, function(err) {
         if (err) {
             console.error("Error al crear fichaje manual:", err.message);
-            return res.status(500).json({ message: 'Error al guardar el fichaje en la base de datos.' });
+            return res.status(500).json({ message: 'Error al guardar el fichaje.' });
         }
         res.status(201).json({ message: 'Fichaje manual creado con éxito.' });
     });
@@ -348,58 +275,40 @@ app.get('/api/informe-mensual', authenticateToken, (req, res) => {
     if (!anio || !mes || !usuarioId) return res.status(400).json({ message: 'Parámetros incompletos.' });
 
     try {
-        const fechaInicio = dateFns.startOfMonth(new Date(anio, mes - 1, 1));
-        const fechaFin = dateFns.endOfMonth(fechaInicio);
+        const fechaInicio = DateTime.fromObject({ year: anio, month: mes, day: 1 }).startOf('month');
+        const fechaFin = fechaInicio.endOf('month');
         const sql = `SELECT fecha_hora, tipo FROM registros WHERE usuario_id = ? AND fecha_hora BETWEEN ? AND ? ORDER BY fecha_hora ASC`;
 
-        db.all(sql, [usuarioId, fechaInicio.toISOString(), fechaFin.toISOString()], (err, registros) => {
-            if (err) {
-                console.error("DB Error en /informe-mensual:", err.message);
-                return res.status(500).json({ message: 'Error en la base de datos.' });
-            }
+        db.all(sql, [usuarioId, fechaInicio.toUTC().toISO(), fechaFin.toUTC().toISO()], (err, registros) => {
+            if (err) return res.status(500).json({ message: 'Error en la base de datos.' });
 
             const registrosPorDia = registros.reduce((acc, registro) => {
-                const dia = registro.fecha_hora.split('T')[0];
+                const dia = DateTime.fromISO(registro.fecha_hora).toISODate();
                 if (!acc[dia]) acc[dia] = [];
                 acc[dia].push(registro);
                 return acc;
             }, {});
 
-            const resumenDiario = {};
+            const informe = { resumenSemanas: {}, totalHorasMesSegundos: 0, totalHorasExtraMesSegundos: 0 };
+            
             for (const dia in registrosPorDia) {
                 const registrosDelDia = registrosPorDia[dia];
                 let totalSegundosDia = 0;
                 let entradaActual = null;
                 for (const registro of registrosDelDia) {
+                    const fechaRegistro = DateTime.fromISO(registro.fecha_hora);
                     if (registro.tipo === 'entrada' && !entradaActual) {
-                        entradaActual = registro.fecha_hora;
+                        entradaActual = fechaRegistro;
                     } else if (registro.tipo === 'salida' && entradaActual) {
-                        const duracion = dateFns.differenceInSeconds(dateFns.parseISO(registro.fecha_hora), dateFns.parseISO(entradaActual));
+                        const duracion = fechaRegistro.diff(entradaActual, 'seconds').seconds;
                         if (duracion > 0) totalSegundosDia += duracion;
                         entradaActual = null;
                     }
                 }
-                resumenDiario[dia] = totalSegundosDia;
-            }
-
-            const getWeekNumber = (d) => {
-                d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
-                d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
-                var yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-                return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
-            };
-
-            const informe = { resumenSemanas: {}, totalHorasMesSegundos: 0, totalHorasExtraMesSegundos: 0 };
-
-            for(const dia in resumenDiario) {
-                const segundos = resumenDiario[dia];
-                const fecha = dateFns.parseISO(dia);
-                const numSemana = getWeekNumber(fecha);
-                if (!informe.resumenSemanas[numSemana]) {
-                    informe.resumenSemanas[numSemana] = { totalSegundos: 0, horasExtraSegundos: 0 };
-                }
-                informe.resumenSemanas[numSemana].totalSegundos += segundos;
-                informe.totalHorasMesSegundos += segundos;
+                const numSemana = DateTime.fromISO(dia).weekNumber;
+                if (!informe.resumenSemanas[numSemana]) informe.resumenSemanas[numSemana] = { totalSegundos: 0, horasExtraSegundos: 0 };
+                informe.resumenSemanas[numSemana].totalSegundos += totalSegundosDia;
+                informe.totalHorasMesSegundos += totalSegundosDia;
             }
             
             const umbralSemanalSegundos = 40 * 3600;
@@ -425,23 +334,19 @@ app.get('/api/exportar-csv', authenticateToken, (req, res) => {
     const { anio, mes, usuarioId } = req.query;
     if (!anio || !mes || !usuarioId) return res.status(400).json({ message: 'Faltan parámetros.' });
 
-    const fechaInicio = dateFns.startOfMonth(new Date(anio, mes - 1, 1));
-    const fechaFin = dateFns.endOfMonth(fechaInicio);
+    const fechaInicio = DateTime.fromObject({ year: anio, month: mes, day: 1 }).startOf('month');
+    const fechaFin = fechaInicio.endOf('month');
     const sql = `SELECT u.nombre, r.fecha_hora, r.tipo FROM registros r JOIN usuarios u ON r.usuario_id = u.id WHERE r.usuario_id = ? AND r.fecha_hora BETWEEN ? AND ? ORDER BY r.fecha_hora ASC`;
     const timeZone = 'Europe/Madrid';
 
-    db.all(sql, [usuarioId, fechaInicio.toISOString(), fechaFin.toISOString()], (err, data) => {
+    db.all(sql, [usuarioId, fechaInicio.toUTC().toISO(), fechaFin.toUTC().toISO()], (err, data) => {
         if (err) return res.status(500).json({ message: 'Error al obtener datos.' });
         
         const datosProcesados = data.map(registro => {
-            const fechaUTC = new Date(registro.fecha_hora);
-            
-            // CORRECCIÓN FINAL: Llamamos a las funciones como propiedades de los objetos importados
-            const fechaLocal = dateFnsTz.utcToZonedTime(fechaUTC, timeZone);
-            
+            const fechaLocal = DateTime.fromISO(registro.fecha_hora, { zone: 'utc' }).setZone(timeZone);
             return {
                 "Nombre": registro.nombre,
-                "Fecha y Hora (Local)": dateFnsTz.format(fechaLocal, 'dd/MM/yyyy HH:mm:ss', { timeZone }),
+                "Fecha y Hora (Local)": fechaLocal.toFormat('dd/MM/yyyy HH:mm:ss'),
                 "Tipo": registro.tipo
             };
         });
