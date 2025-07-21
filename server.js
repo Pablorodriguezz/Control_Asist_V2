@@ -11,12 +11,14 @@ const multer = require('multer');
 const db = require('./database.js');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-
-// CAMBIO: Importamos las funciones de esta manera más robusta
-const { parseISO, differenceInSeconds, startOfMonth, endOfMonth } = require('date-fns');
-const { utcToZonedTime, format } = require('date-fns-tz');
-
 const { Parser } = require('json2csv');
+
+// =========================================================================
+// == CAMBIO CLAVE: IMPORTACIÓN ROBUSTA DE LIBRERÍAS DE FECHAS ==
+// =========================================================================
+const dateFns = require('date-fns');
+const dateFnsTz = require('date-fns-tz');
+// =========================================================================
 
 
 // 2. INICIALIZACIÓN Y CONFIGURACIÓN
@@ -124,8 +126,8 @@ app.get('/api/mis-registros', authenticateToken, (req, res) => {
     }
 
     try {
-        const fechaInicio = startOfMonth(new Date(anio, mes - 1, 1));
-        const fechaFin = endOfMonth(fechaInicio);
+        const fechaInicio = dateFns.startOfMonth(new Date(anio, mes - 1, 1));
+        const fechaFin = dateFns.endOfMonth(fechaInicio);
         
         const sql = `
             SELECT 
@@ -346,8 +348,8 @@ app.get('/api/informe-mensual', authenticateToken, (req, res) => {
     if (!anio || !mes || !usuarioId) return res.status(400).json({ message: 'Parámetros incompletos.' });
 
     try {
-        const fechaInicio = startOfMonth(new Date(anio, mes - 1, 1));
-        const fechaFin = endOfMonth(fechaInicio);
+        const fechaInicio = dateFns.startOfMonth(new Date(anio, mes - 1, 1));
+        const fechaFin = dateFns.endOfMonth(fechaInicio);
         const sql = `SELECT fecha_hora, tipo FROM registros WHERE usuario_id = ? AND fecha_hora BETWEEN ? AND ? ORDER BY fecha_hora ASC`;
 
         db.all(sql, [usuarioId, fechaInicio.toISOString(), fechaFin.toISOString()], (err, registros) => {
@@ -372,7 +374,7 @@ app.get('/api/informe-mensual', authenticateToken, (req, res) => {
                     if (registro.tipo === 'entrada' && !entradaActual) {
                         entradaActual = registro.fecha_hora;
                     } else if (registro.tipo === 'salida' && entradaActual) {
-                        const duracion = differenceInSeconds(parseISO(registro.fecha_hora), parseISO(entradaActual));
+                        const duracion = dateFns.differenceInSeconds(dateFns.parseISO(registro.fecha_hora), dateFns.parseISO(entradaActual));
                         if (duracion > 0) totalSegundosDia += duracion;
                         entradaActual = null;
                     }
@@ -391,7 +393,7 @@ app.get('/api/informe-mensual', authenticateToken, (req, res) => {
 
             for(const dia in resumenDiario) {
                 const segundos = resumenDiario[dia];
-                const fecha = parseISO(dia);
+                const fecha = dateFns.parseISO(dia);
                 const numSemana = getWeekNumber(fecha);
                 if (!informe.resumenSemanas[numSemana]) {
                     informe.resumenSemanas[numSemana] = { totalSegundos: 0, horasExtraSegundos: 0 };
@@ -423,8 +425,8 @@ app.get('/api/exportar-csv', authenticateToken, (req, res) => {
     const { anio, mes, usuarioId } = req.query;
     if (!anio || !mes || !usuarioId) return res.status(400).json({ message: 'Faltan parámetros.' });
 
-    const fechaInicio = startOfMonth(new Date(anio, mes - 1, 1));
-    const fechaFin = endOfMonth(fechaInicio);
+    const fechaInicio = dateFns.startOfMonth(new Date(anio, mes - 1, 1));
+    const fechaFin = dateFns.endOfMonth(fechaInicio);
     const sql = `SELECT u.nombre, r.fecha_hora, r.tipo FROM registros r JOIN usuarios u ON r.usuario_id = u.id WHERE r.usuario_id = ? AND r.fecha_hora BETWEEN ? AND ? ORDER BY r.fecha_hora ASC`;
     const timeZone = 'Europe/Madrid';
 
@@ -434,13 +436,12 @@ app.get('/api/exportar-csv', authenticateToken, (req, res) => {
         const datosProcesados = data.map(registro => {
             const fechaUTC = new Date(registro.fecha_hora);
             
-            // CORRECCIÓN: Llamamos a la función directamente como la importamos
-            const fechaLocal = utcToZonedTime(fechaUTC, timeZone);
+            // CORRECCIÓN FINAL: Llamamos a las funciones como propiedades de los objetos importados
+            const fechaLocal = dateFnsTz.utcToZonedTime(fechaUTC, timeZone);
             
             return {
                 "Nombre": registro.nombre,
-                // CORRECCIÓN: Usamos la función format directamente
-                "Fecha y Hora (Local)": format(fechaLocal, 'dd/MM/yyyy HH:mm:ss', { timeZone }),
+                "Fecha y Hora (Local)": dateFnsTz.format(fechaLocal, 'dd/MM/yyyy HH:mm:ss', { timeZone }),
                 "Tipo": registro.tipo
             };
         });
