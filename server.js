@@ -13,7 +13,6 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { parseISO, differenceInSeconds, startOfMonth, endOfMonth } = require('date-fns');
 const { Parser } = require('json2csv');
-// AÑADIMOS LA IMPORTACIÓN PARA ZONAS HORARIAS
 const { format, utcToZonedTime } = require('date-fns-tz');
 
 
@@ -190,6 +189,7 @@ app.post('/api/usuarios', authenticateToken, (req, res) => {
         if (err) return res.status(500).json({ message: 'Error al encriptar.' });
         db.run('INSERT INTO usuarios (nombre, usuario, password, rol) VALUES (?, ?, ?, ?)', [nombre, usuario, hash, rol], function(err) {
             if (err) {
+                // CAMBIO: Usamos err.code para un manejo de errores más estándar
                 if (err.code === 'SQLITE_CONSTRAINT') return res.status(409).json({ message: 'El usuario ya existe.' });
                 return res.status(500).json({ message: 'Error al crear el usuario.' });
             }
@@ -415,9 +415,7 @@ app.get('/api/informe-mensual', authenticateToken, (req, res) => {
     }
 });
 
-// =================================================================
-// == RUTA DE EXPORTACIÓN A CSV CON ZONA HORARIA CORREGIDA ==
-// =================================================================
+
 app.get('/api/exportar-csv', authenticateToken, (req, res) => {
     if (req.user.rol !== 'admin') return res.status(403).json({ message: 'Acceso denegado.' });
     const { anio, mes, usuarioId } = req.query;
@@ -426,30 +424,25 @@ app.get('/api/exportar-csv', authenticateToken, (req, res) => {
     const fechaInicio = startOfMonth(new Date(anio, mes - 1, 1));
     const fechaFin = endOfMonth(fechaInicio);
     const sql = `SELECT u.nombre, r.fecha_hora, r.tipo FROM registros r JOIN usuarios u ON r.usuario_id = u.id WHERE r.usuario_id = ? AND r.fecha_hora BETWEEN ? AND ? ORDER BY r.fecha_hora ASC`;
-
-    // Definimos la zona horaria correcta. Para España es 'Europe/Madrid'.
     const timeZone = 'Europe/Madrid';
 
     db.all(sql, [usuarioId, fechaInicio.toISOString(), fechaFin.toISOString()], (err, data) => {
         if (err) return res.status(500).json({ message: 'Error al obtener datos.' });
-
-        // Procesamos los datos para convertir la hora a la zona local
+        
         const datosProcesados = data.map(registro => {
             const fechaUTC = new Date(registro.fecha_hora);
             const fechaLocal = utcToZonedTime(fechaUTC, timeZone);
             
             return {
                 "Nombre": registro.nombre,
-                // Usamos la nueva fecha convertida y le damos un formato legible
                 "Fecha y Hora (Local)": format(fechaLocal, 'dd/MM/yyyy HH:mm:ss', { timeZone }),
                 "Tipo": registro.tipo
             };
         });
 
-        // Definimos las cabeceras del CSV con los nuevos nombres
         const fields = ["Nombre", "Fecha y Hora (Local)", "Tipo"];
         const json2csvParser = new Parser({ fields });
-        const csv = json2csvParser.parse(datosProcesados); // Usamos los datos ya procesados
+        const csv = json2csvParser.parse(datosProcesados);
 
         res.header('Content-Type', 'text/csv');
         res.attachment(`informe-${anio}-${mes}-usuario-${usuarioId}.csv`);
