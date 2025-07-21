@@ -14,7 +14,7 @@ const jwt = require('jsonwebtoken');
 const { Parser } = require('json2csv');
 
 // NUEVA LIBRERÍA DE FECHAS: LUXON
-const { DateTime, Interval } = require('luxon');
+const { DateTime } = require('luxon');
 
 
 // 2. INICIALIZACIÓN Y CONFIGURACIÓN
@@ -329,6 +329,9 @@ app.get('/api/informe-mensual', authenticateToken, (req, res) => {
 });
 
 
+// =========================================================================
+// == RUTA DE EXPORTACIÓN A CSV CON TOTALES AL FINAL ==
+// =========================================================================
 app.get('/api/exportar-csv', authenticateToken, (req, res) => {
     if (req.user.rol !== 'admin') return res.status(403).json({ message: 'Acceso denegado.' });
     const { anio, mes, usuarioId } = req.query;
@@ -342,6 +345,7 @@ app.get('/api/exportar-csv', authenticateToken, (req, res) => {
     db.all(sql, [usuarioId, fechaInicio.toUTC().toISO(), fechaFin.toUTC().toISO()], (err, data) => {
         if (err) return res.status(500).json({ message: 'Error al obtener datos.' });
         
+        // 1. Procesar los fichajes individuales para el CSV
         const datosProcesados = data.map(registro => {
             const fechaLocal = DateTime.fromISO(registro.fecha_hora, { zone: 'utc' }).setZone(timeZone);
             return {
@@ -351,6 +355,54 @@ app.get('/api/exportar-csv', authenticateToken, (req, res) => {
             };
         });
 
+        // 2. Calcular los totales (reutilizando la lógica de la otra ruta)
+        const registrosPorDia = data.reduce((acc, registro) => {
+            const dia = DateTime.fromISO(registro.fecha_hora).toISODate();
+            if (!acc[dia]) acc[dia] = [];
+            acc[dia].push(registro);
+            return acc;
+        }, {});
+        
+        let totalHorasMesSegundos = 0;
+        let totalHorasExtraMesSegundos = 0;
+        const resumenSemanas = {};
+
+        for (const dia in registrosPorDia) {
+            let totalSegundosDia = 0;
+            let entradaActual = null;
+            for (const registro of registrosPorDia[dia]) {
+                const fechaRegistro = DateTime.fromISO(registro.fecha_hora);
+                if (registro.tipo === 'entrada' && !entradaActual) entradaActual = fechaRegistro;
+                else if (registro.tipo === 'salida' && entradaActual) {
+                    const duracion = fechaRegistro.diff(entradaActual, 'seconds').seconds;
+                    if (duracion > 0) totalSegundosDia += duracion;
+                    entradaActual = null;
+                }
+            }
+            const numSemana = DateTime.fromISO(dia).weekNumber;
+            if (!resumenSemanas[numSemana]) resumenSemanas[numSemana] = { totalSegundos: 0 };
+            resumenSemanas[numSemana].totalSegundos += totalSegundosDia;
+            totalHorasMesSegundos += totalSegundosDia;
+        }
+
+        const umbralSemanalSegundos = 40 * 3600;
+        for(const semana in resumenSemanas) {
+            if(resumenSemanas[semana].totalSegundos > umbralSemanalSegundos) {
+                totalHorasExtraMesSegundos += resumenSemanas[semana].totalSegundos - umbralSemanalSegundos;
+            }
+        }
+
+        // 3. Formatear los totales a un formato de hora HH:MM:SS
+        const segundosAFormatoHora = (s) => DateTime.fromSeconds(s, {zone: 'utc'}).toFormat('HH:mm:ss');
+        const totalHorasFormato = segundosAFormatoHora(totalHorasMesSegundos);
+        const totalExtrasFormato = segundosAFormatoHora(totalHorasExtraMesSegundos);
+
+        // 4. Añadir las filas de resumen al final de los datos
+        datosProcesados.push({}); // Fila vacía para separar
+        datosProcesados.push({ "Nombre": "Total Horas Mes", "Fecha y Hora (Local)": totalHorasFormato });
+        datosProcesados.push({ "Nombre": "Total Horas Extra", "Fecha y Hora (Local)": totalExtrasFormato });
+        
+        // 5. Generar el CSV
         const fields = ["Nombre", "Fecha y Hora (Local)", "Tipo"];
         const json2csvParser = new Parser({ fields });
         const csv = json2csvParser.parse(datosProcesados);
