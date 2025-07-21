@@ -1,18 +1,11 @@
-// database.js (VERSIÓN FINAL CON VARIABLE PERSONALIZADA)
+// database.js (VERSIÓN PARA RAILWAY)
 const sqlite3 = require('sqlite3').verbose();
 const bcrypt = require('bcryptjs');
 const path = require('path');
 
-// ========================================================================
-// USAMOS NUESTRA PROPIA VARIABLE DE ENTORNO PARA FORZAR LA RUTA
-// En Railway, crea una variable de entorno llamada DATABASE_PATH con el valor /data
-// Si la variable no existe (ej. en tu ordenador), usará la carpeta actual.
-// ========================================================================
-const dataDir = process.env.DATABASE_PATH || __dirname;
+// Railway nos dará la ruta en una variable de entorno. Si no existe, usamos la carpeta local.
+const dataDir = process.env.RAILWAY_VOLUME_MOUNT_PATH || __dirname;
 const dbPath = path.join(dataDir, 'asistencia.db');
-
-// El log de depuración ahora usa una etiqueta personalizada para que sea fácil de encontrar
-console.log(`[CUSTOM-VAR-CHECK] La ruta de la base de datos es: ${dbPath}`);
 
 const db = new sqlite3.Database(dbPath, (err) => {
     if (err) {
@@ -22,7 +15,7 @@ const db = new sqlite3.Database(dbPath, (err) => {
     }
 });
 
-// El resto del código de inicialización de la base de datos permanece igual
+// El resto de tu código original se queda exactamente igual
 db.serialize(() => {
     db.run(`CREATE TABLE IF NOT EXISTS usuarios (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -33,45 +26,30 @@ db.serialize(() => {
     )`);
 
     db.run(`CREATE TABLE IF NOT EXISTS registros (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        usuario_id INTEGER,
-        fecha_hora DATETIME NOT NULL,
-        tipo TEXT NOT NULL CHECK(tipo IN ('entrada', 'salida')),
-        foto_path TEXT,
-        
-        -- Nuevos campos para la auditoría --
-        es_modificado BOOLEAN DEFAULT 0,
-        fecha_hora_original DATETIME,
-        modificado_por_admin_id INTEGER,
-        fecha_modificacion DATETIME,
-        motivo_modificacion TEXT,
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    usuario_id INTEGER,
+    fecha_hora DATETIME NOT NULL,
+    tipo TEXT NOT NULL CHECK(tipo IN ('entrada', 'salida')),
+    foto_path TEXT,
+    
+    -- Nuevos campos para la auditoría --
+    es_modificado BOOLEAN DEFAULT 0,
+    fecha_hora_original DATETIME,
+    modificado_por_admin_id INTEGER,
+    fecha_modificacion DATETIME,
+    motivo_modificacion TEXT,
 
-        FOREIGN KEY (usuario_id) REFERENCES usuarios (id) ON DELETE CASCADE,
-        FOREIGN KEY (modificado_por_admin_id) REFERENCES usuarios (id)
-    )`);
+    FOREIGN KEY (usuario_id) REFERENCES usuarios (id) ON DELETE CASCADE,
+    FOREIGN KEY (modificado_por_admin_id) REFERENCES usuarios (id)
+)`);
 
     const adminUser = 'admin';
     const adminPass = 'admin123';
     db.get('SELECT * FROM usuarios WHERE usuario = ?', [adminUser], (err, row) => {
-        if (err) {
-            console.error("Error al buscar usuario admin:", err.message);
-            return;
-        }
         if (!row) {
             bcrypt.hash(adminPass, 10, (err, hash) => {
-                if (err) {
-                    console.error("Error al hashear password de admin:", err.message);
-                    return;
-                }
                 db.run('INSERT INTO usuarios (nombre, usuario, password, rol) VALUES (?, ?, ?, ?)',
-                    ['Administrador', adminUser, hash, 'admin'],
-                    (err) => {
-                        if (err) {
-                            console.error("Error al insertar usuario admin:", err.message);
-                        } else {
-                            console.log("Usuario administrador creado con éxito.");
-                        }
-                    }
+                    ['Administrador', adminUser, hash, 'admin']
                 );
             });
         }

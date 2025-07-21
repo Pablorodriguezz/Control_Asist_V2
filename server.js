@@ -74,12 +74,21 @@ app.post('/api/login', (req, res) => {
 // --- RUTA EMPLEADO: OBTENER ESTADO ---
 app.get('/api/estado', authenticateToken, (req, res) => {
     const usuario_id = req.user.id;
-    db.get('SELECT tipo FROM registros WHERE usuario_id = ? ORDER BY fecha_hora DESC LIMIT 1', [usuario_id], (err, row) => {
+    const hoy = new Date().toISOString().split('T')[0];
+    const sql = `
+        SELECT tipo 
+        FROM registros 
+        WHERE usuario_id = ? AND date(fecha_hora) = ? 
+        ORDER BY fecha_hora DESC 
+        LIMIT 1
+    `;
+    db.get(sql, [usuario_id, hoy], (err, row) => {
         if (err) return res.status(500).json({ message: 'Error al consultar el estado.' });
         const ultimoEstado = row ? row.tipo : 'salida';
         res.json({ estado: ultimoEstado });
     });
 });
+
 
 // --- RUTA EMPLEADO: FICHAJE CON FOTO ---
 app.post('/api/fichar', authenticateToken, upload.single('foto'), (req, res) => {
@@ -99,6 +108,45 @@ app.post('/api/fichar', authenticateToken, upload.single('foto'), (req, res) => 
         res.json({ message: `Fichaje de ${tipo} registrado con foto.` });
     });
 });
+
+// --- RUTA EMPLEADO: OBTENER SU PROPIO HISTORIAL DE FICHAJES ---
+app.get('/api/mis-registros', authenticateToken, (req, res) => {
+    const usuarioId = req.user.id;
+    const { anio, mes } = req.query;
+
+    if (!anio || !mes) {
+        return res.status(400).json({ message: 'Se requieren el año y el mes.' });
+    }
+
+    try {
+        const fechaInicio = startOfMonth(new Date(anio, mes - 1, 1));
+        const fechaFin = endOfMonth(fechaInicio);
+        
+        const sql = `
+            SELECT 
+                fecha_hora, 
+                tipo, 
+                es_modificado, 
+                motivo_modificacion, 
+                fecha_hora_original 
+            FROM registros 
+            WHERE usuario_id = ? AND fecha_hora BETWEEN ? AND ? 
+            ORDER BY fecha_hora DESC
+        `;
+
+        db.all(sql, [usuarioId, fechaInicio.toISOString(), fechaFin.toISOString()], (err, rows) => {
+            if (err) {
+                console.error("Error en /api/mis-registros:", err.message);
+                return res.status(500).json({ message: 'Error al obtener tus registros.' });
+            }
+            res.json(rows);
+        });
+    } catch (e) {
+        console.error("Error procesando la fecha en /mis-registros:", e.message);
+        res.status(500).json({ message: "Error interno del servidor." });
+    }
+});
+
 
 // --- RUTA ADMIN: INFORME DIARIO ---
 app.get('/api/informe', authenticateToken, (req, res) => {
@@ -296,35 +344,67 @@ app.get('/api/informe-mensual', authenticateToken, (req, res) => {
         const fechaInicio = startOfMonth(new Date(anio, mes - 1, 1));
         const fechaFin = endOfMonth(fechaInicio);
         const sql = `SELECT fecha_hora, tipo FROM registros WHERE usuario_id = ? AND fecha_hora BETWEEN ? AND ? ORDER BY fecha_hora ASC`;
-        
+
         db.all(sql, [usuarioId, fechaInicio.toISOString(), fechaFin.toISOString()], (err, registros) => {
             if (err) {
                 console.error("DB Error en /informe-mensual:", err.message);
                 return res.status(500).json({ message: 'Error en la base de datos.' });
             }
 
-            const periodosTrabajados = [];
-            let entradaActual = null;
-            for (const registro of registros) {
-                if (registro.tipo === 'entrada' && !entradaActual) {
-                    entradaActual = registro.fecha_hora;
-                } else if (registro.tipo === 'salida' && entradaActual) {
-                    const fechaEntrada = parseISO(entradaActual);
-                    const fechaSalida = parseISO(registro.fecha_hora);
-                    const duracionSegundos = differenceInSeconds(fechaSalida, fechaEntrada);
+            const registrosPorDia = registros.reduce((acc, registro) => {
+                const dia = registro.fecha_hora.split('T')[0];
+                if (!acc[dia]) acc[dia] = [];
+                acc[dia].push(registro);
+                return acc;
+            }, {});
 
-                    if (duracionSegundos >= 0) {
-                        periodosTrabajados.push({
-                            fecha: entradaActual.split('T')[0],
-                            entrada: entradaActual,
-                            salida: registro.fecha_hora,
-                            duracionSegundos: duracionSegundos
-                        });
+            const resumenDiario = {};
+            for (const dia in registrosPorDia) {
+                const registrosDelDia = registrosPorDia[dia];
+                let totalSegundosDia = 0;
+                let entradaActual = null;
+                for (const registro of registrosDelDia) {
+                    if (registro.tipo === 'entrada' && !entradaActual) {
+                        entradaActual = registro.fecha_hora;
+                    } else if (registro.tipo === 'salida' && entradaActual) {
+                        const duracion = differenceInSeconds(parseISO(registro.fecha_hora), parseISO(entradaActual));
+                        if (duracion > 0) totalSegundosDia += duracion;
+                        entradaActual = null;
                     }
-                    entradaActual = null;
+                }
+                resumenDiario[dia] = totalSegundosDia;
+            }
+
+            const getWeekNumber = (d) => {
+                d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+                d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+                var yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+                return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+            };
+
+            const informe = { resumenSemanas: {}, totalHorasMesSegundos: 0, totalHorasExtraMesSegundos: 0 };
+
+            for(const dia in resumenDiario) {
+                const segundos = resumenDiario[dia];
+                const fecha = parseISO(dia);
+                const numSemana = getWeekNumber(fecha);
+                if (!informe.resumenSemanas[numSemana]) {
+                    informe.resumenSemanas[numSemana] = { totalSegundos: 0, horasExtraSegundos: 0 };
+                }
+                informe.resumenSemanas[numSemana].totalSegundos += segundos;
+                informe.totalHorasMesSegundos += segundos;
+            }
+            
+            const umbralSemanalSegundos = 40 * 3600;
+            for(const semana in informe.resumenSemanas) {
+                const totalSemana = informe.resumenSemanas[semana].totalSegundos;
+                if(totalSemana > umbralSemanalSegundos) {
+                    const extra = totalSemana - umbralSemanalSegundos;
+                    informe.resumenSemanas[semana].horasExtraSegundos = extra;
+                    informe.totalHorasExtraMesSegundos += extra;
                 }
             }
-            res.json(periodosTrabajados);
+            res.json(informe);
         });
     } catch (e) {
         console.error("Error crítico en /informe-mensual:", e.message);
@@ -351,7 +431,7 @@ app.get('/api/exportar-csv', authenticateToken, (req, res) => {
         res.send(csv);
     });
 });
-// prueba
+
 // =================================================================
 // INICIO DEL SERVIDOR
 // =================================================================
