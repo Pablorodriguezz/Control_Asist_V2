@@ -11,9 +11,12 @@ const multer = require('multer');
 const db = require('./database.js');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+
+// CAMBIO: Importamos las funciones de esta manera más robusta
 const { parseISO, differenceInSeconds, startOfMonth, endOfMonth } = require('date-fns');
+const { utcToZonedTime, format } = require('date-fns-tz');
+
 const { Parser } = require('json2csv');
-const { format, utcToZonedTime } = require('date-fns-tz');
 
 
 // 2. INICIALIZACIÓN Y CONFIGURACIÓN
@@ -189,7 +192,6 @@ app.post('/api/usuarios', authenticateToken, (req, res) => {
         if (err) return res.status(500).json({ message: 'Error al encriptar.' });
         db.run('INSERT INTO usuarios (nombre, usuario, password, rol) VALUES (?, ?, ?, ?)', [nombre, usuario, hash, rol], function(err) {
             if (err) {
-                // CAMBIO: Usamos err.code para un manejo de errores más estándar
                 if (err.code === 'SQLITE_CONSTRAINT') return res.status(409).json({ message: 'El usuario ya existe.' });
                 return res.status(500).json({ message: 'Error al crear el usuario.' });
             }
@@ -431,10 +433,13 @@ app.get('/api/exportar-csv', authenticateToken, (req, res) => {
         
         const datosProcesados = data.map(registro => {
             const fechaUTC = new Date(registro.fecha_hora);
+            
+            // CORRECCIÓN: Llamamos a la función directamente como la importamos
             const fechaLocal = utcToZonedTime(fechaUTC, timeZone);
             
             return {
                 "Nombre": registro.nombre,
+                // CORRECCIÓN: Usamos la función format directamente
                 "Fecha y Hora (Local)": format(fechaLocal, 'dd/MM/yyyy HH:mm:ss', { timeZone }),
                 "Tipo": registro.tipo
             };
