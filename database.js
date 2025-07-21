@@ -1,7 +1,15 @@
-// database.js (VERSIÓN FINAL CON FUNCIÓN DE INICIALIZACIÓN)
+// database.js (VERSIÓN BLINDADA CONTRA VARIABLES DE ENTORNO FALTANTES)
 const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 
+// 1. Verificación explícita de la variable de entorno
+if (!process.env.DATABASE_URL) {
+    console.error("Error Crítico: La variable de entorno DATABASE_URL no está definida.");
+    console.error("Asegúrate de que el servicio de PostgreSQL está correctamente vinculado a este servicio en Railway.");
+    process.exit(1); // Detiene la aplicación si no se puede conectar
+}
+
+// 2. Creación del pool (solo si la variable existe)
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
     ssl: {
@@ -13,6 +21,7 @@ const init = async () => {
     try {
         console.log('Iniciando conexión y configuración de la base de datos...');
         
+        // El resto del código es idéntico
         await pool.query(`
             CREATE TABLE IF NOT EXISTS usuarios (
                 id SERIAL PRIMARY KEY,
@@ -57,7 +66,6 @@ const init = async () => {
 
     } catch (err) {
         console.error('Error fatal durante la inicialización de la base de datos:', err.stack);
-        // Si la base de datos no se puede inicializar, la aplicación no debe continuar.
         process.exit(1); 
     }
 };
