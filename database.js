@@ -1,19 +1,18 @@
-// database.js (VERSIÓN PARA POSTGRESQL EN RAILWAY)
+// database.js (VERSIÓN FINAL CON FUNCIÓN DE INICIALIZACIÓN)
 const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 
-// Railway proporciona automáticamente la URL de conexión en esta variable de entorno
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
     ssl: {
-        rejectUnauthorized: false // Requerido para conexiones a bases de datos en la nube como la de Railway
+        rejectUnauthorized: false
     }
 });
 
-console.log('Conectando a la base de datos PostgreSQL...');
-
-const initializeDatabase = async () => {
+const init = async () => {
     try {
+        console.log('Iniciando conexión y configuración de la base de datos...');
+        
         await pool.query(`
             CREATE TABLE IF NOT EXISTS usuarios (
                 id SERIAL PRIMARY KEY,
@@ -39,9 +38,8 @@ const initializeDatabase = async () => {
             );
         `);
         
-        console.log('Tablas "usuarios" y "registros" verificadas/creadas.');
+        console.log('Tablas verificadas/creadas correctamente.');
 
-        // Crear usuario admin si no existe
         const adminUser = 'admin';
         const adminPass = 'admin123';
         const res = await pool.query('SELECT * FROM usuarios WHERE usuario = $1', [adminUser]);
@@ -55,15 +53,16 @@ const initializeDatabase = async () => {
             console.log('Usuario administrador creado.');
         }
 
+        console.log('¡Base de datos lista!');
+
     } catch (err) {
-        console.error('Error al inicializar la base de datos:', err.stack);
+        console.error('Error fatal durante la inicialización de la base de datos:', err.stack);
+        // Si la base de datos no se puede inicializar, la aplicación no debe continuar.
+        process.exit(1); 
     }
 };
 
-// Ejecutar la inicialización
-initializeDatabase();
-
-// Exportamos el pool para poder hacer consultas desde server.js
 module.exports = {
     query: (text, params) => pool.query(text, params),
+    init: init,
 };

@@ -1,15 +1,14 @@
-// server.js (VERSIÓN FINAL PARA POSTGRESQL)
+// server.js (VERSIÓN FINAL CON ARRANQUE CONTROLADO)
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
-const db = require('./database.js');
+const db = require('./database.js'); // Importamos nuestro módulo de DB
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { Parser } = require('json2csv');
 const { DateTime } = require('luxon');
-
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -19,6 +18,7 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
+// ... (El resto de tu código de configuración de multer y middleware authenticateToken se queda igual)
 const uploadDir = path.join(__dirname, 'public/uploads');
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 const storage = multer.diskStorage({
@@ -42,6 +42,9 @@ function authenticateToken(req, res, next) {
     });
 }
 
+// =================================================================
+// DEFINICIÓN DE RUTAS (el código no cambia, solo se queda definido)
+// =================================================================
 app.post('/api/login', async (req, res) => {
     const { usuario, password } = req.body;
     if (!usuario || !password) return res.status(400).json({ message: 'Usuario y contraseña requeridos.' });
@@ -59,6 +62,7 @@ app.post('/api/login', async (req, res) => {
     } catch (err) { res.status(500).json({ message: 'Error del servidor' }); }
 });
 
+// ... (PEGA AQUÍ TODAS LAS DEMÁS RUTAS: /api/estado, /api/fichar, etc. No cambian)
 app.get('/api/estado', authenticateToken, async (req, res) => {
     const usuario_id = req.user.id;
     const sql = `SELECT tipo FROM registros WHERE usuario_id = $1 AND fecha_hora::date = CURRENT_DATE ORDER BY fecha_hora DESC LIMIT 1`;
@@ -270,6 +274,24 @@ app.get('/api/exportar-csv', authenticateToken, async (req, res) => {
     } catch(err) { res.status(500).json({ message: 'Error al exportar.' }); }
 });
 
-app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Servidor corriendo y accesible en la red en el puerto ${PORT}`);
-});
+
+// =================================================================
+// INICIO DEL SERVIDOR (DE FORMA CONTROLADA)
+// =================================================================
+const startServer = async () => {
+    try {
+        // 1. Inicializa la base de datos y espera a que esté lista
+        await db.init();
+        
+        // 2. Solo si la DB está lista, inicia el servidor Express
+        app.listen(PORT, '0.0.0.0', () => {
+            console.log(`Servidor corriendo y accesible en la red en el puerto ${PORT}`);
+        });
+    } catch (error) {
+        console.error("No se pudo iniciar el servidor:", error);
+        process.exit(1);
+    }
+};
+
+// Ejecuta la función de arranque
+startServer();
