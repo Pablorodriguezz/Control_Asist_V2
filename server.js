@@ -320,6 +320,71 @@ app.get('/api/exportar-csv', authenticateToken, async (req, res) => {
     } catch(err) { res.status(500).json({ message: 'Error al exportar.' }); }
 });
 
+// Helper para calcular días naturales (incluye fines de semana)
+function calcularDiasNaturales(fechaInicio, fechaFin) {
+    const inicio = DateTime.fromISO(fechaInicio);
+    const fin = DateTime.fromISO(fechaFin);
+    
+    // El diff en días + 1 para incluir el día de inicio
+    const diff = fin.diff(inicio, 'days').toObject();
+    return diff.days + 1;
+}
+
+// OBTENER todas las vacaciones aprobadas para el calendario
+app.get('/api/vacaciones', authenticateToken, async (req, res) => {
+    if (req.user.rol !== 'admin') return res.sendStatus(403);
+    try {
+        const sql = `
+            SELECT v.id, v.fecha_inicio, v.fecha_fin, u.nombre 
+            FROM vacaciones v 
+            JOIN usuarios u ON v.usuario_id = u.id 
+            WHERE v.estado = 'aprobada'`;
+        const { rows } = await db.query(sql);
+        res.json(rows);
+    } catch(err) { res.status(500).json({ message: 'Error al obtener vacaciones.' }); }
+});
+
+// AÑADIR un nuevo periodo de vacaciones
+app.post('/api/vacaciones', authenticateToken, async (req, res) => {
+    if (req.user.rol !== 'admin') return res.sendStatus(403);
+    const { usuarioId, fechaInicio, fechaFin } = req.body;
+    if (!usuarioId || !fechaInicio || !fechaFin) return res.status(400).json({ message: 'Faltan datos.' });
+    try {
+        const sql = 'INSERT INTO vacaciones (usuario_id, fecha_inicio, fecha_fin) VALUES ($1, $2, $3)';
+        await db.query(sql, [usuarioId, fechaInicio, fechaFin]);
+        res.status(201).json({ message: 'Vacaciones registradas correctamente.' });
+    } catch(err) { res.status(500).json({ message: 'Error al registrar las vacaciones.' }); }
+});
+
+// CALCULAR y OBTENER los días restantes para un usuario
+app.get('/api/usuarios/:id/vacaciones-restantes', authenticateToken, async (req, res) => {
+    if (req.user.rol !== 'admin') return res.sendStatus(403);
+    const { id } = req.params;
+    const anioActual = new Date().getFullYear();
+    try {
+        // 1. Obtener los días totales que le corresponden
+        const resUsuario = await db.query('SELECT dias_vacaciones_anuales FROM usuarios WHERE id = $1', [id]);
+        if (resUsuario.rowCount === 0) return res.status(404).json({ message: 'Usuario no encontrado.' });
+        const diasTotales = resUsuario.rows[0].dias_vacaciones_anuales || 30;
+
+        // 2. Obtener las vacaciones ya tomadas y aprobadas en el año actual
+        const sqlVacaciones = `
+            SELECT fecha_inicio, fecha_fin 
+            FROM vacaciones 
+            WHERE usuario_id = $1 AND estado = 'aprobada' AND EXTRACT(YEAR FROM fecha_inicio) = $2`;
+        const resVacaciones = await db.query(sqlVacaciones, [id, anioActual]);
+
+        // 3. Calcular los días naturales gastados
+        let diasGastados = 0;
+        resVacaciones.rows.forEach(vac => {
+            diasGastados += calcularDiasNaturales(vac.fecha_inicio, vac.fecha_fin);
+        });
+
+        const diasRestantes = diasTotales - diasGastados;
+        res.json({ diasTotales, diasGastados, diasRestantes });
+    } catch(err) { res.status(500).json({ message: 'Error al calcular días restantes.' }); }
+});
+
 
 const startServer = async () => {
     try {

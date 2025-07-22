@@ -1,15 +1,13 @@
-// database.js (VERSIÓN BLINDADA CONTRA VARIABLES DE ENTORNO FALTANTES)
+// database.js (COMPLETO CON VACACIONES)
 const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 
-// 1. Verificación explícita de la variable de entorno
 if (!process.env.DATABASE_URL) {
     console.error("Error Crítico: La variable de entorno DATABASE_URL no está definida.");
     console.error("Asegúrate de que el servicio de PostgreSQL está correctamente vinculado a este servicio en Railway.");
-    process.exit(1); // Detiene la aplicación si no se puede conectar
+    process.exit(1);
 }
 
-// 2. Creación del pool (solo si la variable existe)
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
     ssl: {
@@ -21,16 +19,25 @@ const init = async () => {
     try {
         console.log('Iniciando conexión y configuración de la base de datos...');
         
-        // El resto del código es idéntico
         await pool.query(`
             CREATE TABLE IF NOT EXISTS usuarios (
                 id SERIAL PRIMARY KEY,
                 nombre TEXT NOT NULL,
                 usuario TEXT UNIQUE NOT NULL,
                 password TEXT NOT NULL,
-                rol TEXT NOT NULL CHECK(rol IN ('empleado', 'admin'))
+                rol TEXT NOT NULL CHECK(rol IN ('empleado', 'admin')),
+                dias_vacaciones_anuales INTEGER DEFAULT 30
             );
         `);
+
+        const resColumna = await pool.query(`
+            SELECT column_name FROM information_schema.columns 
+            WHERE table_name='usuarios' AND column_name='dias_vacaciones_anuales'
+        `);
+        if (resColumna.rowCount === 0) {
+            await pool.query('ALTER TABLE usuarios ADD COLUMN dias_vacaciones_anuales INTEGER DEFAULT 30');
+            console.log('Columna "dias_vacaciones_anuales" añadida a la tabla "usuarios" con valor por defecto 30.');
+        }
 
         await pool.query(`
             CREATE TABLE IF NOT EXISTS registros (
@@ -46,8 +53,19 @@ const init = async () => {
                 motivo_modificacion TEXT
             );
         `);
+
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS vacaciones (
+                id SERIAL PRIMARY KEY,
+                usuario_id INTEGER REFERENCES usuarios(id) ON DELETE CASCADE,
+                fecha_inicio DATE NOT NULL,
+                fecha_fin DATE NOT NULL,
+                estado TEXT NOT NULL CHECK(estado IN ('aprobada', 'pendiente', 'rechazada')) DEFAULT 'aprobada',
+                comentarios TEXT
+            );
+        `);
         
-        console.log('Tablas verificadas/creadas correctamente.');
+        console.log('Tablas (usuarios, registros, vacaciones) verificadas/creadas correctamente.');
 
         const adminUser = 'admin';
         const adminPass = 'admin123';
@@ -74,4 +92,3 @@ module.exports = {
     query: (text, params) => pool.query(text, params),
     init: init,
 };
-//prueba
