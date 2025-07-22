@@ -12,6 +12,51 @@ body {
     align-items: center;
     min-height: calc(100vh - 40px);
 }
+/* =================================
+   NUEVOS ESTILOS PARA MENÚ ADMIN
+   ================================= */
+
+/* Habilita el desplazamiento suave en toda la página */
+html {
+    scroll-behavior: smooth;
+    scroll-padding-top: 20px; /* Evita que el título quede oculto bajo el menú fijo (ajustar si tienes menú fijo) */
+}
+
+/* Estilos para el contenedor del menú */
+.admin-nav {
+    margin-bottom: 25px;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 15px;
+}
+
+.admin-nav ul {
+    list-style-type: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-wrap: wrap; /* Permite que los botones pasen a la siguiente línea en pantallas pequeñas */
+    justify-content: center;
+    gap: 10px; /* Espacio entre los botones */
+}
+
+.admin-nav li a {
+    display: block;
+    background-color: #ecf0f1;
+    color: #2c3e50;
+    padding: 10px 15px;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 500;
+    font-size: 14px;
+    transition: background-color 0.2s, color 0.2s;
+    border: 1px solid #bdc3c7;
+}
+
+.admin-nav li a:hover {
+    background-color: #3498db;
+    color: white;
+    border-color: #2980b9;
+}
 .container {
     background-color: white;
     padding: 20px;
