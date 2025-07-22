@@ -1,4 +1,4 @@
-// server.js (VERSIÓN CORREGIDA - SIN ERRORES DE SINTAXIS)
+// server.js (VERSIÓN FINAL CON CORRECCIÓN DE FECHAS)
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
@@ -19,12 +19,10 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
-// RUTA PARA HEALTH CHECK DE RAILWAY
 app.get('/', (req, res) => {
     res.status(200).send('OK: Health check passed');
 });
 
-// Configuración del cliente S3 para Cloudflare R2
 const s3Client = new S3Client({
     region: 'auto',
     endpoint: process.env.AWS_ENDPOINT,
@@ -34,7 +32,6 @@ const s3Client = new S3Client({
     },
 });
 
-// Configuración de Multer para guardar en memoria
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
 
@@ -49,10 +46,7 @@ function authenticateToken(req, res, next) {
     });
 }
 
-// =================================================================
-// RUTAS PRINCIPALES
-// =================================================================
-
+// ... (Rutas de login, fichar, etc. que no cambian) ...
 app.post('/api/login', async (req, res) => {
     const { usuario, password } = req.body;
     if (!usuario || !password) return res.status(400).json({ message: 'Usuario y contraseña requeridos.' });
@@ -89,6 +83,8 @@ app.post('/api/fichar', authenticateToken, upload.single('foto'), async (req, re
         res.status(500).json({ message: 'Error al procesar el fichaje.' });
     }
 });
+
+// ... (El resto de rutas que no cambian)
 
 app.get('/api/estado', authenticateToken, async (req, res) => {
     const usuario_id = req.user.id;
@@ -287,13 +283,16 @@ app.get('/api/exportar-csv', authenticateToken, async (req, res) => {
     } catch(err) { res.status(500).json({ message: 'Error al exportar.' }); }
 });
 
+
 // =================================================================
 // RUTAS PARA GESTIÓN DE VACACIONES
 // =================================================================
 
 function calcularDiasNaturales(fechaInicio, fechaFin) {
-    const inicio = DateTime.fromISO(fechaInicio);
-    const fin = DateTime.fromISO(fechaFin);
+    // CORRECCIÓN: Usamos fromJSDate para interpretar correctamente el objeto Date de la DB
+    const inicio = DateTime.fromJSDate(new Date(fechaInicio));
+    const fin = DateTime.fromJSDate(new Date(fechaFin));
+    
     const diff = fin.diff(inicio, 'days').toObject();
     return diff.days + 1;
 }
@@ -328,8 +327,6 @@ app.post('/api/vacaciones', authenticateToken, async (req, res) => {
     } catch(err) { res.status(500).json({ message: 'Error al registrar las vacaciones.' }); }
 });
 
-// server.js - Reemplazar esta ruta
-
 app.get('/api/usuarios/:id/vacaciones-restantes', authenticateToken, async (req, res) => {
     if (req.user.rol !== 'admin') return res.sendStatus(403);
     const { id } = req.params;
@@ -337,19 +334,13 @@ app.get('/api/usuarios/:id/vacaciones-restantes', authenticateToken, async (req,
     try {
         const resUsuario = await db.query('SELECT dias_vacaciones_anuales FROM usuarios WHERE id = $1', [id]);
         if (resUsuario.rowCount === 0) return res.status(404).json({ message: 'Usuario no encontrado.' });
-        
-        // --- CAMBIO IMPORTANTE ---
-        // Nos aseguramos de que si el valor es NULL en la DB, lo tratemos como 30.
         const diasTotales = resUsuario.rows[0].dias_vacaciones_anuales === null ? 30 : resUsuario.rows[0].dias_vacaciones_anuales;
-
         const sqlVacaciones = `SELECT fecha_inicio, fecha_fin FROM vacaciones WHERE usuario_id = $1 AND estado = 'aprobada' AND EXTRACT(YEAR FROM fecha_inicio) = $2`;
         const resVacaciones = await db.query(sqlVacaciones, [id, anioActual]);
-        
         let diasGastados = 0;
         resVacaciones.rows.forEach(vac => {
             diasGastados += calcularDiasNaturales(vac.fecha_inicio, vac.fecha_fin);
         });
-
         const diasRestantes = diasTotales - diasGastados;
         res.json({ diasTotales, diasGastados, diasRestantes });
     } catch(err) {
@@ -362,7 +353,6 @@ app.get('/api/usuarios/:id/vacaciones-restantes', authenticateToken, async (req,
 app.get('/api/fix-vacation-days', authenticateToken, async(req, res) => {
     if (req.user.rol !== 'admin') return res.sendStatus(403);
     try {
-        // Este comando actualiza a 30 días a todos los empleados que tengan el campo a NULL
         await db.query("UPDATE usuarios SET dias_vacaciones_anuales = 30 WHERE rol = 'empleado' AND dias_vacaciones_anuales IS NULL");
         res.send('Datos de vacaciones de usuarios existentes actualizados a 30.');
     } catch (e) {
