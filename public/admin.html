@@ -406,26 +406,52 @@
             } catch (error) { Swal.fire('Error', `No se pudo asignar: ${error.message}`, 'error'); }
         });
         
-        function inicializarPagina() {
-            document.getElementById("fecha").valueAsDate = new Date();
-            const hoy = new Date(), offset = hoy.getTimezoneOffset(), hoyLocal = new Date(hoy.getTime() - (offset*60*1000));
-            document.getElementById('manualFechaHora').value = hoyLocal.toISOString().slice(0, 16);
-            selectMes.value = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`;
-            getReport();
-            loadUsers();
-            poblarSelectorUsuarios('selectUsuario');
-            poblarSelectorUsuarios('manualUsuario');
-            poblarSelectorUsuarios('vacacionesUsuario');
-            inicializarCalendario();
-            const fechaInicioInput = document.getElementById('fechaInicio'), fechaFinInput = document.getElementById('fechaFin');
-            fechaInicioInput.addEventListener('change', () => {
-                const fechaInicioSeleccionada = fechaInicioInput.value;
-                if (fechaInicioSeleccionada) {
-                    fechaFinInput.value = fechaInicioSeleccionada;
-                    fechaFinInput.min = fechaInicioSeleccionada;
+        // admin.html - Reemplazar la función entera
+
+function inicializarCalendario() {
+    const calendarioEl = document.getElementById('calendarioVacaciones');
+    calendario = new FullCalendar.Calendar(calendarioEl, {
+        initialView: 'dayGridMonth',
+        locale: 'es',
+        headerToolbar: {
+            left: 'prev,next today',
+            center: 'title',
+            right: 'dayGridMonth,timeGridWeek,listWeek'
+        },
+        // --- AQUÍ ESTÁ EL CAMBIO ---
+        events: function(fetchInfo, successCallback, failureCallback) {
+            fetch('/api/vacaciones', {
+                method: 'GET',
+                headers: {
+                    // La cabecera se construye aquí, asegurando que el token es el correcto
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
                 }
+            })
+            .then(res => {
+                if (!res.ok) {
+                    throw new Error('Respuesta no válida del servidor');
+                }
+                return res.json();
+            })
+            .then(data => {
+                // Transformamos los datos aquí antes de pasarlos al calendario
+                const eventosTransformados = data.map(evento => ({
+                    id: evento.id,
+                    title: evento.nombre,
+                    start: evento.fecha_inicio,
+                    end: new Date(new Date(evento.fecha_fin).getTime() + 86400000).toISOString().split('T')[0]
+                }));
+                successCallback(eventosTransformados);
+            })
+            .catch(error => {
+                failureCallback(error);
+                Swal.fire('Error', 'No se pudieron cargar las vacaciones en el calendario.', 'error');
             });
         }
+        // --- FIN DEL CAMBIO ---
+    });
+    calendario.render();
+}
 
         inicializarPagina();
     </script>
