@@ -1,14 +1,18 @@
-// server.js (VERSIÓN FINAL CON ARRANQUE CONTROLADO)
+// server.js (VERSIÓN FINAL CON CLOUDFLARE R2)
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-const fs = require('fs');
+// const fs = require('fs'); // ELIMINADO: Ya no necesitamos manejar el sistema de archivos para las fotos.
 const multer = require('multer');
-const db = require('./database.js'); // Importamos nuestro módulo de DB
+const db = require('./database.js');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { Parser } = require('json2csv');
 const { DateTime } = require('luxon');
+
+// NUEVO: Importamos el cliente S3 de AWS y el módulo crypto
+const { S3Client, PutObjectCommand } = require("@aws-sdk/client-s3");
+const crypto = require('crypto');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -18,18 +22,25 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
-// ... (El resto de tu código de configuración de multer y middleware authenticateToken se queda igual)
-const uploadDir = path.join(__dirname, 'public/uploads');
-if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => cb(null, uploadDir),
-    filename: (req, file, cb) => {
-        const userId = req.user ? req.user.id : 'unknown';
-        cb(null, `${Date.now()}-${userId}.jpeg`);
-    }
+// NUEVO: Configuración del cliente S3 para apuntar a Cloudflare R2
+// Leemos las variables de entorno que configuraste en Railway
+const s3Client = new S3Client({
+    region: 'auto', // Requerido por Cloudflare
+    endpoint: process.env.AWS_ENDPOINT, // La URL del endpoint de tu cuenta
+    credentials: {
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+    },
 });
+
+// CAMBIADO: Configuración de Multer
+// En lugar de guardar en disco (diskStorage), guardamos la foto en la memoria (memoryStorage)
+// Esto nos da un "buffer" con los datos del archivo, listo para ser enviado a R2.
+const storage = multer.memoryStorage();
 const upload = multer({ storage });
-app.use('/uploads', express.static(uploadDir));
+
+// ELIMINADO: Ya no necesitamos servir la carpeta /uploads estáticamente
+// app.use('/uploads', express.static(uploadDir));
 
 function authenticateToken(req, res, next) {
     const authHeader = req.headers['authorization'];
@@ -43,8 +54,55 @@ function authenticateToken(req, res, next) {
 }
 
 // =================================================================
-// DEFINICIÓN DE RUTAS (el código no cambia, solo se queda definido)
+// RUTA DE FICHAJE - ¡AQUÍ ESTÁ LA MAGIA!
 // =================================================================
+app.post('/api/fichar', authenticateToken, upload.single('foto'), async (req, res) => {
+    const { tipo } = req.body;
+    const usuario_id = req.user.id;
+    const fecha_hora = new Date();
+
+    if (!req.file) {
+        return res.status(400).json({ message: 'Falta foto.' });
+    }
+    if (!tipo || (tipo !== 'entrada' && tipo !== 'salida')) {
+        return res.status(400).json({ message: 'Tipo inválido.' });
+    }
+
+    try {
+        // NUEVO: Generamos un nombre de archivo único y seguro
+        const fileName = `${crypto.randomBytes(16).toString('hex')}.jpeg`;
+
+        // NUEVO: Creamos el comando para subir el archivo a R2
+        const putCommand = new PutObjectCommand({
+            Bucket: process.env.R2_BUCKET_NAME, // El nombre de tu bucket
+            Key: fileName,                       // El nombre único del archivo
+            Body: req.file.buffer,               // Los datos de la imagen desde la memoria
+            ContentType: req.file.mimetype,      // El tipo de contenido (ej: 'image/jpeg')
+        });
+
+        // NUEVO: Enviamos el comando a R2
+        await s3Client.send(putCommand);
+
+        // CAMBIADO: Construimos la URL pública completa de la foto
+        const foto_path = `${process.env.R2_PUBLIC_URL}/${fileName}`;
+
+        // El resto es igual: insertamos la nueva URL en la base de datos
+        const sql = 'INSERT INTO registros (usuario_id, fecha_hora, tipo, foto_path) VALUES ($1, $2, $3, $4)';
+        await db.query(sql, [usuario_id, fecha_hora, tipo, foto_path]);
+
+        res.json({ message: `Fichaje de ${tipo} registrado.` });
+        
+    } catch (err) {
+        console.error("Error al subir a R2 o guardar en DB:", err);
+        res.status(500).json({ message: 'Error al procesar el fichaje.' });
+    }
+});
+
+
+// =================================================================
+// EL RESTO DE RUTAS NO CAMBIAN
+// =================================================================
+
 app.post('/api/login', async (req, res) => {
     const { usuario, password } = req.body;
     if (!usuario || !password) return res.status(400).json({ message: 'Usuario y contraseña requeridos.' });
@@ -62,7 +120,6 @@ app.post('/api/login', async (req, res) => {
     } catch (err) { res.status(500).json({ message: 'Error del servidor' }); }
 });
 
-// ... (PEGA AQUÍ TODAS LAS DEMÁS RUTAS: /api/estado, /api/fichar, etc. No cambian)
 app.get('/api/estado', authenticateToken, async (req, res) => {
     const usuario_id = req.user.id;
     const sql = `SELECT tipo FROM registros WHERE usuario_id = $1 AND fecha_hora::date = CURRENT_DATE ORDER BY fecha_hora DESC LIMIT 1`;
@@ -71,20 +128,6 @@ app.get('/api/estado', authenticateToken, async (req, res) => {
         const ultimoEstado = result.rows.length > 0 ? result.rows[0].tipo : 'salida';
         res.json({ estado: ultimoEstado });
     } catch (err) { res.status(500).json({ message: 'Error al consultar el estado.' }); }
-});
-
-app.post('/api/fichar', authenticateToken, upload.single('foto'), async (req, res) => {
-    const { tipo } = req.body;
-    const usuario_id = req.user.id;
-    const fecha_hora = new Date();
-    const foto_path = req.file ? `/uploads/${req.file.filename}` : null;
-    if (!tipo || (tipo !== 'entrada' && tipo !== 'salida')) return res.status(400).json({ message: 'Tipo inválido.' });
-    if (!foto_path) return res.status(400).json({ message: 'Falta foto.' });
-    const sql = 'INSERT INTO registros (usuario_id, fecha_hora, tipo, foto_path) VALUES ($1, $2, $3, $4)';
-    try {
-        await db.query(sql, [usuario_id, fecha_hora, tipo, foto_path]);
-        res.json({ message: `Fichaje de ${tipo} registrado.` });
-    } catch (err) { res.status(500).json({ message: 'Error al guardar.' }); }
 });
 
 app.get('/api/mis-registros', authenticateToken, async (req, res) => {
@@ -275,15 +318,9 @@ app.get('/api/exportar-csv', authenticateToken, async (req, res) => {
 });
 
 
-// =================================================================
-// INICIO DEL SERVIDOR (DE FORMA CONTROLADA)
-// =================================================================
 const startServer = async () => {
     try {
-        // 1. Inicializa la base de datos y espera a que esté lista
         await db.init();
-        
-        // 2. Solo si la DB está lista, inicia el servidor Express
         app.listen(PORT, '0.0.0.0', () => {
             console.log(`Servidor corriendo y accesible en la red en el puerto ${PORT}`);
         });
@@ -293,5 +330,4 @@ const startServer = async () => {
     }
 };
 
-// Ejecuta la función de arranque
 startServer();
