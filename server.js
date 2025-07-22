@@ -1,4 +1,4 @@
-// server.js (COMPLETO CON LÓGICA DE 30 DÍAS FIJOS)
+// server.js (COMPLETO CON EDICIÓN Y ELIMINACIÓN DE VACACIONES)
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
@@ -47,7 +47,7 @@ function authenticateToken(req, res, next) {
 }
 
 // =================================================================
-// RUTAS PRINCIPALES (FICHAR, LOGIN, ETC.)
+// RUTAS PRINCIPALES
 // =================================================================
 app.post('/api/login', async (req, res) => {
     const { usuario, password } = req.body;
@@ -193,8 +193,99 @@ app.post('/api/fichaje-manual', authenticateToken, async (req, res) => {
     } catch(err) { res.status(500).json({ message: 'Error al crear fichaje manual.' }); }
 });
 
+app.get('/api/informe-mensual', authenticateToken, async (req, res) => {
+    if (req.user.rol !== 'admin') return res.status(403).json({ message: 'Acceso denegado.' });
+    const { anio, mes, usuarioId } = req.query;
+    const sql = `SELECT fecha_hora, tipo FROM registros WHERE usuario_id = $1 AND date_trunc('month', fecha_hora) = make_date($2, $3, 1) ORDER BY fecha_hora ASC`;
+    try {
+        const { rows: registros } = await db.query(sql, [usuarioId, anio, mes]);
+        const registrosPorDia = registros.reduce((acc, registro) => {
+            const dia = DateTime.fromJSDate(registro.fecha_hora).toISODate();
+            if (!acc[dia]) acc[dia] = []; acc[dia].push(registro);
+            return acc;
+        }, {});
+        const informe = { resumenSemanas: {}, totalHorasMesSegundos: 0, totalHorasExtraMesSegundos: 0 };
+        for (const dia in registrosPorDia) {
+            let totalSegundosDia = 0, entradaActual = null;
+            for (const registro of registrosPorDia[dia]) {
+                const fechaRegistro = DateTime.fromJSDate(registro.fecha_hora);
+                if (registro.tipo === 'entrada' && !entradaActual) entradaActual = fechaRegistro;
+                else if (registro.tipo === 'salida' && entradaActual) {
+                    const duracion = fechaRegistro.diff(entradaActual, 'seconds').seconds;
+                    if (duracion > 0) totalSegundosDia += duracion;
+                    entradaActual = null;
+                }
+            }
+            const numSemana = DateTime.fromISO(dia).weekNumber;
+            if (!informe.resumenSemanas[numSemana]) informe.resumenSemanas[numSemana] = { totalSegundos: 0, horasExtraSegundos: 0 };
+            informe.resumenSemanas[numSemana].totalSegundos += totalSegundosDia;
+            informe.totalHorasMesSegundos += totalSegundosDia;
+        }
+        const umbralSemanalSegundos = 40 * 3600;
+        for(const semana in informe.resumenSemanas) {
+            const totalSemana = informe.resumenSemanas[semana].totalSegundos;
+            if(totalSemana > umbralSemanalSegundos) {
+                const extra = totalSemana - umbralSemanalSegundos;
+                informe.resumenSemanas[semana].horasExtraSegundos = extra;
+                informe.totalHorasExtraMesSegundos += extra;
+            }
+        }
+        res.json(informe);
+    } catch(err) { res.status(500).json({ message: 'Error en informe mensual.' }); }
+});
+
+app.get('/api/exportar-csv', authenticateToken, async (req, res) => {
+    if (req.user.rol !== 'admin') return res.status(403).json({ message: 'Acceso denegado.' });
+    const { anio, mes, usuarioId } = req.query;
+    const sql = `SELECT u.nombre, r.fecha_hora, r.tipo FROM registros r JOIN usuarios u ON r.usuario_id = u.id WHERE r.usuario_id = $1 AND date_trunc('month', r.fecha_hora) = make_date($2, $3, 1) ORDER BY r.fecha_hora ASC`;
+    const timeZone = 'Europe/Madrid';
+    try {
+        const { rows: data } = await db.query(sql, [usuarioId, anio, mes]);
+        let totalHorasMesSegundos = 0, totalHorasExtraMesSegundos = 0;
+        const registrosPorDia = data.reduce((acc, registro) => {
+            const dia = DateTime.fromJSDate(registro.fecha_hora).toISODate();
+            if (!acc[dia]) acc[dia] = []; acc[dia].push(registro);
+            return acc;
+        }, {});
+        const resumenSemanas = {};
+        for (const dia in registrosPorDia) {
+            let totalSegundosDia = 0, entradaActual = null;
+            for (const registro of registrosPorDia[dia]) {
+                const fechaRegistro = DateTime.fromJSDate(registro.fecha_hora);
+                if (registro.tipo === 'entrada' && !entradaActual) entradaActual = fechaRegistro;
+                else if (registro.tipo === 'salida' && entradaActual) {
+                    const duracion = fechaRegistro.diff(entradaActual, 'seconds').seconds;
+                    if (duracion > 0) totalSegundosDia += duracion;
+                    entradaActual = null;
+                }
+            }
+            const numSemana = DateTime.fromISO(dia).weekNumber;
+            if (!resumenSemanas[numSemana]) resumenSemanas[numSemana] = { totalSegundos: 0 };
+            resumenSemanas[numSemana].totalSegundos += totalSegundosDia;
+            totalHorasMesSegundos += totalSegundosDia;
+        }
+        const umbralSemanalSegundos = 40 * 3600;
+        for(const semana in resumenSemanas) {
+            if(resumenSemanas[semana].totalSegundos > umbralSemanalSegundos) totalHorasExtraMesSegundos += resumenSemanas[semana].totalSegundos - umbralSemanalSegundos;
+        }
+        const datosProcesados = data.map(registro => {
+            const fechaLocal = DateTime.fromJSDate(registro.fecha_hora, { zone: 'utc' }).setZone(timeZone);
+            return { "Nombre": registro.nombre, "Fecha y Hora (Local)": fechaLocal.toFormat('dd/MM/yyyy HH:mm:ss'), "Tipo": registro.tipo };
+        });
+        const segundosAFormatoHora = (s) => DateTime.fromSeconds(s, {zone: 'utc'}).toFormat('HH:mm:ss');
+        datosProcesados.push({}, { "Nombre": "Total Horas Mes", "Fecha y Hora (Local)": segundosAFormatoHora(totalHorasMesSegundos) }, { "Nombre": "Total Horas Extra", "Fecha y Hora (Local)": segundosAFormatoHora(totalHorasExtraMesSegundos) });
+        const fields = ["Nombre", "Fecha y Hora (Local)", "Tipo"];
+        const json2csvParser = new Parser({ fields });
+        const csv = json2csvParser.parse(datosProcesados);
+        res.header('Content-Type', 'text/csv');
+        res.attachment(`informe-${anio}-${mes}-usuario-${usuarioId}.csv`);
+        res.send(csv);
+    } catch(err) { res.status(500).json({ message: 'Error al exportar.' }); }
+});
+
+
 // =================================================================
-// RUTAS PARA GESTIÓN DE VACACIONES (LÓGICA SIMPLIFICADA)
+// RUTAS PARA GESTIÓN DE VACACIONES
 // =================================================================
 
 function calcularDiasNaturales(fechaInicio, fechaFin) {
@@ -212,13 +303,13 @@ app.get('/api/vacaciones', authenticateToken, async (req, res) => {
         const params = [];
         if (start && end) {
             sql += ` AND v.fecha_fin >= $1 AND v.fecha_inicio <= $2`;
-            params.push(start.split('T')[0]);
+            params.push(start.split('T')[0]); 
             params.push(end.split('T')[0]);
         }
         const { rows } = await db.query(sql, params);
         res.json(rows);
     } catch(err) {
-        console.error("Error en GET /api/vacaciones:", err);
+        console.error("Error en GET /api/vacaciones:", err); 
         res.status(500).json({ message: 'Error al obtener vacaciones.' });
     }
 });
@@ -241,21 +332,15 @@ app.get('/api/usuarios/:id/vacaciones-restantes', authenticateToken, async (req,
     try {
         const resUsuario = await db.query('SELECT dias_vacaciones_anuales FROM usuarios WHERE id = $1', [id]);
         if (resUsuario.rowCount === 0) return res.status(404).json({ message: 'Usuario no encontrado.' });
-        
         const diasTotales = resUsuario.rows[0].dias_vacaciones_anuales === null ? 30 : resUsuario.rows[0].dias_vacaciones_anuales;
-
         const sqlVacaciones = `SELECT fecha_inicio, fecha_fin FROM vacaciones WHERE usuario_id = $1 AND estado = 'aprobada' AND EXTRACT(YEAR FROM fecha_inicio) = $2`;
         const resVacaciones = await db.query(sqlVacaciones, [id, anioActual]);
-        
         let diasGastados = 0;
         resVacaciones.rows.forEach(vac => {
             diasGastados += calcularDiasNaturales(vac.fecha_inicio, vac.fecha_fin);
         });
-
         const diasRestantes = diasTotales - diasGastados;
-        
         res.json({ diasTotales, diasGastados, diasRestantes });
-
     } catch(err) {
         console.error("Error al calcular días restantes:", err);
         res.status(500).json({ message: 'Error al calcular días restantes.' });
@@ -289,6 +374,16 @@ app.delete('/api/vacaciones/:id', authenticateToken, async (req, res) => {
     } catch (err) {
         console.error("Error en DELETE /api/vacaciones/:id", err);
         res.status(500).json({ message: 'Error al eliminar las vacaciones.' });
+    }
+});
+
+app.get('/api/fix-vacation-days', authenticateToken, async(req, res) => {
+    if (req.user.rol !== 'admin') return res.sendStatus(403);
+    try {
+        await db.query("UPDATE usuarios SET dias_vacaciones_anuales = 30 WHERE rol = 'empleado' AND dias_vacaciones_anuales IS NULL");
+        res.send('Datos de vacaciones de usuarios existentes actualizados a 30.');
+    } catch (e) {
+        res.status(500).send('Error al actualizar: ' + e.message);
     }
 });
 
