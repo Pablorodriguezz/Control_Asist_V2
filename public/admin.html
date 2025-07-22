@@ -116,6 +116,7 @@
         const selectUsuario = document.getElementById('selectUsuario');
         const selectMes = document.getElementById('selectMes');
         const btnExportar = document.getElementById('btnExportar');
+        let calendario;
         
         function logout() {
             localStorage.removeItem("token");
@@ -356,80 +357,144 @@
                 getReport();
             } catch (error) { Swal.fire('Error', `No se pudo crear el fichaje: ${error.message}`, 'error'); }
         });
-
-        let calendario;
-
-        // admin.html - Reemplazar la función entera
-
-// admin.html - Reemplazar la función `inicializarCalendario`
-
-function inicializarCalendario() {
-    const calendarioEl = document.getElementById('calendarioVacaciones');
-    calendario = new FullCalendar.Calendar(calendarioEl, {
-        initialView: 'dayGridMonth',
-        locale: 'es',
-        headerToolbar: {
-            left: 'prev,next today',
-            center: 'title',
-            right: 'dayGridMonth,timeGridWeek,listWeek'
-        },
-        events: function(fetchInfo, successCallback, failureCallback) {
-            fetch('/api/vacaciones', {
-                method: 'GET',
-                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-            })
-            .then(res => {
-                if (!res.ok) throw new Error('Respuesta no válida del servidor');
-                return res.json();
-            })
-            .then(data => {
-                // --- LÓGICA PARA DETECTAR SOLAPAMIENTOS ---
-                const dataProcesada = data.map(evento => {
-                    let solapado = false;
-                    const inicioEvento = new Date(evento.fecha_inicio);
-                    const finEvento = new Date(evento.fecha_fin);
-
-                    // Comparamos este evento con todos los demás
-                    for (const otroEvento of data) {
-                        if (evento.id === otroEvento.id) continue; // No comparar consigo mismo
-
-                        const inicioOtro = new Date(otroEvento.fecha_inicio);
-                        const finOtro = new Date(otroEvento.fecha_fin);
-
-                        // La condición de solapamiento
-                        if (inicioEvento <= finOtro && finEvento >= inicioOtro) {
-                            solapado = true;
-                            break; // Si ya encontramos un solapamiento, no hace falta seguir buscando
-                        }
-                    }
-
-                    // Devolvemos el evento con el color si está solapado
-                    return {
-                        ...evento,
-                        backgroundColor: solapado ? '#e74c3c' : '#3498db', // Rojo si se solapa, azul si no
-                        borderColor: solapado ? '#c0392b' : '#2980b9'
-                    };
-                });
-                
-                // Transformamos los datos al formato de FullCalendar
-                const eventosFinales = dataProcesada.map(evento => ({
-                    id: evento.id,
-                    title: evento.nombre,
-                    start: evento.fecha_inicio,
-                    end: new Date(new Date(evento.fecha_fin).getTime() + 86400000).toISOString().split('T')[0],
-                    backgroundColor: evento.backgroundColor, // Aplicamos el color
-                    borderColor: evento.borderColor
-                }));
-                successCallback(eventosFinales);
-            })
-            .catch(error => {
-                failureCallback(error);
-                Swal.fire('Error', 'No se pudieron cargar las vacaciones en el calendario.', 'error');
+        
+        // ==================================================
+        // LÓGICA PARA GESTIÓN DE VACACIONES
+        // ==================================================
+        function inicializarCalendario() {
+            const calendarioEl = document.getElementById('calendarioVacaciones');
+            calendario = new FullCalendar.Calendar(calendarioEl, {
+                initialView: 'dayGridMonth',
+                locale: 'es',
+                headerToolbar: {
+                    left: 'prev,next today',
+                    center: 'title',
+                    right: 'dayGridMonth,timeGridWeek,listWeek'
+                },
+                eventClick: function(info) {
+                    handleEventClick(info.event);
+                },
+                events: function(fetchInfo, successCallback, failureCallback) {
+                    fetch('/api/vacaciones', {
+                        method: 'GET',
+                        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+                    })
+                    .then(res => res.ok ? res.json() : Promise.reject('Respuesta no válida del servidor'))
+                    .then(data => {
+                        const dataProcesada = data.map(evento => {
+                            let solapado = false;
+                            const inicioEvento = new Date(evento.fecha_inicio);
+                            const finEvento = new Date(evento.fecha_fin);
+                            for (const otroEvento of data) {
+                                if (evento.id === otroEvento.id) continue;
+                                const inicioOtro = new Date(otroEvento.fecha_inicio);
+                                const finOtro = new Date(otroEvento.fecha_fin);
+                                if (inicioEvento <= finOtro && finEvento >= inicioOtro) {
+                                    solapado = true;
+                                    break;
+                                }
+                            }
+                            return { ...evento, backgroundColor: solapado ? '#e74c3c' : '#3498db', borderColor: solapado ? '#c0392b' : '#2980b9' };
+                        });
+                        const eventosFinales = dataProcesada.map(evento => ({
+                            id: evento.id, title: evento.nombre, start: evento.fecha_inicio,
+                            end: new Date(new Date(evento.fecha_fin).getTime() + 86400000).toISOString().split('T')[0],
+                            backgroundColor: evento.backgroundColor, borderColor: evento.borderColor
+                        }));
+                        successCallback(eventosFinales);
+                    })
+                    .catch(error => {
+                        failureCallback(error);
+                        Swal.fire('Error', 'No se pudieron cargar las vacaciones en el calendario.', 'error');
+                    });
+                }
             });
+            calendario.render();
         }
-    });
-    calendario.render();
-}
+
+        async function handleEventClick(event) {
+            const { value: action } = await Swal.fire({
+                title: `Gestionar vacaciones de ${event.title}`,
+                text: `Del ${new Date(event.start).toLocaleDateString()} al ${new Date(new Date(event.end).getTime() - 86400000).toLocaleDateString()}`,
+                showCancelButton: true,
+                showDenyButton: true,
+                confirmButtonText: '✏️ Editar',
+                denyButtonText: `🗑️ Eliminar`,
+                cancelButtonText: 'Cancelar'
+            });
+
+            if (action === true) {
+                handleEditVacation(event);
+            } else if (action === false) {
+                handleDeleteVacation(event);
+            }
+        }
+
+        async function handleEditVacation(event) {
+            const fechaInicioActual = new Date(event.start).toISOString().split('T')[0];
+            const fechaFinActual = new Date(new Date(event.end).getTime() - 86400000).toISOString().split('T')[0];
+            const { value: formValues } = await Swal.fire({
+                title: `Editar vacaciones de ${event.title}`,
+                html: `
+                    <label for="swal-fecha-inicio" style="display: block; text-align: left; margin-top: 1rem;">Fecha de Inicio:</label>
+                    <input id="swal-fecha-inicio" type="date" class="swal2-input" value="${fechaInicioActual}">
+                    <label for="swal-fecha-fin" style="display: block; text-align: left; margin-top: 1rem;">Fecha de Fin:</label>
+                    <input id="swal-fecha-fin" type="date" class="swal2-input" value="${fechaFinActual}">`,
+                focusConfirm: false,
+                showCancelButton: true,
+                confirmButtonText: 'Guardar Cambios',
+                preConfirm: () => ({
+                    fechaInicio: document.getElementById('swal-fecha-inicio').value,
+                    fechaFin: document.getElementById('swal-fecha-fin').value
+                })
+            });
+
+            if (formValues) {
+                try {
+                    const res = await fetch(`/api/vacaciones/${event.id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify(formValues)
+                    });
+                    const data = await res.json();
+                    if (!res.ok) throw new Error(data.message);
+                    Swal.fire('¡Actualizado!', data.message, 'success');
+                    calendario.refetchEvents();
+                    mostrarDiasRestantes();
+                } catch (error) {
+                    Swal.fire('Error', `No se pudo actualizar: ${error.message}`, 'error');
+                }
+            }
+        }
+
+        async function handleDeleteVacation(event) {
+            const result = await Swal.fire({
+                title: '¿Estás seguro?',
+                text: `Se eliminarán las vacaciones de ${event.title}. ¡Esta acción no se puede revertir!`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                cancelButtonColor: '#3085d6',
+                confirmButtonText: 'Sí, ¡eliminar!',
+                cancelButtonText: 'Cancelar'
+            });
+
+            if (result.isConfirmed) {
+                try {
+                    const res = await fetch(`/api/vacaciones/${event.id}`, {
+                        method: 'DELETE',
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    const data = await res.json();
+                    if (!res.ok) throw new Error(data.message);
+                    Swal.fire('¡Eliminado!', data.message, 'success');
+                    calendario.refetchEvents();
+                    mostrarDiasRestantes();
+                } catch (error) {
+                    Swal.fire('Error', `No se pudo eliminar: ${error.message}`, 'error');
+                }
+            }
+        }
 
         async function mostrarDiasRestantes() {
             const usuarioId = document.getElementById('vacacionesUsuario').value;

@@ -1,4 +1,4 @@
-// server.js (VERSIÓN FINAL CON CORRECCIÓN DE FECHAS)
+// server.js (COMPLETO CON EDICIÓN Y ELIMINACIÓN DE VACACIONES)
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
@@ -46,7 +46,9 @@ function authenticateToken(req, res, next) {
     });
 }
 
-// ... (Rutas de login, fichar, etc. que no cambian) ...
+// =================================================================
+// RUTAS PRINCIPALES
+// =================================================================
 app.post('/api/login', async (req, res) => {
     const { usuario, password } = req.body;
     if (!usuario || !password) return res.status(400).json({ message: 'Usuario y contraseña requeridos.' });
@@ -83,8 +85,6 @@ app.post('/api/fichar', authenticateToken, upload.single('foto'), async (req, re
         res.status(500).json({ message: 'Error al procesar el fichaje.' });
     }
 });
-
-// ... (El resto de rutas que no cambian)
 
 app.get('/api/estado', authenticateToken, async (req, res) => {
     const usuario_id = req.user.id;
@@ -289,10 +289,8 @@ app.get('/api/exportar-csv', authenticateToken, async (req, res) => {
 // =================================================================
 
 function calcularDiasNaturales(fechaInicio, fechaFin) {
-    // CORRECCIÓN: Usamos fromJSDate para interpretar correctamente el objeto Date de la DB
     const inicio = DateTime.fromJSDate(new Date(fechaInicio));
     const fin = DateTime.fromJSDate(new Date(fechaFin));
-    
     const diff = fin.diff(inicio, 'days').toObject();
     return diff.days + 1;
 }
@@ -349,7 +347,36 @@ app.get('/api/usuarios/:id/vacaciones-restantes', authenticateToken, async (req,
     }
 });
 
-// RUTA TEMPORAL PARA ARREGLAR DATOS
+app.put('/api/vacaciones/:id', authenticateToken, async (req, res) => {
+    if (req.user.rol !== 'admin') return res.sendStatus(403);
+    const { id } = req.params;
+    const { fechaInicio, fechaFin } = req.body;
+    if (!fechaInicio || !fechaFin) return res.status(400).json({ message: 'Faltan las fechas de inicio y fin.' });
+    try {
+        const sql = 'UPDATE vacaciones SET fecha_inicio = $1, fecha_fin = $2 WHERE id = $3';
+        const result = await db.query(sql, [fechaInicio, fechaFin, id]);
+        if (result.rowCount === 0) return res.status(404).json({ message: 'Periodo de vacaciones no encontrado.' });
+        res.json({ message: 'Vacaciones actualizadas correctamente.' });
+    } catch (err) {
+        console.error("Error en PUT /api/vacaciones/:id", err);
+        res.status(500).json({ message: 'Error al actualizar las vacaciones.' });
+    }
+});
+
+app.delete('/api/vacaciones/:id', authenticateToken, async (req, res) => {
+    if (req.user.rol !== 'admin') return res.sendStatus(403);
+    const { id } = req.params;
+    try {
+        const sql = 'DELETE FROM vacaciones WHERE id = $1';
+        const result = await db.query(sql, [id]);
+        if (result.rowCount === 0) return res.status(404).json({ message: 'Periodo de vacaciones no encontrado.' });
+        res.json({ message: 'Vacaciones eliminadas correctamente.' });
+    } catch (err) {
+        console.error("Error en DELETE /api/vacaciones/:id", err);
+        res.status(500).json({ message: 'Error al eliminar las vacaciones.' });
+    }
+});
+
 app.get('/api/fix-vacation-days', authenticateToken, async(req, res) => {
     if (req.user.rol !== 'admin') return res.sendStatus(403);
     try {
