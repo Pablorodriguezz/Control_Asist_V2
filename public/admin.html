@@ -122,6 +122,8 @@
         </section>
     </div>
 
+    <button id="scrollTopBtn" title="Volver arriba">⇧</button>
+
     <script>
         const token = localStorage.getItem("token");
         if (!token) window.location.href = "/index.html";
@@ -560,6 +562,30 @@
         }
 
         inicializarPagina();
+
+        
+
+        // ===============================================
+        // NUEVO: LÓGICA PARA EL BOTÓN "VOLVER ARRIBA"
+        // ===============================================
+        const scrollTopBtn = document.getElementById("scrollTopBtn");
+
+        // Muestra el botón cuando el usuario baja 100px en la página
+        window.onscroll = function() {
+            if (document.body.scrollTop > 100 || document.documentElement.scrollTop > 100) {
+                scrollTopBtn.classList.add("show");
+            } else {
+                scrollTopBtn.classList.remove("show");
+            }
+        };
+
+        // Función que se ejecuta al hacer clic en el botón
+        function scrollToTop() {
+            window.scrollTo({top: 0, behavior: 'smooth'});
+        }
+
+        // Asigna la función al evento 'click' del botón
+        scrollTopBtn.addEventListener("click", scrollToTop);
     </script>
 </body>
 </html>

@@ -121,6 +121,39 @@ hr { border: none; border-top: 1px solid #eee; margin: 25px 0; }
 .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.6); justify-content: center; align-items: center; }
 .modal-content { background: white; padding: 20px; border-radius: 12px; text-align: center; }
 #video { width: 100%; max-width: 320px; border-radius: 8px; transform: scaleX(-1); }
+/* =================================
+   ESTILOS PARA BOTÓN "VOLVER ARRIBA"
+   ================================= */
+
+#scrollTopBtn {
+    position: fixed; /* Lo fija en la pantalla */
+    bottom: 20px;    /* 20px desde abajo */
+    right: 30px;     /* 30px desde la derecha */
+    z-index: 99;     /* Se asegura de que esté por encima de otros elementos */
+    border: none;
+    outline: none;
+    background-color: #3498db;
+    color: white;
+    cursor: pointer;
+    padding: 12px 15px;
+    border-radius: 10px;
+    font-size: 18px;
+    width: auto; /* Ancho automático basado en el contenido */
+    
+    /* Lógica para ocultarlo/mostrarlo con una transición suave */
+    opacity: 0;
+    pointer-events: none; /* Evita que se pueda hacer clic cuando está oculto */
+    transition: opacity 0.3s ease-in-out;
+}
+
+#scrollTopBtn.show {
+    opacity: 1;
+    pointer-events: auto; /* Permite hacer clic cuando es visible */
+}
+
+#scrollTopBtn:hover {
+    background-color: #2980b9; /* Un azul un poco más oscuro al pasar el ratón */
+}
 
 @media (min-width: 768px) {
     .container { padding: 40px; max-width: 900px; }
