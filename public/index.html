@@ -7,35 +7,48 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    // index.html - dentro del <script>
-document.getElementById('loginForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const usuario = document.getElementById('usuario').value;
-    const password = document.getElementById('password').value;
-    const errorP = document.getElementById('error');
-    try {
-        const res = await fetch('/api/login', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ usuario, password })
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.message);
-        localStorage.setItem('token', data.token);
+    <div class="container">
+        <img src="/images/logo1.jpg" alt="Logo de la Empresa" class="logo-img">
+        <h1>Iniciar Sesión</h1>
+        
+        <!-- ESTE ES EL FORMULARIO QUE FALTABA -->
+        <form id="loginForm">
+            <input type="text" id="usuario" placeholder="Usuario" required autocomplete="username">
+            <input type="password" id="password" placeholder="Contraseña" required autocomplete="current-password">
+            <button type="submit" class="btn-principal">Entrar</button>
+        </form>
+        <p id="error" class="status-message error" style="display: none;"></p>
+    </div>
+    
+    <script>
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const usuario = document.getElementById('usuario').value;
+            const password = document.getElementById('password').value;
+            const errorP = document.getElementById('error');
+            try {
+                const res = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ usuario, password })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.message);
+                localStorage.setItem('token', data.token);
 
-        // --- LÓGICA DE REDIRECCIÓN MEJORADA ---
-        if (data.rol === 'admin') {
-            window.location.href = '/admin.html';
-        } else if (data.rol === 'gestor_vacaciones') {
-            window.location.href = '/vacaciones.html';
-        } else {
-            window.location.href = '/panel.html';
-        }
-    } catch (err) {
-        errorP.textContent = err.message;
-        errorP.style.display = 'block';
-    }
-});
+                // --- LÓGICA DE REDIRECCIÓN MEJORADA ---
+                if (data.rol === 'admin') {
+                    window.location.href = '/admin.html';
+                } else if (data.rol === 'gestor_vacaciones') {
+                    window.location.href = '/vacaciones.html';
+                } else {
+                    window.location.href = '/panel.html';
+                }
+            } catch (err) {
+                errorP.textContent = err.message;
+                errorP.style.display = 'block';
+            }
+        });
     </script>
 </body>
 </html>
