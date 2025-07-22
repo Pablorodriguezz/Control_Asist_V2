@@ -1,49 +1,42 @@
-// server.js (VERSIÓN FINAL CON CLOUDFLARE R2)
+// server.js (COMPLETO Y ACTUALIZADO)
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-// const fs = require('fs'); // ELIMINADO: Ya no necesitamos manejar el sistema de archivos para las fotos.
 const multer = require('multer');
 const db = require('./database.js');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { Parser } = require('json2csv');
 const { DateTime } = require('luxon');
-
-// NUEVO: Importamos el cliente S3 de AWS y el módulo crypto
 const { S3Client, PutObjectCommand } = require("@aws-sdk/client-s3");
 const crypto = require('crypto');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const JWT_SECRET = 'tu_secreto_super_secreto_y_largo_y_dificil_de_adivinar_987654';
+const JWT_SECRET = process.env.JWT_SECRET || 'tu_secreto_super_secreto_y_largo_y_dificil_de_adivinar_987654';
 
 app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
+
 // RUTA PARA HEALTH CHECK DE RAILWAY
 app.get('/', (req, res) => {
-    res.status(200).send('OK');
+    res.status(200).send('OK: Health check passed');
 });
-// NUEVO: Configuración del cliente S3 para apuntar a Cloudflare R2
-// Leemos las variables de entorno que configuraste en Railway
+
+// Configuración del cliente S3 para Cloudflare R2
 const s3Client = new S3Client({
-    region: 'auto', // Requerido por Cloudflare
-    endpoint: process.env.AWS_ENDPOINT, // La URL del endpoint de tu cuenta
+    region: 'auto',
+    endpoint: process.env.AWS_ENDPOINT,
     credentials: {
         accessKeyId: process.env.AWS_ACCESS_KEY_ID,
         secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
     },
 });
 
-// CAMBIADO: Configuración de Multer
-// En lugar de guardar en disco (diskStorage), guardamos la foto en la memoria (memoryStorage)
-// Esto nos da un "buffer" con los datos del archivo, listo para ser enviado a R2.
+// Configuración de Multer para guardar en memoria
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
-
-// ELIMINADO: Ya no necesitamos servir la carpeta /uploads estáticamente
-// app.use('/uploads', express.static(uploadDir));
 
 function authenticateToken(req, res, next) {
     const authHeader = req.headers['authorization'];
@@ -57,8 +50,151 @@ function authenticateToken(req, res, next) {
 }
 
 // =================================================================
-// RUTA DE FICHAJE - ¡AQUÍ ESTÁ LA MAGIA!
+// DEFINICIÓN DE RUTAS (USUARIOS Y FICHAR)
 // =================================================================
+
+app.post('/api/login', async (req, res) => {
+    const { usuario, password } = req.body;
+    if (!usuario || !password) return res.status(400).json({ message: 'Usuario y contraseña requeridos.' });
+    try {
+        const result = await db.query('SELECT * FROM usuarios WHERE usuario = $1', [usuario]);
+        if (result.rows.length === 0) return res.status(401).json({ message: 'Usuario o contraseña incorrectos' });
+        const user = result.rows[0];
+        const match = await bcrypt.compare(password, user.password);
+        if (match) {
+            const token = jwt.sign({ id: user.id, rol: user.rol, nombre: user.nombre }, JWT_SECRET, { expiresIn: '8h' });
+            res.json({ token, rol: user.rol, nombre: user.nombre });
+        } else {
+            res.status(401).json({ message: 'Usuario o contraseña incorrectos' });
+        }
+    } catch (err) { res.status(500).json({ message: 'Error del servidor' }); }
+});
+
+app.post('/api/fichar', authenticateToken, upload.single('foto'), async (req, res) => {
+    const { tipo } = req.body;
+    const usuario_id = req.user.id;
+    const fecha_hora = new Date();
+    if (!req.file) return res.status(400).json({ message: 'Falta foto.' });
+    if (!tipo || (tipo !== 'entrada' && tipo !== 'salida')) return res.status(400).json({ message: 'Tipo inválido.' });
+
+    try {
+        const fileName = `${crypto.randomBytes(16).toString('hex')}.jpeg`;
+        const putCommand = new PutObjectCommand({
+            Bucket: process.env.R2_BUCKET_NAME,
+            Key: fileName,
+            Body: req.file.buffer,
+            ContentType: req.file.mimetype,
+        });
+        await s3Client.send(putCommand);
+        const foto_path = `${process.env.R2_PUBLIC_URL}/${fileName}`;
+        const sql = 'INSERT INTO registros (usuario_id, fecha_hora, tipo, foto_path) VALUES ($1, $2, $3, $4)';
+        await db.query(sql, [usuario_id, fecha_hora, tipo, foto_path]);
+        res.json({ message: `Fichaje de ${tipo} registrado.` });
+    } catch (err) {
+        console.error("Error al subir a R2 o guardar en DB:", err);
+        res.status(500).json({ message: 'Error al procesar el fichaje.' });
+    }
+});
+
+// ... (todas las demás rutas de informes, usuarios, etc. se quedan aquí)
+app.get('/api/estado', authenticateToken, async (req, res) => {
+    const usuario_id = req.user.id;
+    const sql = `SELECT tipo FROM registros WHERE usuario_id = $1 AND fecha_hora::date = CURRENT_DATE ORDER BY fecha_hora DESC LIMIT 1`;
+    try {
+        const result = await db.query(sql, [usuario_id]);
+        const ultimoEstado = result.rows.length > 0 ? result.rows[0].tipo : 'salida';
+        res.json({ estado: ultimoEstado });
+    } catch (err) { res.status(500).json({ message: 'Error al consultar el estado.' }); }
+});
+
+app.get('/api/mis-registros', authenticateToken, async (req, res) => {
+    const usuarioId = req.user.id;
+    const { anio, mes } = req.query;
+    if (!anio || !mes) return res.status(400).json({ message: 'Año y mes requeridos.' });
+    try {
+        const sql = `SELECT fecha_hora, tipo, es_modificado, motivo_modificacion, fecha_hora_original FROM registros WHERE usuario_id = $1 AND date_trunc('month', fecha_hora) = make_date($2, $3, 1) ORDER BY fecha_hora ASC`;
+        const result = await db.query(sql, [usuarioId, anio, mes]);
+        res.json(result.rows);
+    } catch (err) { res.status(500).json({ message: "Error del servidor." }); }
+});
+
+app.get('/api/informe', authenticateToken, async (req, res) => {
+    if (req.user.rol !== 'admin') return res.status(403).json({ message: 'Acceso denegado.' });
+    const { fecha } = req.query;
+    if (!fecha) return res.status(400).json({ message: 'Fecha requerida.' });
+    const sql = `SELECT r.id, u.nombre, r.fecha_hora, r.tipo, r.foto_path, r.es_modificado, r.fecha_hora_original, r.motivo_modificacion FROM registros r JOIN usuarios u ON r.usuario_id = u.id WHERE r.fecha_hora::date = $1 ORDER BY u.nombre, r.fecha_hora`;
+    try {
+        const result = await db.query(sql, [fecha]);
+        res.json(result.rows);
+    } catch (err) { res.status(500).json({ message: 'Error al obtener informe.' }); }
+});
+
+app.get('/api/usuarios', authenticateToken, async (req, res) => {
+    if (req.user.rol !== 'admin') return res.status(403).json({ message: 'Acceso denegado.' });
+    try {
+        const result = await db.query("SELECT id, nombre, usuario, rol FROM usuarios ORDER BY nombre");
+        res.json(result.rows);
+    } catch(err) { res.status(500).json({ message: "Error al obtener usuarios." }); }
+});
+
+app.post('/api/usuarios', authenticateToken, async (req, res) => {
+    if (req.user.rol !== 'admin') return res.status(403).json({ message: 'Acceso denegado.' });
+    const { nombre, usuario, password, rol } = req.body;
+    if (!nombre || !usuario || !password || !rol) return res.status(400).json({ message: 'Faltan datos.' });
+    try {
+        const hash = await bcrypt.hash(password, 10);
+        const result = await db.query('INSERT INTO usuarios (nombre, usuario, password, rol) VALUES ($1, $2, VERSIÓN FINAL CON ARRANQUE CONTROLADO)
+const express = require('express');
+const cors = require('cors');
+const path = require('path');
+const multer = require('multer');
+const db = require('./database.js'); 
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const { Parser } = require('json2csv');
+const { DateTime } = require('luxon');
+
+const { S3Client, PutObjectCommand } = require("@aws-sdk/client-s3");
+const crypto = require('crypto');
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+const JWT_SECRET = process.env.JWT_SECRET || 'tu_secreto_super_secreto_y_largo_y_dificil_de_adivinar_987654';
+
+app.use(cors());
+app.use(express.json());
+app.use(express.static('public'));
+
+
+app.get('/', (req, res) => {
+    res.status(200).send('OK: Health check passed');
+});
+
+const s3Client = new S3Client({
+    region: 'auto',
+    endpoint: process.env.AWS_ENDPOINT,
+    credentials: {
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+    },
+});
+
+const storage = multer.memoryStorage();
+const upload = multer({ storage });
+
+
+function authenticateToken(req, res, next) {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    if (token == null) return res.sendStatus(401);
+    jwt.verify(token, JWT_SECRET, (err, user) => {
+        if (err) return res.sendStatus(403);
+        req.user = user;
+        next();
+    });
+}
+
+
 app.post('/api/fichar', authenticateToken, upload.single('foto'), async (req, res) => {
     const { tipo } = req.body;
     const usuario_id = req.user.id;
@@ -72,24 +208,24 @@ app.post('/api/fichar', authenticateToken, upload.single('foto'), async (req, re
     }
 
     try {
-        // NUEVO: Generamos un nombre de archivo único y seguro
+       
         const fileName = `${crypto.randomBytes(16).toString('hex')}.jpeg`;
 
-        // NUEVO: Creamos el comando para subir el archivo a R2
+       
         const putCommand = new PutObjectCommand({
-            Bucket: process.env.R2_BUCKET_NAME, // El nombre de tu bucket
-            Key: fileName,                       // El nombre único del archivo
-            Body: req.file.buffer,               // Los datos de la imagen desde la memoria
-            ContentType: req.file.mimetype,      // El tipo de contenido (ej: 'image/jpeg')
+            Bucket: process.env.R2_BUCKET_NAME, 
+            Key: fileName,                       
+            Body: req.file.buffer,               
+            ContentType: req.file.mimetype,      
         });
 
-        // NUEVO: Enviamos el comando a R2
+       
         await s3Client.send(putCommand);
 
-        // CAMBIADO: Construimos la URL pública completa de la foto
+        
         const foto_path = `${process.env.R2_PUBLIC_URL}/${fileName}`;
 
-        // El resto es igual: insertamos la nueva URL en la base de datos
+        
         const sql = 'INSERT INTO registros (usuario_id, fecha_hora, tipo, foto_path) VALUES ($1, $2, $3, $4)';
         await db.query(sql, [usuario_id, fecha_hora, tipo, foto_path]);
 
@@ -101,10 +237,6 @@ app.post('/api/fichar', authenticateToken, upload.single('foto'), async (req, re
     }
 });
 
-
-// =================================================================
-// EL RESTO DE RUTAS NO CAMBIAN
-// =================================================================
 
 app.post('/api/login', async (req, res) => {
     const { usuario, password } = req.body;
@@ -320,31 +452,46 @@ app.get('/api/exportar-csv', authenticateToken, async (req, res) => {
     } catch(err) { res.status(500).json({ message: 'Error al exportar.' }); }
 });
 
-// Helper para calcular días naturales (incluye fines de semana)
+
 function calcularDiasNaturales(fechaInicio, fechaFin) {
     const inicio = DateTime.fromISO(fechaInicio);
     const fin = DateTime.fromISO(fechaFin);
-    
-    // El diff en días + 1 para incluir el día de inicio
     const diff = fin.diff(inicio, 'days').toObject();
     return diff.days + 1;
 }
 
-// OBTENER todas las vacaciones aprobadas para el calendario
+
 app.get('/api/vacaciones', authenticateToken, async (req, res) => {
     if (req.user.rol !== 'admin') return res.sendStatus(403);
+
+    const { start, end } = req.query;
+
     try {
-        const sql = `
+        let sql = `
             SELECT v.id, v.fecha_inicio, v.fecha_fin, u.nombre 
             FROM vacaciones v 
             JOIN usuarios u ON v.usuario_id = u.id 
             WHERE v.estado = 'aprobada'`;
-        const { rows } = await db.query(sql);
+        
+        const params = [];
+
+        
+        if (start && end) {
+            sql += ` AND v.fecha_fin >= $1 AND v.fecha_inicio <= $2`;
+            params.push(start.split('T')[0]); 
+            params.push(end.split('T')[0]);
+        }
+
+        const { rows } = await db.query(sql, params);
         res.json(rows);
-    } catch(err) { res.status(500).json({ message: 'Error al obtener vacaciones.' }); }
+
+    } catch(err) {
+        console.error("Error en GET /api/vacaciones:", err); 
+        res.status(500).json({ message: 'Error al obtener vacaciones.' });
+    }
 });
 
-// AÑADIR un nuevo periodo de vacaciones
+
 app.post('/api/vacaciones', authenticateToken, async (req, res) => {
     if (req.user.rol !== 'admin') return res.sendStatus(403);
     const { usuarioId, fechaInicio, fechaFin } = req.body;
@@ -356,25 +503,25 @@ app.post('/api/vacaciones', authenticateToken, async (req, res) => {
     } catch(err) { res.status(500).json({ message: 'Error al registrar las vacaciones.' }); }
 });
 
-// CALCULAR y OBTENER los días restantes para un usuario
+
 app.get('/api/usuarios/:id/vacaciones-restantes', authenticateToken, async (req, res) => {
     if (req.user.rol !== 'admin') return res.sendStatus(403);
     const { id } = req.params;
     const anioActual = new Date().getFullYear();
     try {
-        // 1. Obtener los días totales que le corresponden
+       
         const resUsuario = await db.query('SELECT dias_vacaciones_anuales FROM usuarios WHERE id = $1', [id]);
         if (resUsuario.rowCount === 0) return res.status(404).json({ message: 'Usuario no encontrado.' });
         const diasTotales = resUsuario.rows[0].dias_vacaciones_anuales || 30;
 
-        // 2. Obtener las vacaciones ya tomadas y aprobadas en el año actual
+       
         const sqlVacaciones = `
             SELECT fecha_inicio, fecha_fin 
             FROM vacaciones 
             WHERE usuario_id = $1 AND estado = 'aprobada' AND EXTRACT(YEAR FROM fecha_inicio) = $2`;
         const resVacaciones = await db.query(sqlVacaciones, [id, anioActual]);
 
-        // 3. Calcular los días naturales gastados
+       
         let diasGastados = 0;
         resVacaciones.rows.forEach(vac => {
             diasGastados += calcularDiasNaturales(vac.fecha_inicio, vac.fecha_fin);
@@ -388,7 +535,10 @@ app.get('/api/usuarios/:id/vacaciones-restantes', authenticateToken, async (req,
 
 const startServer = async () => {
     try {
+        
         await db.init();
+        
+        
         app.listen(PORT, '0.0.0.0', () => {
             console.log(`Servidor corriendo y accesible en la red en el puerto ${PORT}`);
         });
@@ -398,5 +548,5 @@ const startServer = async () => {
     }
 };
 
+
 startServer();
-//prueba
