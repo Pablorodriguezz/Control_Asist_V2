@@ -328,6 +328,8 @@ app.post('/api/vacaciones', authenticateToken, async (req, res) => {
     } catch(err) { res.status(500).json({ message: 'Error al registrar las vacaciones.' }); }
 });
 
+// server.js - Reemplazar esta ruta
+
 app.get('/api/usuarios/:id/vacaciones-restantes', authenticateToken, async (req, res) => {
     if (req.user.rol !== 'admin') return res.sendStatus(403);
     const { id } = req.params;
@@ -335,16 +337,37 @@ app.get('/api/usuarios/:id/vacaciones-restantes', authenticateToken, async (req,
     try {
         const resUsuario = await db.query('SELECT dias_vacaciones_anuales FROM usuarios WHERE id = $1', [id]);
         if (resUsuario.rowCount === 0) return res.status(404).json({ message: 'Usuario no encontrado.' });
-        const diasTotales = resUsuario.rows[0].dias_vacaciones_anuales || 30;
+        
+        // --- CAMBIO IMPORTANTE ---
+        // Nos aseguramos de que si el valor es NULL en la DB, lo tratemos como 30.
+        const diasTotales = resUsuario.rows[0].dias_vacaciones_anuales === null ? 30 : resUsuario.rows[0].dias_vacaciones_anuales;
+
         const sqlVacaciones = `SELECT fecha_inicio, fecha_fin FROM vacaciones WHERE usuario_id = $1 AND estado = 'aprobada' AND EXTRACT(YEAR FROM fecha_inicio) = $2`;
         const resVacaciones = await db.query(sqlVacaciones, [id, anioActual]);
+        
         let diasGastados = 0;
         resVacaciones.rows.forEach(vac => {
             diasGastados += calcularDiasNaturales(vac.fecha_inicio, vac.fecha_fin);
         });
+
         const diasRestantes = diasTotales - diasGastados;
         res.json({ diasTotales, diasGastados, diasRestantes });
-    } catch(err) { res.status(500).json({ message: 'Error al calcular días restantes.' }); }
+    } catch(err) {
+        console.error("Error al calcular días restantes:", err);
+        res.status(500).json({ message: 'Error al calcular días restantes.' });
+    }
+});
+
+// RUTA TEMPORAL PARA ARREGLAR DATOS
+app.get('/api/fix-vacation-days', authenticateToken, async(req, res) => {
+    if (req.user.rol !== 'admin') return res.sendStatus(403);
+    try {
+        // Este comando actualiza a 30 días a todos los empleados que tengan el campo a NULL
+        await db.query("UPDATE usuarios SET dias_vacaciones_anuales = 30 WHERE rol = 'empleado' AND dias_vacaciones_anuales IS NULL");
+        res.send('Datos de vacaciones de usuarios existentes actualizados a 30.');
+    } catch (e) {
+        res.status(500).send('Error al actualizar: ' + e.message);
+    }
 });
 
 // =================================================================

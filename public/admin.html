@@ -361,6 +361,8 @@
 
         // admin.html - Reemplazar la función entera
 
+// admin.html - Reemplazar la función `inicializarCalendario`
+
 function inicializarCalendario() {
     const calendarioEl = document.getElementById('calendarioVacaciones');
     calendario = new FullCalendar.Calendar(calendarioEl, {
@@ -371,37 +373,60 @@ function inicializarCalendario() {
             center: 'title',
             right: 'dayGridMonth,timeGridWeek,listWeek'
         },
-        // --- AQUÍ ESTÁ EL CAMBIO ---
         events: function(fetchInfo, successCallback, failureCallback) {
             fetch('/api/vacaciones', {
                 method: 'GET',
-                headers: {
-                    // La cabecera se construye aquí, asegurando que el token es el correcto
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
-                }
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
             })
             .then(res => {
-                if (!res.ok) {
-                    throw new Error('Respuesta no válida del servidor');
-                }
+                if (!res.ok) throw new Error('Respuesta no válida del servidor');
                 return res.json();
             })
             .then(data => {
-                // Transformamos los datos aquí antes de pasarlos al calendario
-                const eventosTransformados = data.map(evento => ({
+                // --- LÓGICA PARA DETECTAR SOLAPAMIENTOS ---
+                const dataProcesada = data.map(evento => {
+                    let solapado = false;
+                    const inicioEvento = new Date(evento.fecha_inicio);
+                    const finEvento = new Date(evento.fecha_fin);
+
+                    // Comparamos este evento con todos los demás
+                    for (const otroEvento of data) {
+                        if (evento.id === otroEvento.id) continue; // No comparar consigo mismo
+
+                        const inicioOtro = new Date(otroEvento.fecha_inicio);
+                        const finOtro = new Date(otroEvento.fecha_fin);
+
+                        // La condición de solapamiento
+                        if (inicioEvento <= finOtro && finEvento >= inicioOtro) {
+                            solapado = true;
+                            break; // Si ya encontramos un solapamiento, no hace falta seguir buscando
+                        }
+                    }
+
+                    // Devolvemos el evento con el color si está solapado
+                    return {
+                        ...evento,
+                        backgroundColor: solapado ? '#e74c3c' : '#3498db', // Rojo si se solapa, azul si no
+                        borderColor: solapado ? '#c0392b' : '#2980b9'
+                    };
+                });
+                
+                // Transformamos los datos al formato de FullCalendar
+                const eventosFinales = dataProcesada.map(evento => ({
                     id: evento.id,
                     title: evento.nombre,
                     start: evento.fecha_inicio,
-                    end: new Date(new Date(evento.fecha_fin).getTime() + 86400000).toISOString().split('T')[0]
+                    end: new Date(new Date(evento.fecha_fin).getTime() + 86400000).toISOString().split('T')[0],
+                    backgroundColor: evento.backgroundColor, // Aplicamos el color
+                    borderColor: evento.borderColor
                 }));
-                successCallback(eventosTransformados);
+                successCallback(eventosFinales);
             })
             .catch(error => {
                 failureCallback(error);
                 Swal.fire('Error', 'No se pudieron cargar las vacaciones en el calendario.', 'error');
             });
         }
-        // --- FIN DEL CAMBIO ---
     });
     calendario.render();
 }
