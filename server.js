@@ -1,4 +1,4 @@
-// server.js (COMPLETO CON ROLLOVERY Y VALIDACIÓN)
+// server.js (COMPLETO CON LÓGICA DE 30 DÍAS FIJOS)
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
@@ -47,7 +47,7 @@ function authenticateToken(req, res, next) {
 }
 
 // =================================================================
-// RUTAS PRINCIPALES
+// RUTAS PRINCIPALES (FICHAR, LOGIN, ETC.)
 // =================================================================
 app.post('/api/login', async (req, res) => {
     const { usuario, password } = req.body;
@@ -193,10 +193,8 @@ app.post('/api/fichaje-manual', authenticateToken, async (req, res) => {
     } catch(err) { res.status(500).json({ message: 'Error al crear fichaje manual.' }); }
 });
 
-// ... (informe mensual y exportar csv no cambian)
-
 // =================================================================
-// RUTAS PARA GESTIÓN DE VACACIONES
+// RUTAS PARA GESTIÓN DE VACACIONES (LÓGICA SIMPLIFICADA)
 // =================================================================
 
 function calcularDiasNaturales(fechaInicio, fechaFin) {
@@ -214,13 +212,13 @@ app.get('/api/vacaciones', authenticateToken, async (req, res) => {
         const params = [];
         if (start && end) {
             sql += ` AND v.fecha_fin >= $1 AND v.fecha_inicio <= $2`;
-            params.push(start.split('T')[0]); 
+            params.push(start.split('T')[0]);
             params.push(end.split('T')[0]);
         }
         const { rows } = await db.query(sql, params);
         res.json(rows);
     } catch(err) {
-        console.error("Error en GET /api/vacaciones:", err); 
+        console.error("Error en GET /api/vacaciones:", err);
         res.status(500).json({ message: 'Error al obtener vacaciones.' });
     }
 });
@@ -241,32 +239,25 @@ app.get('/api/usuarios/:id/vacaciones-restantes', authenticateToken, async (req,
     const { id } = req.params;
     const anioActual = new Date().getFullYear();
     try {
-        const getVacationDataForYear = async (usuarioId, anio) => {
-            const resUsuario = await db.query('SELECT dias_vacaciones_anuales FROM usuarios WHERE id = $1', [usuarioId]);
-            if (resUsuario.rowCount === 0) throw new Error('Usuario no encontrado');
-            const diasBase = resUsuario.rows[0].dias_vacaciones_anuales === null ? 30 : resUsuario.rows[0].dias_vacaciones_anuales;
-            const sqlVacaciones = `SELECT fecha_inicio, fecha_fin FROM vacaciones WHERE usuario_id = $1 AND estado = 'aprobada' AND EXTRACT(YEAR FROM fecha_inicio) = $2`;
-            const resVacaciones = await db.query(sqlVacaciones, [usuarioId, anio]);
-            let diasGastados = 0;
-            resVacaciones.rows.forEach(vac => {
-                diasGastados += calcularDiasNaturales(vac.fecha_inicio, vac.fecha_fin);
-            });
-            return { diasBase, diasGastados };
-        };
-
-        const anioAnterior = anioActual - 1;
-        const dataAnioAnterior = await getVacationDataForYear(id, anioAnterior);
-        const diasAcumulados = Math.max(0, dataAnioAnterior.diasBase - dataAnioAnterior.diasGastados);
-        const dataAnioActual = await getVacationDataForYear(id, anioActual);
+        const resUsuario = await db.query('SELECT dias_vacaciones_anuales FROM usuarios WHERE id = $1', [id]);
+        if (resUsuario.rowCount === 0) return res.status(404).json({ message: 'Usuario no encontrado.' });
         
-        const diasBaseActuales = dataAnioActual.diasBase;
-        const diasTotales = diasBaseActuales + diasAcumulados;
-        const diasGastados = dataAnioActual.diasGastados;
-        const diasRestantes = diasTotales - diasGastados;
+        const diasTotales = resUsuario.rows[0].dias_vacaciones_anuales === null ? 30 : resUsuario.rows[0].dias_vacaciones_anuales;
 
-        res.json({ diasBase: diasBaseActuales, diasAcumulados, diasTotales, diasGastados, diasRestantes });
+        const sqlVacaciones = `SELECT fecha_inicio, fecha_fin FROM vacaciones WHERE usuario_id = $1 AND estado = 'aprobada' AND EXTRACT(YEAR FROM fecha_inicio) = $2`;
+        const resVacaciones = await db.query(sqlVacaciones, [id, anioActual]);
+        
+        let diasGastados = 0;
+        resVacaciones.rows.forEach(vac => {
+            diasGastados += calcularDiasNaturales(vac.fecha_inicio, vac.fecha_fin);
+        });
+
+        const diasRestantes = diasTotales - diasGastados;
+        
+        res.json({ diasTotales, diasGastados, diasRestantes });
+
     } catch(err) {
-        console.error("Error al calcular días restantes con rollover:", err);
+        console.error("Error al calcular días restantes:", err);
         res.status(500).json({ message: 'Error al calcular días restantes.' });
     }
 });
@@ -298,16 +289,6 @@ app.delete('/api/vacaciones/:id', authenticateToken, async (req, res) => {
     } catch (err) {
         console.error("Error en DELETE /api/vacaciones/:id", err);
         res.status(500).json({ message: 'Error al eliminar las vacaciones.' });
-    }
-});
-
-app.get('/api/fix-vacation-days', authenticateToken, async(req, res) => {
-    if (req.user.rol !== 'admin') return res.sendStatus(403);
-    try {
-        await db.query("UPDATE usuarios SET dias_vacaciones_anuales = 30 WHERE rol = 'empleado' AND dias_vacaciones_anuales IS NULL");
-        res.send('Datos de vacaciones de usuarios existentes actualizados a 30.');
-    } catch (e) {
-        res.status(500).send('Error al actualizar: ' + e.message);
     }
 });
 
