@@ -6,8 +6,6 @@
     <title>Panel de Administrador</title>
     <link rel="stylesheet" href="style.css" />
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js'></script>
-    <link href='https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css' rel='stylesheet'>
 </head>
 <body>
     <div class="container">
@@ -85,28 +83,6 @@
                 <textarea id="manualMotivo" placeholder="Es obligatorio explicar por qué se crea este fichaje." required></textarea>
                 <button type="submit">Crear Fichaje Manual</button>
             </form>
-        </section>
-        <hr />
-
-        <section>
-            <h2>Gestión de Vacaciones</h2>
-            <form id="formVacaciones">
-                <label for="vacacionesUsuario">Trabajador:</label>
-                <select id="vacacionesUsuario" required>
-                    <option value="">-- Selecciona un trabajador --</option>
-                </select>
-                <span id="infoDiasRestantes" style="display: block; margin-bottom: 15px; font-weight: bold;"></span>
-                
-                <label for="fechaInicio">Fecha de Inicio:</label>
-                <input type="date" id="fechaInicio" required>
-                
-                <label for="fechaFin">Fecha de Fin:</label>
-                <input type="date" id="fechaFin" required>
-                
-                <button type="submit">Asignar Vacaciones</button>
-            </form>
-            <hr style="margin: 20px 0;">
-            <div id="calendarioVacaciones"></div>
         </section>
     </div>
 
@@ -238,7 +214,6 @@
                         loadUsers();
                         poblarSelectorUsuarios('selectUsuario');
                         poblarSelectorUsuarios('manualUsuario');
-                        poblarSelectorUsuarios('vacacionesUsuario');
                     } catch (error) { Swal.fire('Error', error.message, 'error'); }
                 }
             });
@@ -336,7 +311,6 @@
                 loadUsers();
                 poblarSelectorUsuarios('selectUsuario');
                 poblarSelectorUsuarios('manualUsuario');
-                poblarSelectorUsuarios('vacacionesUsuario');
             } catch (error) { Swal.fire('Error', error.message, 'error'); }
         });
 
@@ -357,101 +331,18 @@
             } catch (error) { Swal.fire('Error', `No se pudo crear el fichaje: ${error.message}`, 'error'); }
         });
 
-        let calendario;
-
-        function inicializarCalendario() {
-            const calendarioEl = document.getElementById('calendarioVacaciones');
-            calendario = new FullCalendar.Calendar(calendarioEl, {
-                initialView: 'dayGridMonth', locale: 'es',
-                headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,listWeek' },
-                events: {
-                    url: '/api/vacaciones', headers: { 'Authorization': `Bearer ${token}` },
-                    failure: () => Swal.fire('Error', 'No se pudieron cargar las vacaciones en el calendario.', 'error'),
-                    eventDataTransform: (evento) => ({
-                        id: evento.id, title: evento.nombre, start: evento.fecha_inicio,
-                        end: new Date(new Date(evento.fecha_fin).getTime() + 86400000).toISOString().split('T')[0]
-                    })
-                }
-            });
-            calendario.render();
+        function inicializarPagina() {
+            document.getElementById("fecha").valueAsDate = new Date();
+            const hoy = new Date();
+            const offset = hoy.getTimezoneOffset();
+            const hoyLocal = new Date(hoy.getTime() - (offset*60*1000));
+            document.getElementById('manualFechaHora').value = hoyLocal.toISOString().slice(0, 16);
+            selectMes.value = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`;
+            getReport();
+            loadUsers();
+            poblarSelectorUsuarios('selectUsuario');
+            poblarSelectorUsuarios('manualUsuario');
         }
-
-        async function mostrarDiasRestantes() {
-            const usuarioId = document.getElementById('vacacionesUsuario').value;
-            const infoSpan = document.getElementById('infoDiasRestantes');
-            if (!usuarioId) { infoSpan.textContent = ''; return; }
-            try {
-                const res = await fetch(`/api/usuarios/${usuarioId}/vacaciones-restantes`, { headers: { Authorization: `Bearer ${token}` } });
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.message);
-                infoSpan.innerHTML = `Disponibles: <span style="color: green;">${data.diasRestantes}</span> / ${data.diasTotales} (Gastados: ${data.diasGastados})`;
-            } catch (error) { infoSpan.textContent = 'Error al calcular días.'; infoSpan.style.color = 'red'; }
-        }
-        
-        document.getElementById('vacacionesUsuario').addEventListener('change', mostrarDiasRestantes);
-
-        document.getElementById('formVacaciones').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const usuarioId = document.getElementById('vacacionesUsuario').value;
-            const fechaInicio = document.getElementById('fechaInicio').value;
-            const fechaFin = document.getElementById('fechaFin').value;
-            try {
-                const res = await fetch('/api/vacaciones', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ usuarioId, fechaInicio, fechaFin }) });
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.message);
-                Swal.fire('¡Éxito!', 'Vacaciones asignadas.', 'success');
-                e.target.reset();
-                document.getElementById('infoDiasRestantes').textContent = '';
-                calendario.refetchEvents();
-            } catch (error) { Swal.fire('Error', `No se pudo asignar: ${error.message}`, 'error'); }
-        });
-        
-        // admin.html - Reemplazar la función entera
-
-function inicializarCalendario() {
-    const calendarioEl = document.getElementById('calendarioVacaciones');
-    calendario = new FullCalendar.Calendar(calendarioEl, {
-        initialView: 'dayGridMonth',
-        locale: 'es',
-        headerToolbar: {
-            left: 'prev,next today',
-            center: 'title',
-            right: 'dayGridMonth,timeGridWeek,listWeek'
-        },
-        // --- AQUÍ ESTÁ EL CAMBIO ---
-        events: function(fetchInfo, successCallback, failureCallback) {
-            fetch('/api/vacaciones', {
-                method: 'GET',
-                headers: {
-                    // La cabecera se construye aquí, asegurando que el token es el correcto
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
-                }
-            })
-            .then(res => {
-                if (!res.ok) {
-                    throw new Error('Respuesta no válida del servidor');
-                }
-                return res.json();
-            })
-            .then(data => {
-                // Transformamos los datos aquí antes de pasarlos al calendario
-                const eventosTransformados = data.map(evento => ({
-                    id: evento.id,
-                    title: evento.nombre,
-                    start: evento.fecha_inicio,
-                    end: new Date(new Date(evento.fecha_fin).getTime() + 86400000).toISOString().split('T')[0]
-                }));
-                successCallback(eventosTransformados);
-            })
-            .catch(error => {
-                failureCallback(error);
-                Swal.fire('Error', 'No se pudieron cargar las vacaciones en el calendario.', 'error');
-            });
-        }
-        // --- FIN DEL CAMBIO ---
-    });
-    calendario.render();
-}
 
         inicializarPagina();
     </script>
