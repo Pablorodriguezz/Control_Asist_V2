@@ -119,7 +119,8 @@ app.get('/api/informe', authenticateToken, async (req, res) => {
 });
 
 app.get('/api/usuarios', authenticateToken, async (req, res) => {
-    if (req.user.rol !== 'admin') return res.status(403).json({ message: 'Acceso denegado.' });
+    // CAMBIO: Permitimos acceso a 'admin' Y 'gestor_vacaciones'
+if (req.user.rol !== 'admin' && req.user.rol !== 'gestor_vacaciones') return res.status(403);
     try {
         const result = await db.query("SELECT id, nombre, usuario, rol FROM usuarios ORDER BY nombre");
         res.json(result.rows);
@@ -296,7 +297,8 @@ function calcularDiasNaturales(fechaInicio, fechaFin) {
 }
 
 app.get('/api/vacaciones', authenticateToken, async (req, res) => {
-    if (req.user.rol !== 'admin') return res.sendStatus(403);
+    // CAMBIO: Permitimos acceso a 'admin' Y 'gestor_vacaciones'
+if (req.user.rol !== 'admin' && req.user.rol !== 'gestor_vacaciones') return res.sendStatus(403);
     const { start, end } = req.query;
     try {
         let sql = `SELECT v.id, v.fecha_inicio, v.fecha_fin, u.nombre FROM vacaciones v JOIN usuarios u ON v.usuario_id = u.id WHERE v.estado = 'aprobada'`;
@@ -315,7 +317,8 @@ app.get('/api/vacaciones', authenticateToken, async (req, res) => {
 });
 
 app.post('/api/vacaciones', authenticateToken, async (req, res) => {
-    if (req.user.rol !== 'admin') return res.sendStatus(403);
+// CAMBIO: Permitimos acceso a 'admin' Y 'gestor_vacaciones'
+if (req.user.rol !== 'admin' && req.user.rol !== 'gestor_vacaciones') return res.sendStatus(403);
     const { usuarioId, fechaInicio, fechaFin } = req.body;
     if (!usuarioId || !fechaInicio || !fechaFin) return res.status(400).json({ message: 'Faltan datos.' });
     try {
@@ -326,7 +329,8 @@ app.post('/api/vacaciones', authenticateToken, async (req, res) => {
 });
 
 app.get('/api/usuarios/:id/vacaciones-restantes', authenticateToken, async (req, res) => {
-    if (req.user.rol !== 'admin') return res.sendStatus(403);
+    // CAMBIO: Permitimos acceso a 'admin' Y 'gestor_vacaciones'
+if (req.user.rol !== 'admin' && req.user.rol !== 'gestor_vacaciones') return res.sendStatus(403);
     const { id } = req.params;
     const anioActual = new Date().getFullYear();
     try {
@@ -348,7 +352,8 @@ app.get('/api/usuarios/:id/vacaciones-restantes', authenticateToken, async (req,
 });
 
 app.put('/api/vacaciones/:id', authenticateToken, async (req, res) => {
-    if (req.user.rol !== 'admin') return res.sendStatus(403);
+    // CAMBIO: Permitimos acceso a 'admin' Y 'gestor_vacaciones'
+if (req.user.rol !== 'admin' && req.user.rol !== 'gestor_vacaciones') return res.sendStatus(403);
     const { id } = req.params;
     const { fechaInicio, fechaFin } = req.body;
     if (!fechaInicio || !fechaFin) return res.status(400).json({ message: 'Faltan las fechas de inicio y fin.' });
@@ -364,7 +369,8 @@ app.put('/api/vacaciones/:id', authenticateToken, async (req, res) => {
 });
 
 app.delete('/api/vacaciones/:id', authenticateToken, async (req, res) => {
-    if (req.user.rol !== 'admin') return res.sendStatus(403);
+    // CAMBIO: Permitimos acceso a 'admin' Y 'gestor_vacaciones'
+if (req.user.rol !== 'admin' && req.user.rol !== 'gestor_vacaciones') return res.sendStatus(403);
     const { id } = req.params;
     try {
         const sql = 'DELETE FROM vacaciones WHERE id = $1';

@@ -25,7 +25,7 @@ const init = async () => {
                 nombre TEXT NOT NULL,
                 usuario TEXT UNIQUE NOT NULL,
                 password TEXT NOT NULL,
-                rol TEXT NOT NULL CHECK(rol IN ('empleado', 'admin')),
+                rol TEXT NOT NULL CHECK(rol IN ('empleado', 'admin', 'gestor_vacaciones')),
                 dias_vacaciones_anuales INTEGER DEFAULT 30
             );
         `);
