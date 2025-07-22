@@ -21,7 +21,10 @@ const JWT_SECRET = 'tu_secreto_super_secreto_y_largo_y_dificil_de_adivinar_98765
 app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
-
+// RUTA PARA HEALTH CHECK DE RAILWAY
+app.get('/', (req, res) => {
+    res.status(200).send('OK');
+});
 // NUEVO: Configuración del cliente S3 para apuntar a Cloudflare R2
 // Leemos las variables de entorno que configuraste en Railway
 const s3Client = new S3Client({
