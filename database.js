@@ -1,10 +1,9 @@
-// database.js (COMPLETO CON VACACIONES)
+// database.js (VERSIÓN CON ACTUALIZACIÓN DE REGLAS)
 const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 
 if (!process.env.DATABASE_URL) {
     console.error("Error Crítico: La variable de entorno DATABASE_URL no está definida.");
-    console.error("Asegúrate de que el servicio de PostgreSQL está correctamente vinculado a este servicio en Railway.");
     process.exit(1);
 }
 
@@ -25,10 +24,31 @@ const init = async () => {
                 nombre TEXT NOT NULL,
                 usuario TEXT UNIQUE NOT NULL,
                 password TEXT NOT NULL,
-                rol TEXT NOT NULL CHECK(rol IN ('empleado', 'admin', 'gestor_vacaciones')),
+                rol TEXT NOT NULL, -- Eliminamos el CHECK de aquí para manejarlo dinámicamente
                 dias_vacaciones_anuales INTEGER DEFAULT 30
             );
         `);
+
+        // ==========================================================
+        // NUEVO: Bloque para actualizar la restricción (constraint) del rol
+        // Esto asegura que en cada despliegue, la regla esté actualizada.
+        // ==========================================================
+        try {
+            // 1. Intentamos eliminar la restricción antigua si existe.
+            await pool.query(`ALTER TABLE usuarios DROP CONSTRAINT IF EXISTS usuarios_rol_check;`);
+            
+            // 2. Añadimos la nueva restricción con todos los roles permitidos.
+            await pool.query(`
+                ALTER TABLE usuarios 
+                ADD CONSTRAINT usuarios_rol_check 
+                CHECK(rol IN ('empleado', 'admin', 'gestor_vacaciones'));
+            `);
+            console.log('Restricción de roles actualizada correctamente.');
+        } catch (err) {
+            console.warn('Advertencia: No se pudo actualizar la restricción de roles. Puede que ya estuviera correcta.', err.message);
+        }
+        // ==========================================================
+
 
         const resColumna = await pool.query(`
             SELECT column_name FROM information_schema.columns 
