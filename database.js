@@ -55,8 +55,8 @@ const init = async () => {
             WHERE table_name='usuarios' AND column_name='dias_vacaciones_anuales'
         `);
         if (resColumna.rowCount === 0) {
-            await pool.query('ALTER TABLE usuarios ADD COLUMN dias_vacaciones_anuales INTEGER DEFAULT 30');
-            console.log('Columna "dias_vacaciones_anuales" añadida a la tabla "usuarios" con valor por defecto 30.');
+            await pool.query('ALTER TABLE usuarios ADD COLUMN dias_vacaciones_anuales INTEGER DEFAULT 28');
+            console.log('Columna "dias_vacaciones_anuales" añadida a la tabla "usuarios" con valor por defecto 28.');
         }
 
         await pool.query(`
