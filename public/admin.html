@@ -16,6 +16,7 @@
 
         <nav class="admin-nav">
             <ul>
+                <li><a href="#dashboard">Dashboard</a></li>
                 <li><a href="#informe-diario">Informe Diario</a></li>
                 <li><a href="#informe-mensual">Informe Mensual</a></li>
                 <li><a href="#gestion-usuarios">Gestión Usuarios</a></li>
@@ -24,6 +25,46 @@
                 <li><a href="#gestion-vacaciones">Gestión Vacaciones</a></li>
             </ul>
         </nav>
+
+        <!-- ===================================== -->
+        <!-- NUEVO: DASHBOARD DE ESTADO EN TIEMPO REAL -->
+        <!-- ===================================== -->
+        <section id="dashboard">
+            <h2>Dashboard en Tiempo Real</h2>
+            <div class="dashboard-grid">
+                <!-- Widget: Quién está dentro -->
+                <div class="widget">
+                    <h3><i class="bi bi-person-check-fill"></i> Empleados Fichados</h3>
+                    <ul id="empleados-dentro" class="employee-list">
+                        <li>Cargando...</li>
+                    </ul>
+                </div>
+
+                <!-- Widget: Quién está fuera -->
+                <div class="widget">
+                    <h3><i class="bi bi-person-x-fill"></i> Empleados Fuera</h3>
+                    <ul id="empleados-fuera" class="employee-list">
+                        <li>Cargando...</li>
+                    </ul>
+                </div>
+
+                <!-- Widget: Ausencias del día -->
+                <div class="widget">
+                    <h3><i class="bi bi-calendar-x"></i> Ausencias Hoy</h3>
+                    <ul id="ausencias-hoy" class="employee-list">
+                        <li>Cargando...</li>
+                    </ul>
+                </div>
+
+                <!-- Widget: Resumen de Fichajes -->
+                <div class="widget">
+                    <h3><i class="bi bi-card-list"></i> Resumen del Día</h3>
+                    <p id="total-fichajes"><strong>Total de fichajes hoy:</strong> <span>Cargando...</span></p>
+                    <p id="fichajes-manuales"><strong>Fichajes manuales/editados:</strong> <span>Cargando...</span></p>
+                </div>
+            </div>
+        </section>
+        <hr />
 
         <section id="informe-diario">
             <h2>Informe de Asistencia Diario</h2>
@@ -135,6 +176,55 @@
         function logout() {
             localStorage.removeItem("token");
             window.location.href = "/index.html";
+        }
+
+        // ===================================================
+        // NUEVO: LÓGICA PARA CARGAR EL DASHBOARD
+        // ===================================================
+        async function cargarDashboard() {
+            const ids = {
+                dentro: document.getElementById('empleados-dentro'),
+                fuera: document.getElementById('empleados-fuera'),
+                ausencias: document.getElementById('ausencias-hoy'),
+                total: document.querySelector('#total-fichajes span'),
+                manuales: document.querySelector('#fichajes-manuales span')
+            };
+
+            try {
+                const res = await fetch('/api/dashboard', { headers: { Authorization: `Bearer ${token}` } });
+                if (!res.ok) throw new Error('No se pudo cargar el dashboard.');
+                const data = await res.json();
+                
+                // Función auxiliar para rellenar listas
+                const rellenarLista = (ulElement, items) => {
+                    ulElement.innerHTML = ''; // Limpiar "Cargando..."
+                    if (items.length === 0) {
+                        ulElement.innerHTML = '<li></li>'; // Para que muestre el mensaje de "No hay datos" del CSS
+                    } else {
+                        items.forEach(item => {
+                            const li = document.createElement('li');
+                            li.textContent = item;
+                            ulElement.appendChild(li);
+                        });
+                    }
+                };
+
+                // Rellenar widgets
+                rellenarLista(ids.dentro, data.empleadosDentro);
+                rellenarLista(ids.fuera, data.empleadosFuera);
+                rellenarLista(ids.ausencias, data.ausenciasHoy);
+                
+                ids.total.textContent = data.resumen.totalFichajes;
+                ids.manuales.textContent = data.resumen.fichajesManuales;
+
+            } catch (error) {
+                console.error('Error en cargarDashboard:', error);
+                // Mostrar mensaje de error en los widgets
+                Object.values(ids).forEach(el => {
+                    if (el.tagName === 'UL') el.innerHTML = '<li>Error al cargar</li>';
+                    else if (el.tagName === 'SPAN') el.textContent = 'Error';
+                });
+            }
         }
 
         async function getReport() {
@@ -545,12 +635,15 @@
             const hoy = new Date(), offset = hoy.getTimezoneOffset(), hoyLocal = new Date(hoy.getTime() - (offset*60*1000));
             document.getElementById('manualFechaHora').value = hoyLocal.toISOString().slice(0, 16);
             selectMes.value = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`;
+            
+            cargarDashboard(); // Cargar el nuevo dashboard
             getReport();
             loadUsers();
             poblarSelectorUsuarios('selectUsuario');
             poblarSelectorUsuarios('manualUsuario');
             poblarSelectorUsuarios('vacacionesUsuario');
             inicializarCalendario();
+
             const fechaInicioInput = document.getElementById('fechaInicio'), fechaFinInput = document.getElementById('fechaFin');
             fechaInicioInput.addEventListener('change', () => {
                 const fechaInicioSeleccionada = fechaInicioInput.value;
@@ -563,14 +656,8 @@
 
         inicializarPagina();
 
-        
-
-        // ===============================================
-        // NUEVO: LÓGICA PARA EL BOTÓN "VOLVER ARRIBA"
-        // ===============================================
+        // Lógica para el botón "Volver arriba"
         const scrollTopBtn = document.getElementById("scrollTopBtn");
-
-        // Muestra el botón cuando el usuario baja 100px en la página
         window.onscroll = function() {
             if (document.body.scrollTop > 100 || document.documentElement.scrollTop > 100) {
                 scrollTopBtn.classList.add("show");
@@ -578,14 +665,9 @@
                 scrollTopBtn.classList.remove("show");
             }
         };
-
-        // Función que se ejecuta al hacer clic en el botón
-        function scrollToTop() {
+        scrollTopBtn.addEventListener("click", () => {
             window.scrollTo({top: 0, behavior: 'smooth'});
-        }
-
-        // Asigna la función al evento 'click' del botón
-        scrollTopBtn.addEventListener("click", scrollToTop);
+        });
     </script>
 </body>
 </html>
