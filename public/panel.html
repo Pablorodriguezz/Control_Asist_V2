@@ -7,7 +7,6 @@
     <link rel="stylesheet" href="style.css">
     <link href='https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css' rel='stylesheet'>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <!-- SCRIPT DE FULLCALENDAR (NECESARIO PARA LA NUEVA PESTAÑA) -->
     <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js'></script>
 </head>
 <body>
@@ -80,6 +79,7 @@
         <div id="calendario-content" class="tab-content">
             <section class="calendario-section">
                 <h2>Mi Calendario de Vacaciones</h2>
+                <p id="info-dias-calendario" class="vacation-counter">Cargando días...</p>
                 <div id="miCalendario"></div>
             </section>
         </div>
@@ -87,21 +87,11 @@
     
     <!-- ===== BARRA DE NAVEGACIÓN INFERIOR ===== -->
     <nav class="bottom-nav">
-        <a href="#" class="nav-item active" data-target="inicio-content">
-            <i class="bi bi-house-door-fill"></i>
-            <span>Inicio</span>
-        </a>
-        <a href="#" class="nav-item" data-target="historial-content">
-            <i class="bi bi-calendar-week-fill"></i>
-            <span>Historial</span>
-        </a>
-        <a href="#" class="nav-item" data-target="calendario-content">
-            <i class="bi bi-calendar-heart-fill"></i>
-            <span>Calendario</span>
-        </a>
+        <a href="#" class="nav-item active" data-target="inicio-content"><i class="bi bi-house-door-fill"></i><span>Inicio</span></a>
+        <a href="#" class="nav-item" data-target="historial-content"><i class="bi bi-calendar-week-fill"></i><span>Historial</span></a>
+        <a href="#" class="nav-item" data-target="calendario-content"><i class="bi bi-calendar-heart-fill"></i><span>Vacaciones</span></a>
     </nav>
     
-    <!-- MODAL DE CÁMARA (sin cambios) -->
     <div id="cameraModal" class="modal"><div class="modal-content"><h2>Sonríe para la foto</h2><video id="video" autoplay playsinline></video><p>Tomando foto en 3 segundos...</p></div></div>
     <canvas id="canvas" style="display:none;"></canvas>
 
@@ -109,22 +99,19 @@
         const token = localStorage.getItem('token');
         if (!token) window.location.href = '/index.html';
 
-        // --- VARIABLES GLOBALES ---
         const [btnEntrada, btnSalida] = [document.getElementById('btnEntrada'), document.getElementById('btnSalida')];
         const [cameraModal, video, canvas] = [document.getElementById('cameraModal'), document.getElementById('video'), document.getElementById('canvas')];
         let stream;
-        let miCalendario; // Variable para guardar la instancia del calendario
+        let miCalendario;
 
-        // --- FUNCIONES DE LOGOUT ---
         function confirmarLogout() {
             Swal.fire({
-                title: '¿Cerrar sesión?', text: "¿Estás seguro de que quieres salir?", icon: 'question',
+                title: '¿Cerrar sesión?', text: "¿Estás seguro?", icon: 'question',
                 showCancelButton: true, confirmButtonText: 'Sí, cerrar sesión', cancelButtonText: 'Cancelar'
             }).then((result) => { if (result.isConfirmed) logout(); });
         }
         function logout() { localStorage.removeItem('token'); window.location.href = '/index.html'; }
 
-        // --- FUNCIONES DE CARGA DE DATOS ---
         async function cargarDatosInicio() {
             const mesValue = document.getElementById('selectMesHistorial').value;
             if (!mesValue) return;
@@ -134,10 +121,8 @@
                     fetch('/api/mis-vacaciones-restantes', { headers: { 'Authorization': `Bearer ${token}` } }),
                     fetch(`/api/mis-registros?anio=${anio}&mes=${mes}`, { headers: { 'Authorization': `Bearer ${token}` } })
                 ]);
-                // Vacaciones
                 const dataVac = await resVac.json();
                 document.getElementById('dias-vacaciones').textContent = dataVac.diasRestantes ?? '--';
-                // Registros
                 const dataReg = await resReg.json();
                 if (!resReg.ok) throw new Error(dataReg.message);
                 document.getElementById('fichajes-mes').textContent = dataReg.length;
@@ -182,46 +167,46 @@
                 }
             } catch (error) { tbody.innerHTML = `<tr><td colspan="3" class="error">${error.message}</td></tr>`; }
         }
+        
+        async function cargarContadorVacaciones() {
+            const infoP = document.getElementById('info-dias-calendario');
+            infoP.textContent = 'Cargando días...';
+            try {
+                const res = await fetch('/api/mis-vacaciones-restantes', { headers: { 'Authorization': `Bearer ${token}` } });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.message);
+                infoP.innerHTML = `Disponibles: <span class="dias-restantes">${data.diasRestantes}</span> / ${data.diasTotales} (Gastados: ${data.diasGastados})`;
+            } catch (error) {
+                console.error('Error al cargar el contador de vacaciones:', error);
+                infoP.textContent = 'No se pudo cargar el balance de días.';
+                infoP.style.color = 'red';
+            }
+        }
 
-                function inicializarMiCalendario() {
+        function inicializarMiCalendario() {
             const calendarioEl = document.getElementById('miCalendario');
             miCalendario = new FullCalendar.Calendar(calendarioEl, {
-                initialView: 'dayGridMonth',
-                locale: 'es',
+                initialView: 'dayGridMonth', locale: 'es',
                 headerToolbar: { left: 'prev,next', center: 'title', right: 'today' },
-                // --- CAMBIO CLAVE: Usamos una función para 'events' ---
                 events: function(fetchInfo, successCallback, failureCallback) {
                     fetch('/api/mis-vacaciones', {
                         method: 'GET',
-                        headers: {
-                            'Authorization': `Bearer ${token}` // Añadimos la autorización
-                        }
+                        headers: { 'Authorization': `Bearer ${token}` }
                     })
-                    .then(res => {
-                        if (!res.ok) {
-                            throw new Error('No se pudo cargar el calendario');
-                        }
-                        return res.json();
-                    })
+                    .then(res => res.ok ? res.json() : Promise.reject('Error en respuesta'))
                     .then(data => {
-                        // El `eventDataTransform` lo hacemos aquí ahora
                         const eventosProcesados = data.map(evento => ({
                             ...evento,
                             end: new Date(new Date(evento.end).getTime() + 86400000).toISOString().split('T')[0]
                         }));
                         successCallback(eventosProcesados);
                     })
-                    .catch(error => {
-                        failureCallback(error);
-                        console.error('Error al cargar eventos del calendario:', error);
-                        Swal.fire('Error', 'No se pudo cargar tu calendario de vacaciones.', 'error');
-                    });
+                    .catch(error => { failureCallback(error); });
                 }
             });
             miCalendario.render();
         }
 
-        // --- FUNCIONES DE FICHAJE (sin cambios) ---
         async function inicializarPanel() {
              try {
                 const res = await fetch('/api/estado', { headers: { 'Authorization': `Bearer ${token}` } });
@@ -256,34 +241,27 @@
         }
         function actualizarBotones(estado) { btnEntrada.disabled = (estado === 'entrada'); btnSalida.disabled = (estado !== 'entrada'); }
 
-        // --- LÓGICA DE NAVEGACIÓN Y INICIALIZACIÓN ---
         document.addEventListener('DOMContentLoaded', () => {
             const navItems = document.querySelectorAll('.nav-item');
             const tabContents = document.querySelectorAll('.tab-content');
-
             navItems.forEach(item => {
                 item.addEventListener('click', (e) => {
                     e.preventDefault();
                     const targetId = item.getAttribute('data-target');
-
-                    // Gestionar visibilidad de pestañas
                     tabContents.forEach(content => content.classList.remove('active'));
                     document.getElementById(targetId).classList.add('active');
-
-                    // Gestionar estado activo del menú
                     navItems.forEach(i => i.classList.remove('active'));
                     item.classList.add('active');
-
-                    // Cargar contenido específico si es necesario
                     if (targetId === 'historial-content') {
                         cargarHistorialCompleto();
-                    } else if (targetId === 'calendario-content' && !miCalendario) {
-                        // Cargar el calendario solo la primera vez que se hace clic
-                        inicializarMiCalendario();
+                    } else if (targetId === 'calendario-content') {
+                        cargarContadorVacaciones();
+                        if (!miCalendario) {
+                            inicializarMiCalendario();
+                        }
                     }
                 });
             });
-
             function inicializarPaginaEmpleado() {
                 const hoy = new Date();
                 document.getElementById('selectMesHistorial').value = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`;
