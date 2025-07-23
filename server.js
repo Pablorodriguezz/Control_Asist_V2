@@ -289,12 +289,8 @@ app.get('/api/exportar-csv', authenticateToken, async (req, res) => {
 // RUTAS PARA GESTIÓN DE VACACIONES
 // =================================================================
 
-function calcularDiasNaturales(fechaInicio, fechaFin) {
-    const inicio = DateTime.fromJSDate(new Date(fechaInicio));
-    const fin = DateTime.fromJSDate(new Date(fechaFin));
-    const diff = fin.diff(inicio, 'days').toObject();
-    return diff.days + 1;
-}
+
+
 
 app.get('/api/vacaciones', authenticateToken, async (req, res) => {
     if (req.user.rol !== 'admin' && req.user.rol !== 'gestor_vacaciones') return res.sendStatus(403);
