@@ -183,18 +183,39 @@
             } catch (error) { tbody.innerHTML = `<tr><td colspan="3" class="error">${error.message}</td></tr>`; }
         }
 
-        function inicializarMiCalendario() {
+                function inicializarMiCalendario() {
             const calendarioEl = document.getElementById('miCalendario');
             miCalendario = new FullCalendar.Calendar(calendarioEl, {
                 initialView: 'dayGridMonth',
                 locale: 'es',
                 headerToolbar: { left: 'prev,next', center: 'title', right: 'today' },
-                events: '/api/mis-vacaciones', // Nueva ruta para obtener solo mis vacaciones
-                eventDataTransform: function(eventData) {
-                    return {
-                        ...eventData,
-                        end: new Date(new Date(eventData.end).getTime() + 86400000).toISOString().split('T')[0]
-                    };
+                // --- CAMBIO CLAVE: Usamos una función para 'events' ---
+                events: function(fetchInfo, successCallback, failureCallback) {
+                    fetch('/api/mis-vacaciones', {
+                        method: 'GET',
+                        headers: {
+                            'Authorization': `Bearer ${token}` // Añadimos la autorización
+                        }
+                    })
+                    .then(res => {
+                        if (!res.ok) {
+                            throw new Error('No se pudo cargar el calendario');
+                        }
+                        return res.json();
+                    })
+                    .then(data => {
+                        // El `eventDataTransform` lo hacemos aquí ahora
+                        const eventosProcesados = data.map(evento => ({
+                            ...evento,
+                            end: new Date(new Date(evento.end).getTime() + 86400000).toISOString().split('T')[0]
+                        }));
+                        successCallback(eventosProcesados);
+                    })
+                    .catch(error => {
+                        failureCallback(error);
+                        console.error('Error al cargar eventos del calendario:', error);
+                        Swal.fire('Error', 'No se pudo cargar tu calendario de vacaciones.', 'error');
+                    });
                 }
             });
             miCalendario.render();
