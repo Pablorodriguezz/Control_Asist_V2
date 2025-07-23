@@ -513,6 +513,8 @@ app.get('/api/mis-vacaciones', authenticateToken, async (req, res) => {
 });
 
 // (EMPLEADO) Nueva ruta para solicitar vacaciones
+// En server.js
+
 app.post('/api/solicitar-vacaciones', authenticateToken, async (req, res) => {
     const { fechaInicio, fechaFin } = req.body;
     const usuarioId = req.user.id;
@@ -525,23 +527,42 @@ app.post('/api/solicitar-vacaciones', authenticateToken, async (req, res) => {
     try {
         const diasSolicitados = calcularDiasNaturales(fechaInicio, fechaFin);
 
+        // --- ¡VALIDACIÓN ACTUALIZADA AQUÍ! ---
+        if (diasSolicitados < 7) {
+            return res.status(400).json({ 
+                message: `Debes solicitar un mínimo de 7 días. Has solicitado ${diasSolicitados}.` 
+            });
+        }
+        if (diasSolicitados > 14) {
+            return res.status(400).json({
+                message: `Puedes solicitar un máximo de 14 días. Has solicitado ${diasSolicitados}.`
+            });
+        }
+        // --- FIN DE LA VALIDACIÓN ACTUALIZADA ---
+
         const resUsuario = await db.query('SELECT dias_vacaciones_anuales FROM usuarios WHERE id = $1', [usuarioId]);
-        const diasTotales = resUsuario.rows[0].dias_vacaciones_anuales ?? 30;
+        const diasTotales = resUsuario.rows[0].dias_vacaciones_anuales ?? 28;
 
         const resVacaciones = await db.query("SELECT fecha_inicio, fecha_fin FROM vacaciones WHERE usuario_id = $1 AND estado IN ('aprobada', 'pendiente') AND EXTRACT(YEAR FROM fecha_inicio) = $2", [usuarioId, anioActual]);
+        
         let diasComprometidos = resVacaciones.rows.reduce((total, vac) => total + calcularDiasNaturales(vac.fecha_inicio, vac.fecha_fin), 0);
         
         const diasRestantes = diasTotales - diasComprometidos;
 
         if (diasSolicitados > diasRestantes) {
-            return res.status(400).json({ message: `Días insuficientes. Solicitas ${diasSolicitados} y solo te quedan ${diasRestantes} (contando pendientes).` });
+            return res.status(400).json({ message: `Días insuficientes. Solicitas ${diasSolicitados} y solo te quedan ${diasRestantes} disponibles.` });
         }
         
         await db.query('INSERT INTO vacaciones (usuario_id, fecha_inicio, fecha_fin, estado) VALUES ($1, $2, $3, $4)', [usuarioId, fechaInicio, fechaFin, 'pendiente']);
-        res.status(201).json({ message: 'Solicitud de vacaciones enviada.' });
+        res.status(201).json({ message: 'Solicitud de vacaciones enviada correctamente.' });
 
-    } catch (err) { res.status(500).json({ message: 'Error al procesar la solicitud.' }); }
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: 'Error al procesar la solicitud.' });
+    }
 });
+
+  
 
 // (ADMIN) Nueva ruta para ver solicitudes pendientes
 app.get('/api/vacaciones-pendientes', authenticateToken, async (req, res) => {

@@ -329,34 +329,66 @@
             });
 
             // --- 2. AÑADIDO: EVENT LISTENER PARA EL FORMULARIO DE SOLICITUD ---
-            document.getElementById('solicitarVacacionesForm').addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const btn = e.target.querySelector('button');
-                btn.disabled = true; 
-                btn.textContent = 'Enviando...';
-                
-                try {
-                    const res = await fetch('/api/solicitar-vacaciones', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                        body: JSON.stringify({
-                            fechaInicio: document.getElementById('fechaInicioSolicitud').value,
-                            fechaFin: document.getElementById('fechaFinSolicitud').value
-                        })
-                    });
-                    const data = await res.json();
-                    if (!res.ok) throw new Error(data.message);
-                    
-                    Swal.fire('¡Éxito!', data.message, 'success');
-                    e.target.reset();
-                    cargarDatosSolicitudes(); // Recargar la lista para ver la nueva solicitud
-                } catch (error) {
-                    Swal.fire('Error', error.message, 'error');
-                } finally {
-                    btn.disabled = false;
-                    btn.textContent = 'Enviar Solicitud';
-                }
-            });
+            // Reemplaza el listener de tu formulario por este en panel.html
+
+document.getElementById('solicitarVacacionesForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fechaInicio = document.getElementById('fechaInicioSolicitud').value;
+    const fechaFin = document.getElementById('fechaFinSolicitud').value;
+    
+    if (!fechaInicio || !fechaFin) {
+        Swal.fire('Atención', 'Por favor, selecciona una fecha de inicio y de fin.', 'warning');
+        return;
+    }
+
+    // --- ¡VALIDACIÓN ACTUALIZADA EN EL FRONTEND! ---
+    const inicio = new Date(fechaInicio);
+    const fin = new Date(fechaFin);
+    const diffTime = Math.abs(fin - inicio);
+    const diasSeleccionados = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+
+    if (diasSeleccionados < 7) {
+        Swal.fire({
+            icon: 'error',
+            title: 'Solicitud no válida',
+            text: `Debes solicitar un mínimo de 7 días. Has seleccionado ${diasSeleccionados} días.`
+        });
+        return; 
+    }
+    
+    if (diasSeleccionados > 14) {
+        Swal.fire({
+            icon: 'error',
+            title: 'Solicitud no válida',
+            text: `Puedes solicitar un máximo de 14 días. Has seleccionado ${diasSeleccionados} días.`
+        });
+        return;
+    }
+    // --- FIN DE LA VALIDACIÓN ACTUALIZADA ---
+
+    const btn = e.target.querySelector('button');
+    btn.disabled = true; 
+    btn.textContent = 'Enviando...';
+    
+    try {
+        const res = await fetch('/api/solicitar-vacaciones', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ fechaInicio, fechaFin })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message);
+        
+        Swal.fire('¡Éxito!', data.message, 'success');
+        e.target.reset();
+        cargarDatosSolicitudes(); 
+    } catch (error) {
+        Swal.fire('Error', error.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Enviar Solicitud';
+    }
+});
 
             // Función que se ejecuta al cargar la página por primera vez
             function inicializarPaginaEmpleado() {

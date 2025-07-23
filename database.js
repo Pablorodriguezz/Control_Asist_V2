@@ -25,7 +25,7 @@ const init = async () => {
                 usuario TEXT UNIQUE NOT NULL,
                 password TEXT NOT NULL,
                 rol TEXT NOT NULL, -- Eliminamos el CHECK de aquí para manejarlo dinámicamente
-                dias_vacaciones_anuales INTEGER DEFAULT 30
+                dias_vacaciones_anuales INTEGER DEFAULT 28
             );
         `);
 
@@ -95,7 +95,7 @@ const init = async () => {
         await pool.query("ALTER TABLE vacaciones DROP CONSTRAINT IF EXISTS vacaciones_estado_check;");
         await pool.query("ALTER TABLE vacaciones ADD CONSTRAINT vacaciones_estado_check CHECK(estado IN ('aprobada', 'pendiente', 'rechazada'));");
         console.log('Tabla "vacaciones" actualizada con estados.');
-        
+
         
         console.log('Tablas (usuarios, registros, vacaciones) verificadas/creadas correctamente.');
 
