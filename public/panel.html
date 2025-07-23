@@ -2,20 +2,85 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Panel de Fichaje</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Panel de Empleado</title>
     <link rel="stylesheet" href="style.css">
+    <link href='https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css' rel='stylesheet'>
 </head>
 <body>
-    <div class="container">
-        <h1>Control de Asistencia</h1>
-        <p id="welcome"></p>
-        <button id="btnEntrada" class="btn-fichar" onclick="iniciarFichaje('entrada')">Registrar ENTRADA</button>
-        <button id="btnSalida" class="btn-fichar" onclick="iniciarFichaje('salida')">Registrar SALIDA</button>
-        <p id="statusMessage" style="font-weight: bold;"></p>
+    <!-- ===== HEADER ===== -->
+    <header class="main-header">
+        <div class="logo-container">
+            <img src="/images/logo1.jpg" alt="Logo" class="header-logo">
+            <span class="header-title">Mi Portal</span>
+        </div>
+        <div class="profile-container">
+            <button class="profile-btn" onclick="logout()" title="Cerrar Sesión"><i class="bi bi-person-circle"></i></button>
+        </div>
+    </header>
 
-        <hr />
-        <section class="historial-section">
+    <!-- ===== CONTENIDO PRINCIPAL ===== -->
+    <main class="main-content">
+        <!-- SECCIÓN DE DESTACADOS (WIDGETS) -->
+        <section class="highlight-section">
+            <h2>Destacados</h2>
+            <div class="widget-grid">
+                <div class="widget-card">
+                    <span id="dias-vacaciones" class="widget-value">--</span>
+                    <span class="widget-label">Días vacaciones</span>
+                </div>
+                <div class="widget-card">
+                    <span id="fichajes-mes" class="widget-value">--</span>
+                    <span class="widget-label">Fichajes este mes</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECCIÓN DE FICHAJE -->
+        <section class="fichaje-section">
+            <h2>Fichaje</h2>
+            <div class="fichaje-actions">
+                <!-- Botón de Entrada -->
+                <div class="action-button-wrapper">
+                    <button id="btnEntrada" class="action-button primary entrada" onclick="iniciarFichaje('entrada')">
+                        <i class="bi bi-plus-lg"></i>
+                    </button>
+                    <span class="action-label">Entrada</span>
+                </div>
+                <!-- Botón de Salida -->
+                <div class="action-button-wrapper">
+                    <button id="btnSalida" class="action-button primary salida" onclick="iniciarFichaje('salida')">
+                        <i class="bi bi-dash-lg"></i>
+                    </button>
+                    <span class="action-label">Salida</span>
+                </div>
+                 <!-- Botones secundarios (placeholders) -->
+                <div class="action-button-wrapper">
+                    <button class="action-button secondary" disabled>
+                        <i class="bi bi-house-door-fill"></i>
+                    </button>
+                    <span class="action-label">Teletrab...</span>
+                </div>
+                <div class="action-button-wrapper">
+                    <button class="action-button secondary" disabled>
+                        <i class="bi bi-person-walking"></i>
+                    </button>
+                    <span class="action-label">Desplaza...</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECCIÓN ÚLTIMO FICHAJE -->
+        <section id="historialSection" class="historial-section">
+            <h2>Último Fichaje</h2>
+            <div id="ultimoFichaje" class="ultimo-fichaje-card">
+                <p>Cargando...</p>
+            </div>
+            <a href="#historialCompleto" class="ver-mas-link">Ver historial completo</a>
+        </section>
+
+        <!-- SECCIÓN HISTORIAL COMPLETO (OCULTA INICIALMENTE O MÁS ABAJO) -->
+        <section id="historialCompleto" class="historial-completo-section">
             <h2>Mi Historial de Fichajes</h2>
             <div>
                 <label for="selectMesHistorial">Selecciona el mes:</label>
@@ -23,21 +88,30 @@
             </div>
             <div class="table-container">
                 <table id="historialTable">
-                    <thead>
-                        <tr>
-                            <th>Fecha y Hora</th>
-                            <th>Tipo</th>
-                            <th>Observaciones</th>
-                        </tr>
-                    </thead>
+                    <thead><tr><th>Fecha y Hora</th><th>Tipo</th><th>Observaciones</th></tr></thead>
                     <tbody></tbody>
                 </table>
             </div>
         </section>
-
-        <button onclick="logout()">Cerrar Sesión</button>
-    </div>
-
+    </main>
+    
+    <!-- ===== BARRA DE NAVEGACIÓN INFERIOR ===== -->
+    <nav class="bottom-nav">
+        <a href="#" class="nav-item active">
+            <i class="bi bi-house-door-fill"></i>
+            <span>Inicio</span>
+        </a>
+        <a href="#historialCompleto" class="nav-item">
+            <i class="bi bi-calendar-week-fill"></i>
+            <span>Historial</span>
+        </a>
+        <a href="#" class="nav-item" onclick="Swal.fire('Próximamente', 'La sección de solicitudes estará disponible en futuras versiones.', 'info')">
+            <i class="bi bi-send-fill"></i>
+            <span>Solicitudes</span>
+        </a>
+    </nav>
+    
+    <!-- MODAL DE CÁMARA (sin cambios) -->
     <div id="cameraModal" class="modal">
         <div class="modal-content">
             <h2>Sonríe para la foto</h2>
@@ -51,44 +125,82 @@
         const token = localStorage.getItem('token');
         if (!token) window.location.href = '/index.html';
 
-        const [btnEntrada, btnSalida, welcomeP, statusMessageP] = [document.getElementById('btnEntrada'), document.getElementById('btnSalida'), document.getElementById('welcome'), document.getElementById('statusMessage')];
+        const [btnEntrada, btnSalida] = [document.getElementById('btnEntrada'), document.getElementById('btnSalida')];
         const [cameraModal, video, canvas] = [document.getElementById('cameraModal'), document.getElementById('video'), document.getElementById('canvas')];
         let stream;
-        
-        async function verMisFichajes() {
+
+        // Función principal para cargar todos los datos del empleado
+        async function cargarDatosEmpleado() {
             const mesValue = document.getElementById('selectMesHistorial').value;
             if (!mesValue) return;
+
             const [anio, mes] = mesValue.split('-');
             const tbody = document.querySelector("#historialTable tbody");
             tbody.innerHTML = '<tr><td colspan="3">Cargando historial...</td></tr>';
+            
+            // Cargar días de vacaciones restantes
+            try {
+                const resVac = await fetch('/api/mis-vacaciones-restantes', { headers: { 'Authorization': `Bearer ${token}` } });
+                const dataVac = await resVac.json();
+                document.getElementById('dias-vacaciones').textContent = dataVac.diasRestantes ?? '--';
+            } catch (error) {
+                console.error('Error al cargar vacaciones:', error);
+                document.getElementById('dias-vacaciones').textContent = 'Error';
+            }
+
+            // Cargar historial de fichajes y actualizar widgets y último fichaje
             try {
                 const url = `/api/mis-registros?anio=${anio}&mes=${mes}`;
                 const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.message);
+
+                // Actualizar widget de fichajes del mes
+                document.getElementById('fichajes-mes').textContent = data.length;
+
                 tbody.innerHTML = "";
+                const ultimoFichajeDiv = document.getElementById('ultimoFichaje');
+
                 if (data.length === 0) {
                     tbody.innerHTML = '<tr><td colspan="3">No tienes registros para este mes.</td></tr>';
+                    ultimoFichajeDiv.innerHTML = '<p>No hay información disponible</p>';
                 } else {
+                    // Rellenar tabla de historial
                     data.forEach(registro => {
                         const tr = document.createElement("tr");
                         const fechaHora = new Date(registro.fecha_hora).toLocaleString("es-ES", { dateStyle: "long", timeStyle: "medium" });
                         let observaciones = 'Correcto';
                         if (registro.es_modificado) {
-                            const fechaOriginal = registro.fecha_hora_original ? new Date(registro.fecha_hora_original).toLocaleString("es-ES") : 'N/A';
-                            const motivo = registro.motivo_modificacion || 'N/A';
-                            const title = registro.fecha_hora_original ? `Editado por Admin. Original: ${fechaOriginal}. Motivo: ${motivo}` : `Registro manual por Admin. Motivo: ${motivo}`;
+                            const title = registro.fecha_hora_original ? `Editado por Admin. Original: ${new Date(registro.fecha_hora_original).toLocaleString("es-ES")}` : `Registro manual por Admin.`;
                             observaciones = `<span title="${title}" style="cursor: help; color: #f39c12; font-weight: bold;">Modificado ✏️</span>`;
                         }
                         tr.innerHTML = `<td>${fechaHora}</td><td>${registro.tipo}</td><td>${observaciones}</td>`;
                         tbody.appendChild(tr);
                     });
+
+                    // Actualizar tarjeta de "Último Fichaje"
+                    const ultimo = data[data.length - 1];
+                    const fechaUltimo = new Date(ultimo.fecha_hora).toLocaleString("es-ES", { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
+                    const tipoUltimo = ultimo.tipo.charAt(0).toUpperCase() + ultimo.tipo.slice(1);
+                    const icono = tipoUltimo === 'Entrada' ? '<i class="bi bi-box-arrow-in-right" style="color: #2ecc71;"></i>' : '<i class="bi bi-box-arrow-right" style="color: #e74c3c;"></i>';
+                    ultimoFichajeDiv.innerHTML = `<p>${icono} <strong>${tipoUltimo}</strong> - ${fechaUltimo}</p>`;
                 }
-            } catch (error) { tbody.innerHTML = `<tr><td colspan="3" class="error">Error: ${error.message}</td></tr>`; }
+            } catch (error) { 
+                tbody.innerHTML = `<tr><td colspan="3" class="error">Error: ${error.message}</td></tr>`; 
+                document.getElementById('ultimoFichaje').innerHTML = '<p>Error al cargar datos.</p>';
+            }
         }
 
-        try { welcomeP.textContent = `Hola, ${JSON.parse(atob(token.split('.')[1])).nombre}`; } catch (e) { logout(); }
+        async function inicializarPanel() {
+             try {
+                const res = await fetch('/api/estado', { headers: { 'Authorization': `Bearer ${token}` } });
+                if (!res.ok) { if (res.status === 401 || res.status === 403) logout(); return; }
+                const data = await res.json();
+                actualizarBotones(data.estado);
+            } catch (error) { console.error("Error al inicializar panel:", error); }
+        }
 
+        // --- Lógica de fichaje (sin cambios, solo se adapta a los nuevos botones) ---
         async function iniciarFichaje(tipo) {
             cameraModal.style.display = 'flex';
             try {
@@ -117,28 +229,30 @@
         }
 
         async function enviarFichaje(formData) {
-            statusMessageP.textContent = 'Enviando registro...';
+            const tipo = formData.get('tipo');
+            const button = tipo === 'entrada' ? btnEntrada : btnSalida;
+            button.innerHTML = '<div class="loader"></div>'; // Muestra un spinner
+            button.disabled = true;
+
             try {
                 const res = await fetch('/api/fichar', { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: formData });
                 const data = await res.json();
-                statusMessageP.textContent = data.message;
-                if (res.ok) {
-                    inicializarPanel();
-                    verMisFichajes();
-                }
-            } catch (error) { statusMessageP.textContent = "Error de conexión."; } 
-            finally { setTimeout(() => statusMessageP.textContent = '', 5000); }
-        }
+                if (!res.ok) throw new Error(data.message);
 
-        async function inicializarPanel() {
-            try {
-                const res = await fetch('/api/estado', { headers: { 'Authorization': `Bearer ${token}` } });
-                if (!res.ok) { if (res.status === 401 || res.status === 403) logout(); return; }
-                const data = await res.json();
-                actualizarBotones(data.estado);
-            } catch (error) { console.error("Error al inicializar panel:", error); }
+                Swal.fire({ icon: 'success', title: '¡Registrado!', text: data.message, timer: 2000, showConfirmButton: false });
+                
+                // Recargar todo para actualizar la UI
+                inicializarPanel();
+                cargarDatosEmpleado();
+            } catch (error) { 
+                Swal.fire({ icon: 'error', title: 'Error', text: error.message || 'Error de conexión.' });
+            } finally {
+                // Restaurar botón
+                const iconClass = tipo === 'entrada' ? 'bi-plus-lg' : 'bi-dash-lg';
+                button.innerHTML = `<i class="bi ${iconClass}"></i>`;
+            }
         }
-
+        
         function actualizarBotones(estado) {
             btnEntrada.disabled = (estado === 'entrada');
             btnSalida.disabled = (estado !== 'entrada');
@@ -148,10 +262,9 @@
 
         function inicializarPaginaEmpleado() {
             const hoy = new Date();
-            const mesActual = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`;
-            document.getElementById('selectMesHistorial').value = mesActual;
+            document.getElementById('selectMesHistorial').value = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`;
             inicializarPanel();
-            verMisFichajes();
+            cargarDatosEmpleado();
         }
 
         inicializarPaginaEmpleado();

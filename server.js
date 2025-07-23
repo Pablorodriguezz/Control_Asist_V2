@@ -474,6 +474,38 @@ app.get('/api/dashboard', authenticateToken, async (req, res) => {
     }
 });
 
+app.get('/api/mis-vacaciones-restantes', authenticateToken, async (req, res) => {
+    const usuarioId = req.user.id; // Obtenemos el ID del token
+    const anioActual = new Date().getFullYear();
+
+    try {
+        const resUsuario = await db.query('SELECT dias_vacaciones_anuales FROM usuarios WHERE id = $1', [usuarioId]);
+        if (resUsuario.rowCount === 0) {
+            return res.status(404).json({ message: 'Usuario no encontrado.' });
+        }
+        
+        const diasTotales = resUsuario.rows[0].dias_vacaciones_anuales ?? 30;
+        
+        const sqlVacaciones = `SELECT fecha_inicio, fecha_fin FROM vacaciones WHERE usuario_id = $1 AND estado = 'aprobada' AND EXTRACT(YEAR FROM fecha_inicio) = $2`;
+        const resVacaciones = await db.query(sqlVacaciones, [usuarioId, anioActual]);
+        
+        let diasGastados = 0;
+        resVacaciones.rows.forEach(vac => {
+            // Reutilizamos la función de cálculo que ya tenías
+            const inicio = DateTime.fromJSDate(new Date(vac.fecha_inicio));
+            const fin = DateTime.fromJSDate(new Date(vac.fecha_fin));
+            diasGastados += fin.diff(inicio, 'days').toObject().days + 1;
+        });
+        
+        const diasRestantes = diasTotales - diasGastados;
+        res.json({ diasTotales, diasGastados, diasRestantes });
+
+    } catch(err) {
+        console.error("Error al calcular mis días restantes:", err);
+        res.status(500).json({ message: 'Error al calcular días restantes.' });
+    }
+});
+
 
 
 
