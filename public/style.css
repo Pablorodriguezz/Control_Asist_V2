@@ -146,6 +146,15 @@ button:disabled { background-color: #85c1e9 !important; cursor: not-allowed; opa
     color: #7f8c8d;
 }
 
+/* Estilos para la pestaña de solicitudes del empleado */
+.solicitudes-section form { margin-top: 15px; }
+.status-aprobada { color: var(--success-color); font-weight: bold; }
+.status-pendiente { color: #f39c12; font-weight: bold; }
+.status-rechazada { color: var(--danger-color); font-weight: bold; text-decoration: line-through; }
+
+/* Nuevo color de botón para "Aprobar" en el panel de admin */
+.btn-success { background-color: var(--success-color); }
+
 /* Botones de Fichaje */
 .fichaje-actions {
     display: grid;

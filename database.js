@@ -74,16 +74,28 @@ const init = async () => {
             );
         `);
 
+                // --- CAMBIO IMPORTANTE: ACTUALIZACIÓN DE LA TABLA VACACIONES ---
         await pool.query(`
             CREATE TABLE IF NOT EXISTS vacaciones (
                 id SERIAL PRIMARY KEY,
                 usuario_id INTEGER REFERENCES usuarios(id) ON DELETE CASCADE,
                 fecha_inicio DATE NOT NULL,
                 fecha_fin DATE NOT NULL,
-                estado TEXT NOT NULL CHECK(estado IN ('aprobada', 'pendiente', 'rechazada')) DEFAULT 'aprobada',
+                estado TEXT NOT NULL DEFAULT 'pendiente', -- Ahora el estado por defecto es 'pendiente'
                 comentarios TEXT
             );
         `);
+        
+        // Script para asegurar que la columna 'estado' y la restricción existan y estén actualizadas
+        const resColEstado = await pool.query("SELECT 1 FROM information_schema.columns WHERE table_name='vacaciones' AND column_name='estado'");
+        if (resColEstado.rowCount === 0) {
+            await pool.query("ALTER TABLE vacaciones ADD COLUMN estado TEXT NOT NULL DEFAULT 'pendiente'");
+        }
+        
+        await pool.query("ALTER TABLE vacaciones DROP CONSTRAINT IF EXISTS vacaciones_estado_check;");
+        await pool.query("ALTER TABLE vacaciones ADD CONSTRAINT vacaciones_estado_check CHECK(estado IN ('aprobada', 'pendiente', 'rechazada'));");
+        console.log('Tabla "vacaciones" actualizada con estados.');
+        
         
         console.log('Tablas (usuarios, registros, vacaciones) verificadas/creadas correctamente.');
 

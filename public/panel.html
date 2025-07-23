@@ -83,6 +83,31 @@
                 <div id="miCalendario"></div>
             </section>
         </div>
+
+        <!-- PESTAÑA 4: SOLICITUDES (NUEVA) -->
+<div id="solicitudes-content" class="tab-content">
+    <section class="solicitudes-section">
+        <h2>Solicitar Vacaciones</h2>
+        <p id="info-dias-solicitud" class="vacation-counter">Cargando días...</p>
+        <form id="solicitarVacacionesForm">
+            <label for="fechaInicioSolicitud">Fecha de Inicio:</label>
+            <input type="date" id="fechaInicioSolicitud" required>
+            <label for="fechaFinSolicitud">Fecha de Fin:</label>
+            <input type="date" id="fechaFinSolicitud" required>
+            <button type="submit">Enviar Solicitud</button>
+        </form>
+    </section>
+    <hr>
+    <section>
+        <h2>Estado de mis Solicitudes</h2>
+        <div class="table-container">
+            <table id="misSolicitudesTable">
+                <thead><tr><th>Periodo</th><th>Estado</th></tr></thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </section>
+</div>
     </main>
     
     <!-- ===== BARRA DE NAVEGACIÓN INFERIOR ===== -->
@@ -90,6 +115,7 @@
         <a href="#" class="nav-item active" data-target="inicio-content"><i class="bi bi-house-door-fill"></i><span>Inicio</span></a>
         <a href="#" class="nav-item" data-target="historial-content"><i class="bi bi-calendar-week-fill"></i><span>Historial</span></a>
         <a href="#" class="nav-item" data-target="calendario-content"><i class="bi bi-calendar-heart-fill"></i><span>Vacaciones</span></a>
+        <a href="#" class="nav-item" data-target="solicitudes-content"><i class="bi bi-send-fill"></i><span>Solicitudes</span></a>
     </nav>
     
     <div id="cameraModal" class="modal"><div class="modal-content"><h2>Sonríe para la foto</h2><video id="video" autoplay playsinline></video><p>Tomando foto en 3 segundos...</p></div></div>
@@ -227,6 +253,32 @@
             stream.getTracks().forEach(track => track.stop()); cameraModal.style.display = 'none';
             canvas.toBlob(blob => { const formData = new FormData(); formData.append('tipo', tipo); formData.append('foto', blob, 'fichaje.jpeg'); enviarFichaje(formData); }, 'image/jpeg');
         }
+        async function cargarDatosSolicitudes() {
+    const infoP = document.getElementById('info-dias-solicitud');
+    const tbody = document.querySelector("#misSolicitudesTable tbody");
+    infoP.textContent = 'Cargando...';
+    tbody.innerHTML = '<tr><td colspan="2">Cargando...</td></tr>';
+    try {
+        const [resDias, resSol] = await Promise.all([
+            fetch('/api/mis-vacaciones-restantes', { headers: { Authorization: `Bearer ${token}` } }),
+            fetch('/api/mis-solicitudes', { headers: { Authorization: `Bearer ${token}` } })
+        ]);
+
+        const dataDias = await resDias.json();
+        infoP.innerHTML = `Disponibles: <span class="dias-restantes">${dataDias.diasRestantes}</span> / ${dataDias.diasTotales}`;
+        const dataSol = await resSol.json();
+        tbody.innerHTML = "";
+        if (dataSol.length > 0) {
+            dataSol.forEach(sol => {
+                const tr = document.createElement('tr');
+                const fInicio = new Date(sol.fecha_inicio).toLocaleDateString('es-ES');
+                const fFin = new Date(sol.fecha_fin).toLocaleDateString('es-ES');
+                tr.innerHTML = `<td>Del ${fInicio} al ${fFin}</td><td><span class="status-${sol.estado}">${sol.estado}</span></td>`;
+                tbody.appendChild(tr);
+            });
+        } else { tbody.innerHTML = '<tr><td colspan="2">No tienes solicitudes.</td></tr>'; }
+    } catch (error) { console.error('Error cargando solicitudes:', error); }
+}
         async function enviarFichaje(formData) {
             const tipo = formData.get('tipo'); const button = tipo === 'entrada' ? btnEntrada : btnSalida;
             button.innerHTML = '<div class="loader"></div>'; button.disabled = true;
@@ -241,33 +293,79 @@
         }
         function actualizarBotones(estado) { btnEntrada.disabled = (estado === 'entrada'); btnSalida.disabled = (estado !== 'entrada'); }
 
-        document.addEventListener('DOMContentLoaded', () => {
+                document.addEventListener('DOMContentLoaded', () => {
             const navItems = document.querySelectorAll('.nav-item');
             const tabContents = document.querySelectorAll('.tab-content');
-            navItems.forEach(item => {
+
+            // Lógica para la navegación por pestañas
+                        navItems.forEach(item => {
                 item.addEventListener('click', (e) => {
                     e.preventDefault();
                     const targetId = item.getAttribute('data-target');
+
+                    // 1. Oculta todas las pestañas de contenido
                     tabContents.forEach(content => content.classList.remove('active'));
+                    // 2. Muestra solo la pestaña correspondiente al botón pulsado
                     document.getElementById(targetId).classList.add('active');
+                    
+                    // 3. Quita el estado "activo" de todos los botones del menú
                     navItems.forEach(i => i.classList.remove('active'));
+                    // 4. Añade el estado "activo" solo al botón que se ha pulsado
                     item.classList.add('active');
+                    
+                    // 5. Carga el contenido dinámico para la pestaña seleccionada
                     if (targetId === 'historial-content') {
                         cargarHistorialCompleto();
                     } else if (targetId === 'calendario-content') {
                         cargarContadorVacaciones();
+                        // Solo inicializa el calendario la primera vez para no duplicarlo
                         if (!miCalendario) {
                             inicializarMiCalendario();
                         }
+                    } else if (targetId === 'solicitudes-content') {
+                        cargarDatosSolicitudes();
                     }
                 });
             });
+
+            // --- 2. AÑADIDO: EVENT LISTENER PARA EL FORMULARIO DE SOLICITUD ---
+            document.getElementById('solicitarVacacionesForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const btn = e.target.querySelector('button');
+                btn.disabled = true; 
+                btn.textContent = 'Enviando...';
+                
+                try {
+                    const res = await fetch('/api/solicitar-vacaciones', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                        body: JSON.stringify({
+                            fechaInicio: document.getElementById('fechaInicioSolicitud').value,
+                            fechaFin: document.getElementById('fechaFinSolicitud').value
+                        })
+                    });
+                    const data = await res.json();
+                    if (!res.ok) throw new Error(data.message);
+                    
+                    Swal.fire('¡Éxito!', data.message, 'success');
+                    e.target.reset();
+                    cargarDatosSolicitudes(); // Recargar la lista para ver la nueva solicitud
+                } catch (error) {
+                    Swal.fire('Error', error.message, 'error');
+                } finally {
+                    btn.disabled = false;
+                    btn.textContent = 'Enviar Solicitud';
+                }
+            });
+
+            // Función que se ejecuta al cargar la página por primera vez
             function inicializarPaginaEmpleado() {
                 const hoy = new Date();
                 document.getElementById('selectMesHistorial').value = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`;
                 inicializarPanel();
                 cargarDatosInicio();
             }
+
             inicializarPaginaEmpleado();
         });
     </script>
