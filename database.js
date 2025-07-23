@@ -1,4 +1,4 @@
-// database.js (VERSIÓN CON ACTUALIZACIÓN DE REGLAS)
+// database.js (CORREGIDO Y ROBUSTO)
 const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 
@@ -9,54 +9,40 @@ if (!process.env.DATABASE_URL) {
 
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
-    ssl: {
-        rejectUnauthorized: false
-    }
+    ssl: { rejectUnauthorized: false }
 });
 
 const init = async () => {
     try {
         console.log('Iniciando conexión y configuración de la base de datos...');
         
+        // --- CREACIÓN DE LA TABLA usuarios ---
         await pool.query(`
             CREATE TABLE IF NOT EXISTS usuarios (
                 id SERIAL PRIMARY KEY,
                 nombre TEXT NOT NULL,
                 usuario TEXT UNIQUE NOT NULL,
                 password TEXT NOT NULL,
-                rol TEXT NOT NULL, -- Eliminamos el CHECK de aquí para manejarlo dinámicamente
+                rol TEXT NOT NULL,
                 dias_vacaciones_anuales INTEGER DEFAULT 28
             );
         `);
 
-        // ==========================================================
-        // NUEVO: Bloque para actualizar la restricción (constraint) del rol
-        // Esto asegura que en cada despliegue, la regla esté actualizada.
-        // ==========================================================
+        // --- ¡CAMBIO CLAVE! ---
+        // Este bloque se asegura de que el valor por defecto sea 28 en la tabla existente.
+        await pool.query(`
+            ALTER TABLE usuarios 
+            ALTER COLUMN dias_vacaciones_anuales SET DEFAULT 28;
+        `);
+        console.log('Valor por defecto de "dias_vacaciones_anuales" asegurado en 28.');
+
+        // ... (el resto del código de `init` sigue igual) ...
         try {
-            // 1. Intentamos eliminar la restricción antigua si existe.
             await pool.query(`ALTER TABLE usuarios DROP CONSTRAINT IF EXISTS usuarios_rol_check;`);
-            
-            // 2. Añadimos la nueva restricción con todos los roles permitidos.
-            await pool.query(`
-                ALTER TABLE usuarios 
-                ADD CONSTRAINT usuarios_rol_check 
-                CHECK(rol IN ('empleado', 'admin', 'gestor_vacaciones'));
-            `);
+            await pool.query(`ALTER TABLE usuarios ADD CONSTRAINT usuarios_rol_check CHECK(rol IN ('empleado', 'admin', 'gestor_vacaciones'));`);
             console.log('Restricción de roles actualizada correctamente.');
         } catch (err) {
-            console.warn('Advertencia: No se pudo actualizar la restricción de roles. Puede que ya estuviera correcta.', err.message);
-        }
-        // ==========================================================
-
-
-        const resColumna = await pool.query(`
-            SELECT column_name FROM information_schema.columns 
-            WHERE table_name='usuarios' AND column_name='dias_vacaciones_anuales'
-        `);
-        if (resColumna.rowCount === 0) {
-            await pool.query('ALTER TABLE usuarios ADD COLUMN dias_vacaciones_anuales INTEGER DEFAULT 28');
-            console.log('Columna "dias_vacaciones_anuales" añadida a la tabla "usuarios" con valor por defecto 28.');
+            console.warn('Advertencia al actualizar restricción de roles:', err.message);
         }
 
         await pool.query(`
@@ -74,19 +60,17 @@ const init = async () => {
             );
         `);
 
-                // --- CAMBIO IMPORTANTE: ACTUALIZACIÓN DE LA TABLA VACACIONES ---
         await pool.query(`
             CREATE TABLE IF NOT EXISTS vacaciones (
                 id SERIAL PRIMARY KEY,
                 usuario_id INTEGER REFERENCES usuarios(id) ON DELETE CASCADE,
                 fecha_inicio DATE NOT NULL,
                 fecha_fin DATE NOT NULL,
-                estado TEXT NOT NULL DEFAULT 'pendiente', -- Ahora el estado por defecto es 'pendiente'
+                estado TEXT NOT NULL DEFAULT 'pendiente',
                 comentarios TEXT
             );
         `);
         
-        // Script para asegurar que la columna 'estado' y la restricción existan y estén actualizadas
         const resColEstado = await pool.query("SELECT 1 FROM information_schema.columns WHERE table_name='vacaciones' AND column_name='estado'");
         if (resColEstado.rowCount === 0) {
             await pool.query("ALTER TABLE vacaciones ADD COLUMN estado TEXT NOT NULL DEFAULT 'pendiente'");
@@ -95,14 +79,10 @@ const init = async () => {
         await pool.query("ALTER TABLE vacaciones DROP CONSTRAINT IF EXISTS vacaciones_estado_check;");
         await pool.query("ALTER TABLE vacaciones ADD CONSTRAINT vacaciones_estado_check CHECK(estado IN ('aprobada', 'pendiente', 'rechazada'));");
         console.log('Tabla "vacaciones" actualizada con estados.');
-
         
-        console.log('Tablas (usuarios, registros, vacaciones) verificadas/creadas correctamente.');
-
         const adminUser = 'admin';
         const adminPass = 'admin123';
         const res = await pool.query('SELECT * FROM usuarios WHERE usuario = $1', [adminUser]);
-
         if (res.rowCount === 0) {
             const hash = await bcrypt.hash(adminPass, 10);
             await pool.query(
@@ -111,9 +91,7 @@ const init = async () => {
             );
             console.log('Usuario administrador creado.');
         }
-
         console.log('¡Base de datos lista!');
-
     } catch (err) {
         console.error('Error fatal durante la inicialización de la base de datos:', err.stack);
         process.exit(1); 
