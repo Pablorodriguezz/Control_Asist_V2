@@ -318,7 +318,7 @@ if (req.user.rol !== 'admin' && req.user.rol !== 'gestor_vacaciones') return res
     try {
         const resUsuario = await db.query('SELECT dias_vacaciones_anuales FROM usuarios WHERE id = $1', [id]);
         if (resUsuario.rowCount === 0) return res.status(404).json({ message: 'Usuario no encontrado.' });
-        const diasTotales = resUsuario.rows[0].dias_vacaciones_anuales === null ? 30 : resUsuario.rows[0].dias_vacaciones_anuales;
+        const diasTotales = resUsuario.rows[0].dias_vacaciones_anuales === null ? 28 : resUsuario.rows[0].dias_vacaciones_anuales;
         const sqlVacaciones = `SELECT fecha_inicio, fecha_fin FROM vacaciones WHERE usuario_id = $1 AND estado = 'aprobada' AND EXTRACT(YEAR FROM fecha_inicio) = $2`;
         const resVacaciones = await db.query(sqlVacaciones, [id, anioActual]);
         let diasGastados = 0;
@@ -368,8 +368,8 @@ if (req.user.rol !== 'admin' && req.user.rol !== 'gestor_vacaciones') return res
 app.get('/api/fix-vacation-days', authenticateToken, async(req, res) => {
     if (req.user.rol !== 'admin') return res.sendStatus(403);
     try {
-        await db.query("UPDATE usuarios SET dias_vacaciones_anuales = 30 WHERE rol = 'empleado' AND dias_vacaciones_anuales IS NULL");
-        res.send('Datos de vacaciones de usuarios existentes actualizados a 30.');
+        await db.query("UPDATE usuarios SET dias_vacaciones_anuales = 28 WHERE rol = 'empleado' AND dias_vacaciones_anuales IS NULL");
+        res.send('Datos de vacaciones de usuarios existentes actualizados a 28.');
     } catch (e) {
         res.status(500).send('Error al actualizar: ' + e.message);
     }
@@ -466,7 +466,7 @@ app.get('/api/mis-vacaciones-restantes', authenticateToken, async (req, res) => 
             return res.status(404).json({ message: 'Usuario no encontrado.' });
         }
         
-        const diasTotales = resUsuario.rows[0].dias_vacaciones_anuales ?? 30;
+        const diasTotales = resUsuario.rows[0].dias_vacaciones_anuales ?? 28;
         
         const sqlVacaciones = `SELECT fecha_inicio, fecha_fin FROM vacaciones WHERE usuario_id = $1 AND estado = 'aprobada' AND EXTRACT(YEAR FROM fecha_inicio) = $2`;
         const resVacaciones = await db.query(sqlVacaciones, [usuarioId, anioActual]);
