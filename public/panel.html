@@ -6,6 +6,8 @@
     <title>Panel de Empleado</title>
     <link rel="stylesheet" href="style.css">
     <link href='https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css' rel='stylesheet'>
+    <!-- SCRIPT DE SWEETALERT2, NECESARIO PARA LAS ALERTAS -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </head>
 <body>
     <!-- ===== HEADER ===== -->
@@ -15,7 +17,8 @@
             <span class="header-title">Mi Portal</span>
         </div>
         <div class="profile-container">
-            <button class="profile-btn" onclick="logout()" title="Cerrar Sesión"><i class="bi bi-person-circle"></i></button>
+            <!-- CAMBIO: El botón ahora llama a una función de confirmación -->
+            <button class="profile-btn" onclick="confirmarLogout()" title="Cerrar Sesión"><i class="bi bi-person-circle"></i></button>
         </div>
     </header>
 
@@ -39,6 +42,7 @@
         <!-- SECCIÓN DE FICHAJE -->
         <section class="fichaje-section">
             <h2>Fichaje</h2>
+            <!-- CAMBIO: Eliminados los botones de Teletrabajo y Desplazamiento -->
             <div class="fichaje-actions">
                 <!-- Botón de Entrada -->
                 <div class="action-button-wrapper">
@@ -54,19 +58,6 @@
                     </button>
                     <span class="action-label">Salida</span>
                 </div>
-                 <!-- Botones secundarios (placeholders) -->
-                <div class="action-button-wrapper">
-                    <button class="action-button secondary" disabled>
-                        <i class="bi bi-house-door-fill"></i>
-                    </button>
-                    <span class="action-label">Teletrab...</span>
-                </div>
-                <div class="action-button-wrapper">
-                    <button class="action-button secondary" disabled>
-                        <i class="bi bi-person-walking"></i>
-                    </button>
-                    <span class="action-label">Desplaza...</span>
-                </div>
             </div>
         </section>
 
@@ -79,12 +70,12 @@
             <a href="#historialCompleto" class="ver-mas-link">Ver historial completo</a>
         </section>
 
-        <!-- SECCIÓN HISTORIAL COMPLETO (OCULTA INICIALMENTE O MÁS ABAJO) -->
+        <!-- SECCIÓN HISTORIAL COMPLETO -->
         <section id="historialCompleto" class="historial-completo-section">
             <h2>Mi Historial de Fichajes</h2>
             <div>
                 <label for="selectMesHistorial">Selecciona el mes:</label>
-                <input type="month" id="selectMesHistorial" onchange="verMisFichajes()">
+                <input type="month" id="selectMesHistorial" onchange="cargarDatosEmpleado()">
             </div>
             <div class="table-container">
                 <table id="historialTable">
@@ -92,22 +83,21 @@
                     <tbody></tbody>
                 </table>
             </div>
+            <!-- CAMBIO: Nuevo botón de cerrar sesión explícito -->
+            <button class="btn-logout-bottom" onclick="confirmarLogout()">Cerrar Sesión</button>
         </section>
     </main>
     
     <!-- ===== BARRA DE NAVEGACIÓN INFERIOR ===== -->
+    <!-- CAMBIO: Eliminado el item "Solicitudes" -->
     <nav class="bottom-nav">
-        <a href="#" class="nav-item active">
+        <a href="#" class="nav-item active" data-target="inicio">
             <i class="bi bi-house-door-fill"></i>
             <span>Inicio</span>
         </a>
-        <a href="#historialCompleto" class="nav-item">
+        <a href="#historialCompleto" class="nav-item" data-target="historial">
             <i class="bi bi-calendar-week-fill"></i>
             <span>Historial</span>
-        </a>
-        <a href="#" class="nav-item" onclick="Swal.fire('Próximamente', 'La sección de solicitudes estará disponible en futuras versiones.', 'info')">
-            <i class="bi bi-send-fill"></i>
-            <span>Solicitudes</span>
         </a>
     </nav>
     
@@ -122,6 +112,7 @@
     <canvas id="canvas" style="display:none;"></canvas>
 
     <script>
+        // ... (el script de `cargarDatosEmpleado`, `iniciarFichaje`, etc., sigue aquí) ...
         const token = localStorage.getItem('token');
         if (!token) window.location.href = '/index.html';
 
@@ -129,43 +120,50 @@
         const [cameraModal, video, canvas] = [document.getElementById('cameraModal'), document.getElementById('video'), document.getElementById('canvas')];
         let stream;
 
-        // Función principal para cargar todos los datos del empleado
+        // CAMBIO: Nueva función para confirmar el logout
+        function confirmarLogout() {
+            Swal.fire({
+                title: '¿Cerrar sesión?',
+                text: "¿Estás seguro de que quieres salir?",
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: '#e74c3c', // Rojo para la acción de salir
+                cancelButtonColor: '#3498db', // El color primario anterior
+                confirmButtonText: 'Sí, cerrar sesión',
+                cancelButtonText: 'Cancelar'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    logout();
+                }
+            });
+        }
+        
+        function logout() { localStorage.removeItem('token'); window.location.href = '/index.html'; }
+
+        // --- El resto de funciones (cargarDatosEmpleado, etc.) van aquí sin cambios ---
         async function cargarDatosEmpleado() {
             const mesValue = document.getElementById('selectMesHistorial').value;
             if (!mesValue) return;
-
             const [anio, mes] = mesValue.split('-');
             const tbody = document.querySelector("#historialTable tbody");
             tbody.innerHTML = '<tr><td colspan="3">Cargando historial...</td></tr>';
-            
-            // Cargar días de vacaciones restantes
             try {
                 const resVac = await fetch('/api/mis-vacaciones-restantes', { headers: { 'Authorization': `Bearer ${token}` } });
                 const dataVac = await resVac.json();
                 document.getElementById('dias-vacaciones').textContent = dataVac.diasRestantes ?? '--';
-            } catch (error) {
-                console.error('Error al cargar vacaciones:', error);
-                document.getElementById('dias-vacaciones').textContent = 'Error';
-            }
-
-            // Cargar historial de fichajes y actualizar widgets y último fichaje
+            } catch (error) { document.getElementById('dias-vacaciones').textContent = 'Error'; }
             try {
                 const url = `/api/mis-registros?anio=${anio}&mes=${mes}`;
                 const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.message);
-
-                // Actualizar widget de fichajes del mes
                 document.getElementById('fichajes-mes').textContent = data.length;
-
                 tbody.innerHTML = "";
                 const ultimoFichajeDiv = document.getElementById('ultimoFichaje');
-
                 if (data.length === 0) {
                     tbody.innerHTML = '<tr><td colspan="3">No tienes registros para este mes.</td></tr>';
                     ultimoFichajeDiv.innerHTML = '<p>No hay información disponible</p>';
                 } else {
-                    // Rellenar tabla de historial
                     data.forEach(registro => {
                         const tr = document.createElement("tr");
                         const fechaHora = new Date(registro.fecha_hora).toLocaleString("es-ES", { dateStyle: "long", timeStyle: "medium" });
@@ -177,20 +175,14 @@
                         tr.innerHTML = `<td>${fechaHora}</td><td>${registro.tipo}</td><td>${observaciones}</td>`;
                         tbody.appendChild(tr);
                     });
-
-                    // Actualizar tarjeta de "Último Fichaje"
                     const ultimo = data[data.length - 1];
                     const fechaUltimo = new Date(ultimo.fecha_hora).toLocaleString("es-ES", { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
                     const tipoUltimo = ultimo.tipo.charAt(0).toUpperCase() + ultimo.tipo.slice(1);
                     const icono = tipoUltimo === 'Entrada' ? '<i class="bi bi-box-arrow-in-right" style="color: #2ecc71;"></i>' : '<i class="bi bi-box-arrow-right" style="color: #e74c3c;"></i>';
                     ultimoFichajeDiv.innerHTML = `<p>${icono} <strong>${tipoUltimo}</strong> - ${fechaUltimo}</p>`;
                 }
-            } catch (error) { 
-                tbody.innerHTML = `<tr><td colspan="3" class="error">Error: ${error.message}</td></tr>`; 
-                document.getElementById('ultimoFichaje').innerHTML = '<p>Error al cargar datos.</p>';
-            }
+            } catch (error) { tbody.innerHTML = `<tr><td colspan="3" class="error">Error: ${error.message}</td></tr>`; document.getElementById('ultimoFichaje').innerHTML = '<p>Error al cargar datos.</p>'; }
         }
-
         async function inicializarPanel() {
              try {
                 const res = await fetch('/api/estado', { headers: { 'Authorization': `Bearer ${token}` } });
@@ -199,20 +191,14 @@
                 actualizarBotones(data.estado);
             } catch (error) { console.error("Error al inicializar panel:", error); }
         }
-
-        // --- Lógica de fichaje (sin cambios, solo se adapta a los nuevos botones) ---
         async function iniciarFichaje(tipo) {
             cameraModal.style.display = 'flex';
             try {
                 stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
                 video.srcObject = stream;
                 setTimeout(() => tomarFotoYFichar(tipo), 3000);
-            } catch (err) {
-                alert('No se pudo acceder a la cámara. Asegúrate de dar permiso.');
-                cameraModal.style.display = 'none';
-            }
+            } catch (err) { alert('No se pudo acceder a la cámara. Asegúrate de dar permiso.'); cameraModal.style.display = 'none'; }
         }
-
         function tomarFotoYFichar(tipo) {
             const context = canvas.getContext('2d');
             canvas.width = video.videoWidth;
@@ -227,38 +213,53 @@
                 enviarFichaje(formData);
             }, 'image/jpeg');
         }
-
         async function enviarFichaje(formData) {
             const tipo = formData.get('tipo');
             const button = tipo === 'entrada' ? btnEntrada : btnSalida;
-            button.innerHTML = '<div class="loader"></div>'; // Muestra un spinner
+            button.innerHTML = '<div class="loader"></div>';
             button.disabled = true;
-
             try {
                 const res = await fetch('/api/fichar', { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: formData });
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.message);
-
                 Swal.fire({ icon: 'success', title: '¡Registrado!', text: data.message, timer: 2000, showConfirmButton: false });
-                
-                // Recargar todo para actualizar la UI
                 inicializarPanel();
                 cargarDatosEmpleado();
-            } catch (error) { 
-                Swal.fire({ icon: 'error', title: 'Error', text: error.message || 'Error de conexión.' });
-            } finally {
-                // Restaurar botón
+            } catch (error) { Swal.fire({ icon: 'error', title: 'Error', text: error.message || 'Error de conexión.' }); } 
+            finally {
                 const iconClass = tipo === 'entrada' ? 'bi-plus-lg' : 'bi-dash-lg';
                 button.innerHTML = `<i class="bi ${iconClass}"></i>`;
             }
         }
-        
         function actualizarBotones(estado) {
             btnEntrada.disabled = (estado === 'entrada');
             btnSalida.disabled = (estado !== 'entrada');
         }
 
-        function logout() { localStorage.removeItem('token'); window.location.href = '/index.html'; }
+        // CAMBIO: Lógica para la barra de navegación inferior
+        document.addEventListener('DOMContentLoaded', () => {
+            const navItems = document.querySelectorAll('.nav-item');
+            navItems.forEach(item => {
+                item.addEventListener('click', (e) => {
+                    // Si el enlace es a una sección (#), prevenimos el comportamiento por defecto para manejarlo nosotros
+                    if (item.getAttribute('href').startsWith('#')) {
+                        e.preventDefault();
+                        const targetId = item.getAttribute('href');
+                        const targetElement = document.querySelector(targetId);
+                        if(targetElement) {
+                             targetElement.scrollIntoView({ behavior: 'smooth' });
+                        }
+                    }
+                    // Si es el de "Inicio", recarga la página o va arriba
+                    else {
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }
+                    
+                    navItems.forEach(i => i.classList.remove('active'));
+                    item.classList.add('active');
+                });
+            });
+        });
 
         function inicializarPaginaEmpleado() {
             const hoy = new Date();
