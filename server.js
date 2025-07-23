@@ -506,6 +506,31 @@ app.get('/api/mis-vacaciones-restantes', authenticateToken, async (req, res) => 
     }
 });
 
+// =================================================================
+// NUEVA RUTA PARA QUE EL EMPLEADO VEA SU PROPIO CALENDARIO
+// =================================================================
+app.get('/api/mis-vacaciones', authenticateToken, async (req, res) => {
+    const usuarioId = req.user.id; // Obtenemos el ID del token del usuario logueado
+    
+    try {
+        const sql = `
+            SELECT 
+                id, 
+                'Mis Vacaciones' as title, 
+                fecha_inicio as start, 
+                fecha_fin as end
+            FROM vacaciones 
+            WHERE usuario_id = $1 AND estado = 'aprobada'
+        `;
+        const { rows } = await db.query(sql, [usuarioId]);
+        res.json(rows);
+    } catch(err) {
+        console.error("Error en GET /api/mis-vacaciones:", err); 
+        res.status(500).json({ message: 'Error al obtener mis vacaciones.' });
+    }
+});
+
+
 
 
 

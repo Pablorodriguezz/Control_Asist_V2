@@ -338,6 +338,33 @@ th { background-color: #ecf0f1; }
 .employee-list li { padding: 8px 5px; border-bottom: 1px solid #eee; font-size: 0.95rem; }
 .employee-list li:last-child { border-bottom: none; }
 .employee-list li:empty::before { content: "No hay datos."; color: #999; font-style: italic; }
+/* Añade esto a tu style.css */
+
+/* --- ESTILOS PARA LA NAVEGACIÓN POR PESTAÑAS --- */
+.tab-content {
+    display: none; /* Oculta todas las pestañas por defecto */
+}
+.tab-content.active {
+    display: block; /* Muestra solo la pestaña activa */
+}
+
+/* Ajuste para la barra de navegación con 3 items */
+.bottom-nav {
+    padding: 0; /* Quitamos el padding anterior para que se distribuya bien */
+}
+
+/* Estilos para el contenedor del calendario */
+.calendario-section {
+    background-color: white;
+    padding: 15px;
+    border-radius: 12px;
+    margin-top: 20px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+#miCalendario {
+    margin-top: 15px;
+}
 
 /* --- UTILIDADES Y OTROS --- */
 .status-message { font-weight: bold; margin-top: 10px; padding: 10px; border-radius: 4px; }
