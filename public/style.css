@@ -72,7 +72,7 @@ body {
     box-sizing: border-box;
 }
 .logo-container { display: flex; align-items: center; }
-.header-logo { height: 30px; margin-right: 10px; }
+.header-logo { height: 40px; margin-right: 12px; }
 .header-title { font-weight: bold; color: var(--text-color-primary); }
 .profile-btn {
     background: none; border: none; font-size: 28px; padding: 0;
