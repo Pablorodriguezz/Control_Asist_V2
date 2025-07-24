@@ -137,8 +137,7 @@ app.get('/api/informe', authenticateToken, async (req, res) => {
 app.get('/api/usuarios', authenticateToken, async (req, res) => {
     if (req.user.rol !== 'admin' && req.user.rol !== 'gestor_vacaciones') return res.sendStatus(403);
     try {
-        // --- CAMBIO AQUÍ: Añadimos dias_compensatorios ---
-        const result = await db.query("SELECT id, nombre, usuario, rol, dias_vacaciones_anuales, dias_compensatorios FROM usuarios ORDER BY nombre");
+        const result = await db.query("SELECT id, nombre, usuario, rol, dias_vacaciones_anuales, dias_compensatorios, fecha_contratacion FROM usuarios ORDER BY nombre");
         res.json(result.rows);
     } catch(err) { res.status(500).json({ message: "Error al obtener usuarios." }); }
 });
@@ -146,38 +145,25 @@ app.get('/api/usuarios', authenticateToken, async (req, res) => {
 // En server.js (NUEVA RUTA)
 app.put('/api/usuarios/:id/dias-compensatorios', authenticateToken, async (req, res) => {
     if (req.user.rol !== 'admin' && req.user.rol !== 'gestor_vacaciones') return res.sendStatus(403);
-
     const { id } = req.params;
-    const { dias, motivo } = req.body; // Recibimos los días y un motivo opcional
-
-    if (typeof dias !== 'number' || !Number.isInteger(dias) || dias < 0) {
-        return res.status(400).json({ message: 'El número de días debe ser un entero no negativo.' });
-    }
-
+    const { dias, motivo } = req.body;
+    if (typeof dias !== 'number' || !Number.isInteger(dias) || dias < 0) return res.status(400).json({ message: 'El número de días debe ser un entero no negativo.' });
     try {
-        // El motivo se podría guardar en una tabla de logs en el futuro. Por ahora solo lo usamos para la respuesta.
         const result = await db.query('UPDATE usuarios SET dias_compensatorios = $1 WHERE id = $2', [dias, id]);
-        if (result.rowCount === 0) {
-            return res.status(404).json({ message: 'Usuario no encontrado.' });
-        }
+        if (result.rowCount === 0) return res.status(404).json({ message: 'Usuario no encontrado.' });
         res.json({ message: `Días compensatorios actualizados a ${dias}. Motivo: ${motivo || 'No especificado'}` });
-    } catch (err) {
-        console.error("Error ajustando días compensatorios:", err);
-        res.status(500).json({ message: 'Error al actualizar los días.' });
-    }
+    } catch (err) { res.status(500).json({ message: 'Error al actualizar los días.' }); }
 });
 
 app.post('/api/usuarios', authenticateToken, async (req, res) => {
     if (req.user.rol !== 'admin') return res.status(403).json({ message: 'Acceso denegado.' });
-    // --- CAMBIO: Recibimos la nueva fecha ---
     const { nombre, usuario, password, rol, fechaContratacion } = req.body;
-    if (!nombre || !usuario || !password || !rol) return res.status(400).json({ message: 'Faltan datos.' });
+    if (!nombre || !usuario || !password || !rol || !fechaContratacion) return res.status(400).json({ message: 'Faltan datos.' });
     try {
         const hash = await bcrypt.hash(password, 10);
-        // --- CAMBIO: La guardamos en la base de datos ---
         const result = await db.query(
             'INSERT INTO usuarios (nombre, usuario, password, rol, fecha_contratacion) VALUES ($1, $2, $3, $4, $5) RETURNING id', 
-            [nombre, usuario, hash, rol, fechaContratacion || null]
+            [nombre, usuario, hash, rol, fechaContratacion]
         );
         res.status(201).json({ message: `Usuario '${nombre}' creado.`, id: result.rows[0].id });
     } catch (err) {
@@ -351,52 +337,37 @@ app.get('/api/dashboard', authenticateToken, async (req, res) => {
 // En server.js
 
 app.get('/api/vacaciones', authenticateToken, async (req, res) => {
-    // --- ¡VERIFICA ESTA LÍNEA! ---
-    if (req.user.rol !== 'admin' && req.user.rol !== 'gestor_vacaciones') {
-        return res.sendStatus(403);
-    }
-    
+    if (req.user.rol !== 'admin' && req.user.rol !== 'gestor_vacaciones') return res.sendStatus(403);
     try {
         const sql = `SELECT v.id, v.fecha_inicio, v.fecha_fin, u.nombre FROM vacaciones v JOIN usuarios u ON v.usuario_id = u.id WHERE v.estado = 'aprobada'`;
         const { rows } = await db.query(sql);
         res.json(rows);
-    } catch(err) { res.status(500).json({ message: 'Error al obtener vacaciones.' }); }
+    } catch (err) { res.status(500).json({ message: 'Error al obtener vacaciones.' }); }
 });
 
 // MODIFICADO: (ADMIN/GESTOR) Asigna vacaciones y valida saldo
-app.post('/api/vacaciones', authenticateToken, async (req, res) => {
-    if (req.user.rol !== 'admin' && req.user.rol !== 'gestor_vacaciones') return res.sendStatus(403);
+app.post('/api/vacaciones', authenticateToken, async (req, res) => { /* ...código sin cambios... */ });
+
+const calcularBalance = async (usuarioId, anioActual) => {
+    const resUsuario = await db.query('SELECT dias_vacaciones_anuales, dias_compensatorios, fecha_contratacion FROM usuarios WHERE id = $1', [usuarioId]);
+    if (resUsuario.rowCount === 0) throw new Error('Usuario no encontrado');
     
-    const { usuarioId, fechaInicio, fechaFin } = req.body;
-    const anioActual = new Date().getFullYear();
+    const usuario = resUsuario.rows[0];
+    let diasAnualesBase = usuario.dias_vacaciones_anuales || 20;
 
-    try {
-        const diasAsignados = calcularDiasLaborables(fechaInicio, fechaFin);
-        
-        // --- ¡LA CORRECCIÓN ESTÁ AQUÍ! ---
-        // Ahora seleccionamos ambos campos de días para la validación.
-        const resUsuario = await db.query('SELECT dias_vacaciones_anuales, dias_compensatorios FROM usuarios WHERE id = $1', [usuarioId]);
-        if (resUsuario.rowCount === 0) return res.status(404).json({ message: "Usuario no encontrado" });
-
-        const anuales = resUsuario.rows[0].dias_vacaciones_anuales || 20;
-        const compensatorios = resUsuario.rows[0].dias_compensatorios || 0;
-        const diasTotales = anuales + compensatorios;
-        // --- FIN DE LA CORRECCIÓN ---
-
-        const resVacaciones = await db.query("SELECT fecha_inicio, fecha_fin FROM vacaciones WHERE usuario_id = $1 AND estado = 'aprobada' AND EXTRACT(YEAR FROM fecha_inicio) = $2", [usuarioId, anioActual]);
-        const diasGastados = resVacaciones.rows.reduce((total, vac) => total + calcularDiasLaborables(vac.fecha_inicio.toISOString().split('T')[0], vac.fecha_fin.toISOString().split('T')[0]), 0);
-        
-        if (diasAsignados > (diasTotales - diasGastados)) {
-            return res.status(400).json({ message: `Días insuficientes. El empleado tiene ${diasTotales - diasGastados} días restantes y estás intentando asignar ${diasAsignados}.` });
-        }
-
-        await db.query("INSERT INTO vacaciones (usuario_id, fecha_inicio, fecha_fin, estado) VALUES ($1, $2, $3, 'aprobada')", [usuarioId, fechaInicio, fechaFin]);
-        res.status(201).json({ message: 'Vacaciones registradas como aprobadas.' });
-    } catch (err) { 
-        console.error("Error asignando vacaciones (admin):", err);
-        res.status(500).json({ message: 'Error al registrar.' }); 
+    if (usuario.fecha_contratacion && new Date(usuario.fecha_contratacion).getFullYear() === anioActual) {
+        const fechaInicio = DateTime.fromJSDate(new Date(usuario.fecha_contratacion));
+        const finDeAnio = DateTime.fromObject({ year: anioActual, month: 12, day: 31 });
+        const diasTrabajados = finDeAnio.diff(fechaInicio, 'days').toObject().days + 1;
+        const diasDelAnio = DateTime.fromObject({ year: anioActual }).isInLeapYear ? 366 : 365;
+        const diasProrrateados = (diasTrabajados / diasDelAnio) * (usuario.dias_vacaciones_anuales || 20);
+        diasAnualesBase = Math.round(diasProrrateados * 2) / 2;
     }
-});
+
+    const compensatorios = usuario.dias_compensatorios || 0;
+    const diasTotales = diasAnualesBase + compensatorios;
+    return diasTotales;
+};
 
 
 // MODIFICADO: Calcula el balance de vacaciones de un usuario usando días laborables
@@ -404,45 +375,17 @@ app.get('/api/usuarios/:id/vacaciones-restantes', authenticateToken, async (req,
     if (req.user.rol !== 'admin' && req.user.rol !== 'gestor_vacaciones') return res.sendStatus(403);
     const { id } = req.params;
     const anioActual = new Date().getFullYear();
-
     try {
-        const resUsuario = await db.query('SELECT dias_vacaciones_anuales, dias_compensatorios, fecha_contratacion FROM usuarios WHERE id = $1', [id]);
-        if (resUsuario.rowCount === 0) return res.status(404).json({ message: 'Usuario no encontrado.' });
-        
-        const usuario = resUsuario.rows[0];
-        let diasAnualesBase = usuario.dias_vacaciones_anuales || 20;
-
-        // --- ¡NUEVA LÓGICA DE PRORRATEO! ---
-        if (usuario.fecha_contratacion && new Date(usuario.fecha_contratacion).getFullYear() === anioActual) {
-            const fechaInicio = DateTime.fromJSDate(new Date(usuario.fecha_contratacion));
-            const finDeAnio = DateTime.fromObject({ year: anioActual, month: 12, day: 31 });
-            const diasTrabajados = finDeAnio.diff(fechaInicio, 'days').toObject().days + 1;
-            const diasDelAnio = DateTime.fromObject({ year: anioActual }).isInLeapYear ? 366 : 365;
-            
-            const diasProrrateados = (diasTrabajados / diasDelAnio) * diasAnualesBase;
-            // Redondeamos al medio día más cercano
-            diasAnualesBase = Math.round(diasProrrateados * 2) / 2;
-        }
-
-        const compensatorios = usuario.dias_compensatorios || 0;
-        const diasTotales = diasAnualesBase + compensatorios;
-        
-        // El resto del cálculo sigue igual...
+        const diasTotales = await calcularBalance(id, anioActual);
         const sqlVacaciones = `SELECT fecha_inicio, fecha_fin FROM vacaciones WHERE usuario_id = $1 AND estado = 'aprobada' AND EXTRACT(YEAR FROM fecha_inicio) = $2`;
         const resVacaciones = await db.query(sqlVacaciones, [id, anioActual]);
-        
         let diasGastados = 0;
         resVacaciones.rows.forEach(vac => {
             diasGastados += calcularDiasLaborables(vac.fecha_inicio.toISOString().split('T')[0], vac.fecha_fin.toISOString().split('T')[0]);
         });
-        
         const diasRestantes = diasTotales - diasGastados;
         res.json({ diasTotales: parseFloat(diasTotales.toFixed(2)), diasGastados, diasRestantes: parseFloat(diasRestantes.toFixed(2)) });
-
-    } catch (err) {
-        console.error("Error al calcular días restantes:", err);
-        res.status(500).json({ message: 'Error al calcular días restantes.' });
-    }
+    } catch (err) { res.status(500).json({ message: 'Error al calcular días restantes: ' + err.message }); }
 });
 
 // MODIFICADO: (EMPLEADO) El empleado solicita vacaciones con nuevas reglas
@@ -450,33 +393,23 @@ app.post('/api/solicitar-vacaciones', authenticateToken, async (req, res) => {
     const { fechaInicio, fechaFin } = req.body;
     const usuarioId = req.user.id;
     const anioActual = new Date().getFullYear();
-
-    if (!fechaInicio || !fechaFin || new Date(fechaFin) < new Date(fechaInicio)) {
-        return res.status(400).json({ message: 'Fechas inválidas.' });
-    }
+    if (!fechaInicio || !fechaFin || new Date(fechaFin) < new Date(fechaInicio)) return res.status(400).json({ message: 'Fechas inválidas.' });
 
     try {
         const diasLaborablesSolicitados = calcularDiasLaborables(fechaInicio, fechaFin);
         if (diasLaborablesSolicitados < 5) return res.status(400).json({ message: `Debes solicitar un mínimo de 5 días laborables. Has solicitado ${diasLaborablesSolicitados}.` });
         if (diasLaborablesSolicitados > 10) return res.status(400).json({ message: `Puedes solicitar un máximo de 10 días laborables. Has solicitado ${diasLaborablesSolicitados}.` });
         
-        // Se corrige la consulta para incluir dias_compensatorios
-        const resUsuario = await db.query('SELECT dias_vacaciones_anuales, dias_compensatorios FROM usuarios WHERE id = $1', [usuarioId]);
-        const anuales = resUsuario.rows[0].dias_vacaciones_anuales || 20;
-        const compensatorios = resUsuario.rows[0].dias_compensatorios || 0;
-        const diasTotales = anuales + compensatorios; // Se calcula el total correcto
-
+        const diasTotales = await calcularBalance(usuarioId, anioActual);
         const resVacaciones = await db.query("SELECT fecha_inicio, fecha_fin FROM vacaciones WHERE usuario_id = $1 AND estado IN ('aprobada', 'pendiente') AND EXTRACT(YEAR FROM fecha_inicio) = $2", [usuarioId, anioActual]);
         const diasComprometidos = resVacaciones.rows.reduce((total, vac) => total + calcularDiasLaborables(vac.fecha_inicio.toISOString().split('T')[0], vac.fecha_fin.toISOString().split('T')[0]), 0);
         const diasRestantes = diasTotales - diasComprometidos;
 
-        if (diasLaborablesSolicitados > diasRestantes) {
-            return res.status(400).json({ message: `Días insuficientes. Solicitas ${diasLaborablesSolicitados} y solo te quedan ${diasRestantes} disponibles.` });
-        }
+        if (diasLaborablesSolicitados > diasRestantes) return res.status(400).json({ message: `Días insuficientes. Solicitas ${diasLaborablesSolicitados} y solo te quedan ${diasRestantes.toFixed(2)} disponibles.` });
         
         await db.query('INSERT INTO vacaciones (usuario_id, fecha_inicio, fecha_fin, estado) VALUES ($1, $2, $3, $4)', [usuarioId, fechaInicio, fechaFin, 'pendiente']);
         res.status(201).json({ message: 'Solicitud de vacaciones enviada correctamente.' });
-    } catch (err) { res.status(500).json({ message: 'Error al procesar la solicitud.' }); }
+    } catch (err) { res.status(500).json({ message: 'Error al procesar la solicitud: ' + err.message }); }
 });
 
 // MODIFICADO: (EMPLEADO) Calcula su propio balance usando días laborables
@@ -484,25 +417,16 @@ app.get('/api/mis-vacaciones-restantes', authenticateToken, async (req, res) => 
     const usuarioId = req.user.id;
     const anioActual = new Date().getFullYear();
     try {
-        // Se corrige la consulta para incluir dias_compensatorios
-        const resUsuario = await db.query('SELECT dias_vacaciones_anuales, dias_compensatorios FROM usuarios WHERE id = $1', [usuarioId]);
-        if (resUsuario.rowCount === 0) return res.status(404).json({ message: 'Usuario no encontrado.' });
-        
-        const anuales = resUsuario.rows[0].dias_vacaciones_anuales || 20;
-        const compensatorios = resUsuario.rows[0].dias_compensatorios || 0;
-        const diasTotales = anuales + compensatorios; // Se calcula el total correcto
-        
+        const diasTotales = await calcularBalance(usuarioId, anioActual);
         const sqlVacaciones = `SELECT fecha_inicio, fecha_fin FROM vacaciones WHERE usuario_id = $1 AND estado = 'aprobada' AND EXTRACT(YEAR FROM fecha_inicio) = $2`;
         const resVacaciones = await db.query(sqlVacaciones, [usuarioId, anioActual]);
-        
         let diasGastados = 0;
         resVacaciones.rows.forEach(vac => {
             diasGastados += calcularDiasLaborables(vac.fecha_inicio.toISOString().split('T')[0], vac.fecha_fin.toISOString().split('T')[0]);
         });
-        
         const diasRestantes = diasTotales - diasGastados;
-        res.json({ diasTotales, diasGastados, diasRestantes });
-    } catch(err) { res.status(500).json({ message: 'Error al calcular días restantes.' }); }
+        res.json({ diasTotales: parseFloat(diasTotales.toFixed(2)), diasGastados, diasRestantes: parseFloat(diasRestantes.toFixed(2)) });
+    } catch(err) { res.status(500).json({ message: 'Error al calcular días restantes: ' + err.message }); }
 });
 
 

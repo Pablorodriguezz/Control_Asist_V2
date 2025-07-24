@@ -1,4 +1,4 @@
-// database.js (ACTUALIZADO CON DIAS COMPENSATORIOS)
+// database.js (COMPLETO Y FINAL)
 const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 
@@ -16,7 +16,7 @@ const init = async () => {
     try {
         console.log('Iniciando conexión y configuración de la base de datos...');
         
-        // --- CREACIÓN DE LA TABLA usuarios (con la nueva columna) ---
+        // --- CREACIÓN/ACTUALIZACIÓN DE LA TABLA usuarios ---
         await pool.query(`
             CREATE TABLE IF NOT EXISTS usuarios (
                 id SERIAL PRIMARY KEY,
@@ -30,18 +30,21 @@ const init = async () => {
             );
         `);
 
-        // --- SCRIPT PARA AÑADIR LA COLUMNA SI NO EXISTE (para deployments) ---
+        // --- SCRIPT PARA AÑADIR dias_compensatorios SI NO EXISTE ---
+        const resColComp = await pool.query("SELECT 1 FROM information_schema.columns WHERE table_name='usuarios' AND column_name='dias_compensatorios'");
+        if (resColComp.rowCount === 0) {
+            await pool.query("ALTER TABLE usuarios ADD COLUMN dias_compensatorios INTEGER DEFAULT 0 NOT NULL");
+            console.log('Columna "dias_compensatorios" añadida a la tabla usuarios.');
+        }
+        
+        // --- SCRIPT PARA AÑADIR fecha_contratacion SI NO EXISTE ---
         const resColContratacion = await pool.query("SELECT 1 FROM information_schema.columns WHERE table_name='usuarios' AND column_name='fecha_contratacion'");
         if (resColContratacion.rowCount === 0) {
             await pool.query("ALTER TABLE usuarios ADD COLUMN fecha_contratacion DATE");
             console.log('Columna "fecha_contratacion" añadida a la tabla usuarios.');
         }
 
-        // Se asegura de que el valor por defecto de las vacaciones anuales sea 20.
-        await pool.query(`
-            ALTER TABLE usuarios 
-            ALTER COLUMN dias_vacaciones_anuales SET DEFAULT 20;
-        `);
+        await pool.query(`ALTER TABLE usuarios ALTER COLUMN dias_vacaciones_anuales SET DEFAULT 20;`);
         console.log('Valor por defecto de "dias_vacaciones_anuales" asegurado en 20.');
 
         try {
@@ -52,6 +55,7 @@ const init = async () => {
             console.warn('Advertencia al actualizar restricción de roles:', err.message);
         }
 
+        // --- CREACIÓN DE OTRAS TABLAS ---
         await pool.query(`
             CREATE TABLE IF NOT EXISTS registros (
                 id SERIAL PRIMARY KEY,
@@ -87,14 +91,15 @@ const init = async () => {
         await pool.query("ALTER TABLE vacaciones ADD CONSTRAINT vacaciones_estado_check CHECK(estado IN ('aprobada', 'pendiente', 'rechazada'));");
         console.log('Tabla "vacaciones" actualizada con estados.');
         
+        // --- CREACIÓN DEL USUARIO ADMIN POR DEFECTO ---
         const adminUser = 'admin';
         const adminPass = 'admin123';
         const res = await pool.query('SELECT * FROM usuarios WHERE usuario = $1', [adminUser]);
         if (res.rowCount === 0) {
             const hash = await bcrypt.hash(adminPass, 10);
             await pool.query(
-                'INSERT INTO usuarios (nombre, usuario, password, rol) VALUES ($1, $2, $3, $4)',
-                ['Administrador', adminUser, hash, 'admin']
+                'INSERT INTO usuarios (nombre, usuario, password, rol, fecha_contratacion) VALUES ($1, $2, $3, $4, $5)',
+                ['Administrador', adminUser, hash, 'admin', new Date().toISOString().split('T')[0]]
             );
             console.log('Usuario administrador creado.');
         }
