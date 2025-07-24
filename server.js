@@ -368,8 +368,15 @@ app.post('/api/vacaciones', authenticateToken, async (req, res) => {
     try {
         const diasAsignados = calcularDiasLaborables(fechaInicio, fechaFin);
         
-        const resUsuario = await db.query('SELECT dias_vacaciones_anuales FROM usuarios WHERE id = $1', [usuarioId]);
-        const diasTotales = resUsuario.rows[0].dias_vacaciones_anuales || 20;
+        // --- ¡LA CORRECCIÓN ESTÁ AQUÍ! ---
+        // Ahora seleccionamos ambos campos de días para la validación.
+        const resUsuario = await db.query('SELECT dias_vacaciones_anuales, dias_compensatorios FROM usuarios WHERE id = $1', [usuarioId]);
+        if (resUsuario.rowCount === 0) return res.status(404).json({ message: "Usuario no encontrado" });
+
+        const anuales = resUsuario.rows[0].dias_vacaciones_anuales || 20;
+        const compensatorios = resUsuario.rows[0].dias_compensatorios || 0;
+        const diasTotales = anuales + compensatorios;
+        // --- FIN DE LA CORRECCIÓN ---
 
         const resVacaciones = await db.query("SELECT fecha_inicio, fecha_fin FROM vacaciones WHERE usuario_id = $1 AND estado = 'aprobada' AND EXTRACT(YEAR FROM fecha_inicio) = $2", [usuarioId, anioActual]);
         const diasGastados = resVacaciones.rows.reduce((total, vac) => total + calcularDiasLaborables(vac.fecha_inicio.toISOString().split('T')[0], vac.fecha_fin.toISOString().split('T')[0]), 0);
@@ -429,34 +436,26 @@ app.post('/api/solicitar-vacaciones', authenticateToken, async (req, res) => {
 
     try {
         const diasLaborablesSolicitados = calcularDiasLaborables(fechaInicio, fechaFin);
-
-        if (diasLaborablesSolicitados < 5) {
-            return res.status(400).json({ message: `Debes solicitar un mínimo de 5 días laborables. Has solicitado ${diasLaborablesSolicitados}.` });
-        }
-        if (diasLaborablesSolicitados > 10) {
-            return res.status(400).json({ message: `Puedes solicitar un máximo de 10 días laborables. Has solicitado ${diasLaborablesSolicitados}.` });
-        }
-
-        const resUsuario = await db.query('SELECT dias_vacaciones_anuales FROM usuarios WHERE id = $1', [usuarioId]);
-        const diasTotales = resUsuario.rows[0].dias_vacaciones_anuales || 20;
+        if (diasLaborablesSolicitados < 5) return res.status(400).json({ message: `Debes solicitar un mínimo de 5 días laborables. Has solicitado ${diasLaborablesSolicitados}.` });
+        if (diasLaborablesSolicitados > 10) return res.status(400).json({ message: `Puedes solicitar un máximo de 10 días laborables. Has solicitado ${diasLaborablesSolicitados}.` });
+        
+        // Se corrige la consulta para incluir dias_compensatorios
+        const resUsuario = await db.query('SELECT dias_vacaciones_anuales, dias_compensatorios FROM usuarios WHERE id = $1', [usuarioId]);
+        const anuales = resUsuario.rows[0].dias_vacaciones_anuales || 20;
+        const compensatorios = resUsuario.rows[0].dias_compensatorios || 0;
+        const diasTotales = anuales + compensatorios; // Se calcula el total correcto
 
         const resVacaciones = await db.query("SELECT fecha_inicio, fecha_fin FROM vacaciones WHERE usuario_id = $1 AND estado IN ('aprobada', 'pendiente') AND EXTRACT(YEAR FROM fecha_inicio) = $2", [usuarioId, anioActual]);
-        
         const diasComprometidos = resVacaciones.rows.reduce((total, vac) => total + calcularDiasLaborables(vac.fecha_inicio.toISOString().split('T')[0], vac.fecha_fin.toISOString().split('T')[0]), 0);
-        
         const diasRestantes = diasTotales - diasComprometidos;
 
         if (diasLaborablesSolicitados > diasRestantes) {
-            return res.status(400).json({ message: `Días insuficientes. Solicitas ${diasLaborablesSolicitados} días laborables y solo te quedan ${diasRestantes} disponibles (incluyendo otras solicitudes pendientes).` });
+            return res.status(400).json({ message: `Días insuficientes. Solicitas ${diasLaborablesSolicitados} y solo te quedan ${diasRestantes} disponibles.` });
         }
         
         await db.query('INSERT INTO vacaciones (usuario_id, fecha_inicio, fecha_fin, estado) VALUES ($1, $2, $3, $4)', [usuarioId, fechaInicio, fechaFin, 'pendiente']);
         res.status(201).json({ message: 'Solicitud de vacaciones enviada correctamente.' });
-
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ message: 'Error al procesar la solicitud.' });
-    }
+    } catch (err) { res.status(500).json({ message: 'Error al procesar la solicitud.' }); }
 });
 
 // MODIFICADO: (EMPLEADO) Calcula su propio balance usando días laborables
@@ -464,10 +463,13 @@ app.get('/api/mis-vacaciones-restantes', authenticateToken, async (req, res) => 
     const usuarioId = req.user.id;
     const anioActual = new Date().getFullYear();
     try {
-        const resUsuario = await db.query('SELECT dias_vacaciones_anuales FROM usuarios WHERE id = $1', [usuarioId]);
+        // Se corrige la consulta para incluir dias_compensatorios
+        const resUsuario = await db.query('SELECT dias_vacaciones_anuales, dias_compensatorios FROM usuarios WHERE id = $1', [usuarioId]);
         if (resUsuario.rowCount === 0) return res.status(404).json({ message: 'Usuario no encontrado.' });
         
-        const diasTotales = resUsuario.rows[0].dias_vacaciones_anuales || 20;
+        const anuales = resUsuario.rows[0].dias_vacaciones_anuales || 20;
+        const compensatorios = resUsuario.rows[0].dias_compensatorios || 0;
+        const diasTotales = anuales + compensatorios; // Se calcula el total correcto
         
         const sqlVacaciones = `SELECT fecha_inicio, fecha_fin FROM vacaciones WHERE usuario_id = $1 AND estado = 'aprobada' AND EXTRACT(YEAR FROM fecha_inicio) = $2`;
         const resVacaciones = await db.query(sqlVacaciones, [usuarioId, anioActual]);
@@ -479,10 +481,7 @@ app.get('/api/mis-vacaciones-restantes', authenticateToken, async (req, res) => 
         
         const diasRestantes = diasTotales - diasGastados;
         res.json({ diasTotales, diasGastados, diasRestantes });
-    } catch(err) {
-        console.error("Error al calcular mis días restantes:", err);
-        res.status(500).json({ message: 'Error al calcular días restantes.' });
-    }
+    } catch(err) { res.status(500).json({ message: 'Error al calcular días restantes.' }); }
 });
 
 
