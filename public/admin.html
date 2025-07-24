@@ -525,25 +525,34 @@ async function handleDeleteVacation(event) {
         });
       }
 
-      async function loadUsers() {
-        try {
-          const res = await fetch("/api/usuarios", {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          if (!res.ok)
-            throw new Error("No se pudo cargar la lista de usuarios.");
-          const users = await res.json();
-          const tbody = document.querySelector("#usersTable tbody");
-          tbody.innerHTML = "";
-          users.forEach((user) => {
+      // En el <script> de admin.html, dentro de la función loadUsers
+
+async function loadUsers() {
+    try {
+        const res = await fetch("/api/usuarios", { headers: { Authorization: `Bearer ${token}` } });
+        if (!res.ok) throw new Error("No se pudo cargar la lista de usuarios.");
+        const users = await res.json();
+        const tbody = document.querySelector("#usersTable tbody");
+        tbody.innerHTML = "";
+        users.forEach((user) => {
             const tr = document.createElement("tr");
-            tr.innerHTML = `<td>${user.nombre}</td><td>${user.usuario}</td><td>${user.rol}</td><td><button class="action-btn btn-reset" onclick="resetPassword(${user.id}, '${user.nombre}')">Resetear</button><button class="action-btn btn-delete" onclick="deleteUser(${user.id}, '${user.nombre}')">Eliminar</button></td>`;
+            const diasCompensatorios = user.dias_compensatorios || 0;
+            // --- CAMBIO AQUÍ: Se añade el nuevo botón "Ajustar Días" ---
+            tr.innerHTML = `
+                <td>${user.nombre}</td>
+                <td>${user.usuario}</td>
+                <td>${user.rol}</td>
+                <td>
+                    <button class="action-btn" style="background-color: #3498db;" onclick="ajustarDiasCompensatorios(${user.id}, '${user.nombre}', ${diasCompensatorios})">Ajustar Días</button>
+                    <button class="action-btn btn-reset" onclick="resetPassword(${user.id}, '${user.nombre}')">Resetear</button>
+                    <button class="action-btn btn-delete" onclick="deleteUser(${user.id}, '${user.nombre}')">Eliminar</button>
+                </td>`;
             tbody.appendChild(tr);
-          });
-        } catch (error) {
-          console.error("Error en loadUsers:", error);
-        }
-      }
+        });
+    } catch (error) {
+        console.error("Error en loadUsers:", error);
+    }
+}
 
       async function resetPassword(userId, userName) {
         const { value: newPassword } = await Swal.fire({
@@ -636,6 +645,52 @@ async function handleDeleteVacation(event) {
           );
         }
       }
+
+
+async function ajustarDiasCompensatorios(userId, userName, currentDays) {
+    const { value: formValues } = await Swal.fire({
+        title: `Ajustar días de ${userName}`,
+        html: `
+            <p style="margin-bottom: 1rem;">Días compensatorios actuales: <strong>${currentDays}</strong></p>
+            <label for="swal-input-dias">Nuevos días compensatorios:</label>
+            <input id="swal-input-dias" type="number" min="0" value="${currentDays}" class="swal2-input" style="width: auto; margin-top: 0.5rem;">
+            <textarea id="swal-input-motivo" class="swal2-textarea" placeholder="Motivo del ajuste (ej: trabajo en festivo)" style="margin-top: 1rem;"></textarea>
+        `,
+        focusConfirm: false,
+        showCancelButton: true,
+        confirmButtonText: 'Guardar Cambios',
+        preConfirm: () => {
+            const dias = parseInt(document.getElementById('swal-input-dias').value, 10);
+            const motivo = document.getElementById('swal-input-motivo').value.trim();
+            if (isNaN(dias) || dias < 0) {
+                Swal.showValidationMessage('Por favor, introduce un número válido de días (0 o más).');
+                return false;
+            }
+            if (!motivo) {
+                Swal.showValidationMessage('Es obligatorio indicar un motivo para el ajuste.');
+                return false;
+            }
+            return { dias, motivo };
+        }
+    });
+
+    if (formValues) {
+        try {
+            const res = await fetch(`/api/usuarios/${userId}/dias-compensatorios`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify(formValues)
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message);
+            Swal.fire('¡Actualizado!', data.message, 'success');
+            loadUsers(); // Recargamos la lista para ver los cambios
+        } catch (error) {
+            Swal.fire('Error', `No se pudo actualizar: ${error.message}`, 'error');
+        }
+    }
+}
+
 
       async function generarInformeMensual() {
         const usuarioId = selectUsuario.value;

@@ -133,13 +133,40 @@ app.get('/api/informe', authenticateToken, async (req, res) => {
         res.json(result.rows);
     } catch (err) { res.status(500).json({ message: 'Error al obtener informe.' }); }
 });
+// En server.js
 app.get('/api/usuarios', authenticateToken, async (req, res) => {
     if (req.user.rol !== 'admin' && req.user.rol !== 'gestor_vacaciones') return res.sendStatus(403);
     try {
-        const result = await db.query("SELECT id, nombre, usuario, rol, dias_vacaciones_anuales FROM usuarios ORDER BY nombre");
+        // --- CAMBIO AQUÍ: Añadimos dias_compensatorios ---
+        const result = await db.query("SELECT id, nombre, usuario, rol, dias_vacaciones_anuales, dias_compensatorios FROM usuarios ORDER BY nombre");
         res.json(result.rows);
     } catch(err) { res.status(500).json({ message: "Error al obtener usuarios." }); }
 });
+
+// En server.js (NUEVA RUTA)
+app.put('/api/usuarios/:id/dias-compensatorios', authenticateToken, async (req, res) => {
+    if (req.user.rol !== 'admin' && req.user.rol !== 'gestor_vacaciones') return res.sendStatus(403);
+
+    const { id } = req.params;
+    const { dias, motivo } = req.body; // Recibimos los días y un motivo opcional
+
+    if (typeof dias !== 'number' || !Number.isInteger(dias) || dias < 0) {
+        return res.status(400).json({ message: 'El número de días debe ser un entero no negativo.' });
+    }
+
+    try {
+        // El motivo se podría guardar en una tabla de logs en el futuro. Por ahora solo lo usamos para la respuesta.
+        const result = await db.query('UPDATE usuarios SET dias_compensatorios = $1 WHERE id = $2', [dias, id]);
+        if (result.rowCount === 0) {
+            return res.status(404).json({ message: 'Usuario no encontrado.' });
+        }
+        res.json({ message: `Días compensatorios actualizados a ${dias}. Motivo: ${motivo || 'No especificado'}` });
+    } catch (err) {
+        console.error("Error ajustando días compensatorios:", err);
+        res.status(500).json({ message: 'Error al actualizar los días.' });
+    }
+});
+
 app.post('/api/usuarios', authenticateToken, async (req, res) => {
     if (req.user.rol !== 'admin') return res.status(403).json({ message: 'Acceso denegado.' });
     const { nombre, usuario, password, rol } = req.body;
@@ -366,17 +393,19 @@ app.get('/api/usuarios/:id/vacaciones-restantes', authenticateToken, async (req,
     const { id } = req.params;
     const anioActual = new Date().getFullYear();
     try {
-        const resUsuario = await db.query('SELECT dias_vacaciones_anuales FROM usuarios WHERE id = $1', [id]);
+       const resUsuario = await db.query('SELECT dias_vacaciones_anuales, dias_compensatorios FROM usuarios WHERE id = $1', [id]);
         if (resUsuario.rowCount === 0) return res.status(404).json({ message: 'Usuario no encontrado.' });
         
-        const diasTotales = resUsuario.rows[0].dias_vacaciones_anuales || 20;
+        // --- CAMBIO AQUÍ: Calculamos el total sumando ambos ---
+        const anuales = resUsuario.rows[0].dias_vacaciones_anuales || 20;
+        const compensatorios = resUsuario.rows[0].dias_compensatorios || 0;
+        const diasTotales = anuales + compensatorios;
         
         const sqlVacaciones = `SELECT fecha_inicio, fecha_fin FROM vacaciones WHERE usuario_id = $1 AND estado = 'aprobada' AND EXTRACT(YEAR FROM fecha_inicio) = $2`;
         const resVacaciones = await db.query(sqlVacaciones, [id, anioActual]);
         
         let diasGastados = 0;
         resVacaciones.rows.forEach(vac => {
-            // Usamos la nueva función de cálculo
             diasGastados += calcularDiasLaborables(vac.fecha_inicio.toISOString().split('T')[0], vac.fecha_fin.toISOString().split('T')[0]);
         });
         
