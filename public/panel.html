@@ -38,6 +38,25 @@
                     </div>
                 </div>
             </section>
+
+            <section id="seniority-container" class="highlight-section" style="display: none;">
+                <h2>Mi Antigüedad</h2>
+                <div class="seniority-card">
+                    <div class="seniority-item">
+                        <span id="seniority-years" class="seniority-value">--</span>
+                        <span class="seniority-label">Años</span>
+                    </div>
+                    <div class="seniority-item">
+                        <span id="seniority-months" class="seniority-value">--</span>
+                        <span class="seniority-label">Meses</span>
+                    </div>
+                    <div class="seniority-item">
+                        <span id="seniority-days" class="seniority-value">--</span>
+                        <span class="seniority-label">Días</span>
+                    </div>
+                </div>
+            </section>
+
             <section class="fichaje-section">
                 <h2>Fichaje</h2>
                 <div class="fichaje-actions">
@@ -155,32 +174,53 @@
         function logout() { localStorage.removeItem('token'); window.location.href = '/index.html'; }
 
         async function cargarDatosInicio() {
-            const mesValue = document.getElementById('selectMesHistorial').value;
-            if (!mesValue) return;
-            const [anio, mes] = mesValue.split('-');
-            try {
-                const [resVac, resReg] = await Promise.all([
-                    fetch('/api/mis-vacaciones-restantes', { headers: { 'Authorization': `Bearer ${token}` } }),
-                    fetch(`/api/mis-registros?anio=${anio}&mes=${mes}`, { headers: { 'Authorization': `Bearer ${token}` } })
-                ]);
-                const dataVac = await resVac.json();
-                // MODIFICADO: Claridad en el texto
-                document.getElementById('dias-vacaciones').textContent = dataVac.diasRestantes ?? '--';
-                const dataReg = await resReg.json();
-                if (!resReg.ok) throw new Error(dataReg.message);
-                document.getElementById('fichajes-mes').textContent = dataReg.length;
-                const ultimoFichajeDiv = document.getElementById('ultimoFichaje');
-                if (dataReg.length > 0) {
-                    const ultimo = dataReg[dataReg.length - 1];
-                    const fechaUltimo = new Date(ultimo.fecha_hora).toLocaleString("es-ES", { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
-                    const tipoUltimo = ultimo.tipo.charAt(0).toUpperCase() + ultimo.tipo.slice(1);
-                    const icono = tipoUltimo === 'Entrada' ? '<i class="bi bi-box-arrow-in-right" style="color: #2ecc71;"></i>' : '<i class="bi bi-box-arrow-right" style="color: #e74c3c;"></i>';
-                    ultimoFichajeDiv.innerHTML = `<p>${icono} <strong>${tipoUltimo}</strong> - ${fechaUltimo}</p>`;
-                } else {
-                    ultimoFichajeDiv.innerHTML = '<p>No hay información disponible</p>';
-                }
-            } catch (error) { console.error('Error cargando datos de inicio:', error); }
+    const mesValue = document.getElementById('selectMesHistorial').value;
+    if (!mesValue) return;
+    const [anio, mes] = mesValue.split('-');
+    try {
+        const [resVac, resReg] = await Promise.all([
+            fetch('/api/mis-vacaciones-restantes', { headers: { 'Authorization': `Bearer ${token}` } }),
+            fetch(`/api/mis-registros?anio=${anio}&mes=${mes}`, { headers: { 'Authorization': `Bearer ${token}` } })
+        ]);
+
+        if (!resVac.ok || !resReg.ok) throw new Error("Error al cargar los datos iniciales.");
+
+        const dataVac = await resVac.json();
+        const dataReg = await resReg.json();
+
+        // Actualizar widget de vacaciones
+        document.getElementById('dias-vacaciones').textContent = dataVac.diasRestantes ?? '--';
+        
+        // --- NUEVA LÓGICA AQUÍ ---
+        // Si recibimos la fecha de contratación, calculamos y mostramos el contador
+        if (dataVac.fechaContratacion) {
+            const container = document.getElementById('seniority-container');
+            const start = luxon.DateTime.fromISO(dataVac.fechaContratacion);
+            const now = luxon.DateTime.now();
+
+            const diff = now.diff(start, ['years', 'months', 'days']).toObject();
+            
+            document.getElementById('seniority-years').textContent = Math.floor(diff.years) || 0;
+            document.getElementById('seniority-months').textContent = Math.floor(diff.months) || 0;
+            document.getElementById('seniority-days').textContent = Math.floor(diff.days) || 0;
+            
+            container.style.display = 'block'; // Mostramos la sección
         }
+        
+        // Actualizar widget de fichajes y último fichaje (sin cambios)
+        document.getElementById('fichajes-mes').textContent = dataReg.length;
+        const ultimoFichajeDiv = document.getElementById('ultimoFichaje');
+        if (dataReg.length > 0) {
+            const ultimo = dataReg[dataReg.length - 1];
+            const fechaUltimo = new Date(ultimo.fecha_hora).toLocaleString("es-ES", { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
+            const tipoUltimo = ultimo.tipo.charAt(0).toUpperCase() + ultimo.tipo.slice(1);
+            const icono = tipoUltimo === 'Entrada' ? '<i class="bi bi-box-arrow-in-right" style="color: #2ecc71;"></i>' : '<i class="bi bi-box-arrow-right" style="color: #e74c3c;"></i>';
+            ultimoFichajeDiv.innerHTML = `<p>${icono} <strong>${tipoUltimo}</strong> - ${fechaUltimo}</p>`;
+        } else {
+            ultimoFichajeDiv.innerHTML = '<p>No hay información disponible</p>';
+        }
+    } catch (error) { console.error('Error cargando datos de inicio:', error); }
+}
 
         async function cargarHistorialCompleto() {
             const mesValue = document.getElementById('selectMesHistorial').value;
@@ -271,33 +311,54 @@
             stream.getTracks().forEach(track => track.stop()); cameraModal.style.display = 'none';
             canvas.toBlob(blob => { const formData = new FormData(); formData.append('tipo', tipo); formData.append('foto', blob, 'fichaje.jpeg'); enviarFichaje(formData); }, 'image/jpeg');
         }
-        async function cargarDatosSolicitudes() {
-            const infoP = document.getElementById('info-dias-solicitud');
-            const tbody = document.querySelector("#misSolicitudesTable tbody");
-            infoP.textContent = 'Cargando...';
-            tbody.innerHTML = '<tr><td colspan="2">Cargando...</td></tr>';
-            try {
-                const [resDias, resSol] = await Promise.all([
-                    fetch('/api/mis-vacaciones-restantes', { headers: { Authorization: `Bearer ${token}` } }),
-                    fetch('/api/mis-solicitudes', { headers: { Authorization: `Bearer ${token}` } })
-                ]);
+        async function cargarDatosInicio() {
+    const mesValue = document.getElementById('selectMesHistorial').value;
+    if (!mesValue) return;
+    const [anio, mes] = mesValue.split('-');
+    try {
+        const [resVac, resReg] = await Promise.all([
+            fetch('/api/mis-vacaciones-restantes', { headers: { 'Authorization': `Bearer ${token}` } }),
+            fetch(`/api/mis-registros?anio=${anio}&mes=${mes}`, { headers: { 'Authorization': `Bearer ${token}` } })
+        ]);
 
-                const dataDias = await resDias.json();
-                 // MODIFICADO: Claridad en el texto
-                infoP.innerHTML = `Disponibles (laborables): <span class="dias-restantes">${dataDias.diasRestantes}</span> / ${dataDias.diasTotales}`;
-                const dataSol = await resSol.json();
-                tbody.innerHTML = "";
-                if (dataSol.length > 0) {
-                    dataSol.forEach(sol => {
-                        const tr = document.createElement('tr');
-                        const fInicio = new Date(sol.fecha_inicio).toLocaleDateString('es-ES');
-                        const fFin = new Date(sol.fecha_fin).toLocaleDateString('es-ES');
-                        tr.innerHTML = `<td>Del ${fInicio} al ${fFin}</td><td><span class="status-${sol.estado}">${sol.estado}</span></td>`;
-                        tbody.appendChild(tr);
-                    });
-                } else { tbody.innerHTML = '<tr><td colspan="2">No tienes solicitudes.</td></tr>'; }
-            } catch (error) { console.error('Error cargando solicitudes:', error); }
+        if (!resVac.ok || !resReg.ok) throw new Error("Error al cargar los datos iniciales.");
+
+        const dataVac = await resVac.json();
+        const dataReg = await resReg.json();
+
+        // Actualizar widget de vacaciones
+        document.getElementById('dias-vacaciones').textContent = dataVac.diasRestantes ?? '--';
+        
+        // --- NUEVA LÓGICA AQUÍ ---
+        // Si recibimos la fecha de contratación, calculamos y mostramos el contador
+        if (dataVac.fechaContratacion) {
+            const container = document.getElementById('seniority-container');
+            const start = luxon.DateTime.fromISO(dataVac.fechaContratacion);
+            const now = luxon.DateTime.now();
+
+            const diff = now.diff(start, ['years', 'months', 'days']).toObject();
+            
+            document.getElementById('seniority-years').textContent = Math.floor(diff.years) || 0;
+            document.getElementById('seniority-months').textContent = Math.floor(diff.months) || 0;
+            document.getElementById('seniority-days').textContent = Math.floor(diff.days) || 0;
+            
+            container.style.display = 'block'; // Mostramos la sección
         }
+        
+        // Actualizar widget de fichajes y último fichaje (sin cambios)
+        document.getElementById('fichajes-mes').textContent = dataReg.length;
+        const ultimoFichajeDiv = document.getElementById('ultimoFichaje');
+        if (dataReg.length > 0) {
+            const ultimo = dataReg[dataReg.length - 1];
+            const fechaUltimo = new Date(ultimo.fecha_hora).toLocaleString("es-ES", { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
+            const tipoUltimo = ultimo.tipo.charAt(0).toUpperCase() + ultimo.tipo.slice(1);
+            const icono = tipoUltimo === 'Entrada' ? '<i class="bi bi-box-arrow-in-right" style="color: #2ecc71;"></i>' : '<i class="bi bi-box-arrow-right" style="color: #e74c3c;"></i>';
+            ultimoFichajeDiv.innerHTML = `<p>${icono} <strong>${tipoUltimo}</strong> - ${fechaUltimo}</p>`;
+        } else {
+            ultimoFichajeDiv.innerHTML = '<p>No hay información disponible</p>';
+        }
+    } catch (error) { console.error('Error cargando datos de inicio:', error); }
+}
         async function enviarFichaje(formData) {
             const tipo = formData.get('tipo'); const button = tipo === 'entrada' ? btnEntrada : btnSalida;
             button.innerHTML = '<div class="loader"></div>'; button.disabled = true;

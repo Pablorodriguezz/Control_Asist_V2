@@ -472,10 +472,28 @@ app.get('/api/fix-vacation-days', authenticateToken, async(req, res) => {
 
 app.get('/api/mis-vacaciones', authenticateToken, async (req, res) => {
     const usuarioId = req.user.id;
-    try {
-        const sql = `SELECT id, 'Mis Vacaciones' as title, fecha_inicio as start, fecha_fin as end FROM vacaciones WHERE usuario_id = $1 AND estado = 'aprobada'`;
-        const { rows } = await db.query(sql, [usuarioId]);
-        res.json(rows);
+     try {
+        const diasTotales = await calcularBalance(usuarioId, anioActual);
+        const sqlVacaciones = `SELECT fecha_inicio, fecha_fin FROM vacaciones WHERE usuario_id = $1 AND estado = 'aprobada' AND EXTRACT(YEAR FROM fecha_inicio) = $2`;
+        const resVacaciones = await db.query(sqlVacaciones, [usuarioId, anioActual]);
+        
+        let diasGastados = 0;
+        resVacaciones.rows.forEach(vac => {
+            diasGastados += calcularDiasLaborables(vac.fecha_inicio.toISOString().split('T')[0], vac.fecha_fin.toISOString().split('T')[0]);
+        });
+        
+        const diasRestantes = diasTotales - diasGastados;
+        
+        // --- CAMBIO AQUÍ: Añadimos la fecha de contratación a la respuesta ---
+        const { rows } = await db.query('SELECT fecha_contratacion FROM usuarios WHERE id = $1', [usuarioId]);
+        const fechaContratacion = rows.length > 0 ? rows[0].fecha_contratacion : null;
+
+        res.json({ 
+            diasTotales: parseFloat(diasTotales.toFixed(2)), 
+            diasGastados, 
+            diasRestantes: parseFloat(diasRestantes.toFixed(2)),
+            fechaContratacion // Se envía la fecha al frontend
+        });
     } catch(err) {
         res.status(500).json({ message: 'Error al obtener mis vacaciones.' });
     }
