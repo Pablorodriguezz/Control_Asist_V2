@@ -169,11 +169,16 @@ app.put('/api/usuarios/:id/dias-compensatorios', authenticateToken, async (req, 
 
 app.post('/api/usuarios', authenticateToken, async (req, res) => {
     if (req.user.rol !== 'admin') return res.status(403).json({ message: 'Acceso denegado.' });
-    const { nombre, usuario, password, rol } = req.body;
+    // --- CAMBIO: Recibimos la nueva fecha ---
+    const { nombre, usuario, password, rol, fechaContratacion } = req.body;
     if (!nombre || !usuario || !password || !rol) return res.status(400).json({ message: 'Faltan datos.' });
     try {
         const hash = await bcrypt.hash(password, 10);
-        const result = await db.query('INSERT INTO usuarios (nombre, usuario, password, rol) VALUES ($1, $2, $3, $4) RETURNING id', [nombre, usuario, hash, rol]);
+        // --- CAMBIO: La guardamos en la base de datos ---
+        const result = await db.query(
+            'INSERT INTO usuarios (nombre, usuario, password, rol, fecha_contratacion) VALUES ($1, $2, $3, $4, $5) RETURNING id', 
+            [nombre, usuario, hash, rol, fechaContratacion || null]
+        );
         res.status(201).json({ message: `Usuario '${nombre}' creado.`, id: result.rows[0].id });
     } catch (err) {
         if (err.code === '23505') return res.status(409).json({ message: 'El usuario ya existe.' });
@@ -399,15 +404,30 @@ app.get('/api/usuarios/:id/vacaciones-restantes', authenticateToken, async (req,
     if (req.user.rol !== 'admin' && req.user.rol !== 'gestor_vacaciones') return res.sendStatus(403);
     const { id } = req.params;
     const anioActual = new Date().getFullYear();
+
     try {
-       const resUsuario = await db.query('SELECT dias_vacaciones_anuales, dias_compensatorios FROM usuarios WHERE id = $1', [id]);
+        const resUsuario = await db.query('SELECT dias_vacaciones_anuales, dias_compensatorios, fecha_contratacion FROM usuarios WHERE id = $1', [id]);
         if (resUsuario.rowCount === 0) return res.status(404).json({ message: 'Usuario no encontrado.' });
         
-        // --- CAMBIO AQUÍ: Calculamos el total sumando ambos ---
-        const anuales = resUsuario.rows[0].dias_vacaciones_anuales || 20;
-        const compensatorios = resUsuario.rows[0].dias_compensatorios || 0;
-        const diasTotales = anuales + compensatorios;
+        const usuario = resUsuario.rows[0];
+        let diasAnualesBase = usuario.dias_vacaciones_anuales || 20;
+
+        // --- ¡NUEVA LÓGICA DE PRORRATEO! ---
+        if (usuario.fecha_contratacion && new Date(usuario.fecha_contratacion).getFullYear() === anioActual) {
+            const fechaInicio = DateTime.fromJSDate(new Date(usuario.fecha_contratacion));
+            const finDeAnio = DateTime.fromObject({ year: anioActual, month: 12, day: 31 });
+            const diasTrabajados = finDeAnio.diff(fechaInicio, 'days').toObject().days + 1;
+            const diasDelAnio = DateTime.fromObject({ year: anioActual }).isInLeapYear ? 366 : 365;
+            
+            const diasProrrateados = (diasTrabajados / diasDelAnio) * diasAnualesBase;
+            // Redondeamos al medio día más cercano
+            diasAnualesBase = Math.round(diasProrrateados * 2) / 2;
+        }
+
+        const compensatorios = usuario.dias_compensatorios || 0;
+        const diasTotales = diasAnualesBase + compensatorios;
         
+        // El resto del cálculo sigue igual...
         const sqlVacaciones = `SELECT fecha_inicio, fecha_fin FROM vacaciones WHERE usuario_id = $1 AND estado = 'aprobada' AND EXTRACT(YEAR FROM fecha_inicio) = $2`;
         const resVacaciones = await db.query(sqlVacaciones, [id, anioActual]);
         
@@ -417,7 +437,8 @@ app.get('/api/usuarios/:id/vacaciones-restantes', authenticateToken, async (req,
         });
         
         const diasRestantes = diasTotales - diasGastados;
-        res.json({ diasTotales, diasGastados, diasRestantes });
+        res.json({ diasTotales: parseFloat(diasTotales.toFixed(2)), diasGastados, diasRestantes: parseFloat(diasRestantes.toFixed(2)) });
+
     } catch (err) {
         console.error("Error al calcular días restantes:", err);
         res.status(500).json({ message: 'Error al calcular días restantes.' });

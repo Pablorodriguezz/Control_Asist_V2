@@ -25,15 +25,16 @@ const init = async () => {
                 password TEXT NOT NULL,
                 rol TEXT NOT NULL,
                 dias_vacaciones_anuales INTEGER DEFAULT 20,
-                dias_compensatorios INTEGER DEFAULT 0 NOT NULL
+                dias_compensatorios INTEGER DEFAULT 0 NOT NULL,
+                fecha_contratacion DATE
             );
         `);
 
         // --- SCRIPT PARA AÑADIR LA COLUMNA SI NO EXISTE (para deployments) ---
-        const resCol = await pool.query("SELECT 1 FROM information_schema.columns WHERE table_name='usuarios' AND column_name='dias_compensatorios'");
-        if (resCol.rowCount === 0) {
-            await pool.query("ALTER TABLE usuarios ADD COLUMN dias_compensatorios INTEGER DEFAULT 0 NOT NULL");
-            console.log('Columna "dias_compensatorios" añadida a la tabla usuarios.');
+        const resColContratacion = await pool.query("SELECT 1 FROM information_schema.columns WHERE table_name='usuarios' AND column_name='fecha_contratacion'");
+        if (resColContratacion.rowCount === 0) {
+            await pool.query("ALTER TABLE usuarios ADD COLUMN fecha_contratacion DATE");
+            console.log('Columna "fecha_contratacion" añadida a la tabla usuarios.');
         }
 
         // Se asegura de que el valor por defecto de las vacaciones anuales sea 20.

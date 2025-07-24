@@ -150,35 +150,25 @@
       </section>
       <hr />
 
-      <section id="crear-usuario">
-        <h2>Crear Nuevo Usuario</h2>
-        <form id="createUserForm">
-          <input
-            type="text"
-            id="nombre"
-            placeholder="Nombre completo"
-            required
-          />
-          <input
-            type="text"
-            id="usuario"
-            placeholder="Nombre de usuario (login)"
-            required
-          />
-          <input
-            type="password"
-            id="password"
-            placeholder="Contraseña"
-            required
-          />
-          <select id="rol" required>
-            <option value="empleado" selected>Empleado</option>
-            <option value="admin">Administrador</option>
-            <option value="gestor_vacaciones">Gestor de Vacaciones</option>
-          </select>
-          <button type="submit" class="btn-create">Crear Usuario</button>
-        </form>
-      </section>
+      <!-- En admin.html, dentro del <form id="createUserForm"> -->
+<section id="crear-usuario">
+    <h2>Crear Nuevo Usuario</h2>
+    <form id="createUserForm">
+      <input type="text" id="nombre" placeholder="Nombre completo" required />
+      <input type="text" id="usuario" placeholder="Nombre de usuario (login)" required />
+      <input type="password" id="password" placeholder="Contraseña" required />
+      <!-- --- NUEVO CAMPO --- -->
+      <label for="fechaContratacion" style="text-align: left; margin-top: 10px;">Fecha de Contratación:</label>
+      <input type="date" id="fechaContratacion" required />
+
+      <select id="rol" required>
+        <option value="empleado" selected>Empleado</option>
+        <option value="admin">Administrador</option>
+        <option value="gestor_vacaciones">Gestor de Vacaciones</option>
+      </select>
+      <button type="submit" class="btn-create">Crear Usuario</button>
+    </form>
+</section>
       <hr />
 
       <section id="fichaje-manual">
@@ -801,11 +791,12 @@ async function ajustarDiasCompensatorios(userId, userName, currentDays) {
         .getElementById("createUserForm")
         .addEventListener("submit", async (e) => {
           e.preventDefault();
-          const [nombre, usuario, password, rol] = [
+          const [nombre, usuario, password, rol, fechaContratacion] = [
             e.target.nombre.value,
             e.target.usuario.value,
             e.target.password.value,
             e.target.rol.value,
+            e.target.fechaContratacion.value,
           ];
           try {
             const res = await fetch("/api/usuarios", {
@@ -814,7 +805,7 @@ async function ajustarDiasCompensatorios(userId, userName, currentDays) {
                 "Content-Type": "application/json",
                 Authorization: `Bearer ${token}`,
               },
-              body: JSON.stringify({ nombre, usuario, password, rol }),
+              body: JSON.stringify({ nombre, usuario, password, rol, fechaContratacion}),
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data.message);
