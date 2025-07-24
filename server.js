@@ -473,6 +473,27 @@ app.delete('/api/vacaciones/:id', authenticateToken, async (req, res) => {
     }
 });
 
+// --- RUTA AÑADIDA: Obtiene las solicitudes pendientes para el admin/gestor ---
+app.get('/api/vacaciones-pendientes', authenticateToken, async (req, res) => {
+    if (req.user.rol !== 'admin' && req.user.rol !== 'gestor_vacaciones') return res.sendStatus(403);
+    try {
+        const { rows } = await db.query("SELECT v.id, u.nombre, v.fecha_inicio, v.fecha_fin FROM vacaciones v JOIN usuarios u ON v.usuario_id = u.id WHERE v.estado = 'pendiente' ORDER BY v.id ASC");
+        res.json(rows);
+    } catch(err) { res.status(500).json({ message: 'Error al obtener solicitudes.' }); }
+});
+
+// --- RUTA AÑADIDA: Permite al admin/gestor aprobar o rechazar solicitudes ---
+app.put('/api/vacaciones/:id/gestionar', authenticateToken, async (req, res) => {
+    if (req.user.rol !== 'admin' && req.user.rol !== 'gestor_vacaciones') return res.sendStatus(403);
+    const { nuevoEstado } = req.body;
+    if (!['aprobada', 'rechazada'].includes(nuevoEstado)) return res.status(400).json({ message: 'Estado no válido.' });
+    try {
+        const result = await db.query("UPDATE vacaciones SET estado = $1 WHERE id = $2 AND estado = 'pendiente'", [nuevoEstado, req.params.id]);
+        if (result.rowCount === 0) return res.status(404).json({ message: 'Solicitud no encontrada o ya gestionada.' });
+        res.json({ message: `Solicitud ${nuevoEstado}.` });
+    } catch(err) { res.status(500).json({ message: 'Error al gestionar.' }); }
+});
+
 app.get('/api/fix-vacation-days', authenticateToken, async(req, res) => {
     if (req.user.rol !== 'admin') return res.sendStatus(403);
     try {
