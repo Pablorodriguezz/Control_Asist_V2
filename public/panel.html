@@ -9,6 +9,7 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js'></script>
     <script src="https://cdn.jsdelivr.net/npm/luxon@3.4.4/build/global/luxon.min.js"></script>
+    
 </head>
 <body>
     <!-- ===== HEADER ===== -->
@@ -244,6 +245,33 @@
             });
             miCalendario.render();
         }
+        // --- ESTA FUNCIÓN COMPLETA FUE RESTAURADA ---
+async function cargarDatosSolicitudes() {
+    const infoP = document.getElementById('info-dias-solicitud');
+    const tbody = document.querySelector("#misSolicitudesTable tbody");
+    infoP.textContent = 'Cargando...';
+    tbody.innerHTML = '<tr><td colspan="2">Cargando...</td></tr>';
+    try {
+        const [resDias, resSol] = await Promise.all([
+            fetch('/api/mis-vacaciones-restantes', { headers: { Authorization: `Bearer ${token}` } }),
+            fetch('/api/mis-solicitudes', { headers: { Authorization: `Bearer ${token}` } })
+        ]);
+
+        const dataDias = await resDias.json();
+        infoP.innerHTML = `Disponibles (laborables): <span class="dias-restantes">${dataDias.diasRestantes.toFixed(1)}</span> / ${dataDias.diasTotales.toFixed(1)}`;
+        const dataSol = await resSol.json();
+        tbody.innerHTML = "";
+        if (dataSol.length > 0) {
+            dataSol.forEach(sol => {
+                const tr = document.createElement('tr');
+                const fInicio = new Date(sol.fecha_inicio).toLocaleDateString('es-ES');
+                const fFin = new Date(sol.fecha_fin).toLocaleDateString('es-ES');
+                tr.innerHTML = `<td>Del ${fInicio} al ${fFin}</td><td><span class="status-${sol.estado}">${sol.estado}</span></td>`;
+                tbody.appendChild(tr);
+            });
+        } else { tbody.innerHTML = '<tr><td colspan="2">No tienes solicitudes.</td></tr>'; }
+    } catch (error) { console.error('Error cargando solicitudes:', error); }
+}
 
         async function inicializarPanel() {
              try {

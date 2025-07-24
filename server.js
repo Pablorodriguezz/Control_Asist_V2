@@ -484,41 +484,21 @@ app.get('/api/fix-vacation-days', authenticateToken, async(req, res) => {
     }
 });
 
+// En server.js
+// --- LÓGICA RESTAURADA A LA VERSIÓN CORRECTA ---
 app.get('/api/mis-vacaciones', authenticateToken, async (req, res) => {
     const usuarioId = req.user.id;
-     try {
-        const diasTotales = await calcularBalance(usuarioId, anioActual);
-        const sqlVacaciones = `SELECT fecha_inicio, fecha_fin FROM vacaciones WHERE usuario_id = $1 AND estado = 'aprobada' AND EXTRACT(YEAR FROM fecha_inicio) = $2`;
-        const resVacaciones = await db.query(sqlVacaciones, [usuarioId, anioActual]);
-        
-        let diasGastados = 0;
-        resVacaciones.rows.forEach(vac => {
-            diasGastados += calcularDiasLaborables(vac.fecha_inicio.toISOString().split('T')[0], vac.fecha_fin.toISOString().split('T')[0]);
-        });
-        
-        const diasRestantes = diasTotales - diasGastados;
-        
-        // --- CAMBIO AQUÍ: Añadimos la fecha de contratación a la respuesta ---
-        const { rows } = await db.query('SELECT fecha_contratacion FROM usuarios WHERE id = $1', [usuarioId]);
-        const fechaContratacion = rows.length > 0 ? rows[0].fecha_contratacion : null;
-
-        res.json({ 
-            diasTotales: parseFloat(diasTotales.toFixed(2)), 
-            diasGastados, 
-            diasRestantes: parseFloat(diasRestantes.toFixed(2)),
-            fechaContratacion // Se envía la fecha al frontend
-        });
+    try {
+        const sql = `
+            SELECT id, 'Mis Vacaciones' as title, fecha_inicio as start, fecha_fin as end 
+            FROM vacaciones 
+            WHERE usuario_id = $1 AND estado = 'aprobada'
+        `;
+        const { rows } = await db.query(sql, [usuarioId]);
+        res.json(rows); // Ahora devuelve un array de eventos
     } catch(err) {
         res.status(500).json({ message: 'Error al obtener mis vacaciones.' });
     }
-});
-
-app.get('/api/vacaciones-pendientes', authenticateToken, async (req, res) => {
-    if (req.user.rol !== 'admin' && req.user.rol !== 'gestor_vacaciones') return res.sendStatus(403);
-    try {
-        const { rows } = await db.query("SELECT v.id, u.nombre, v.fecha_inicio, v.fecha_fin FROM vacaciones v JOIN usuarios u ON v.usuario_id = u.id WHERE v.estado = 'pendiente' ORDER BY v.id ASC");
-        res.json(rows);
-    } catch(err) { res.status(500).json({ message: 'Error al obtener solicitudes.' }); }
 });
 
 app.put('/api/vacaciones/:id/gestionar', authenticateToken, async (req, res) => {
