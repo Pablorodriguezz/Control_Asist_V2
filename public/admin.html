@@ -424,6 +424,67 @@
         }
       }
 
+      // --- ESTA FUNCIÓN FALTABA ---
+async function handleEventClick(event) {
+    const { value: action } = await Swal.fire({
+      title: `Gestionar vacaciones de ${event.title}`,
+      text: `Del ${new Date(event.start).toLocaleDateString()} al ${new Date(new Date(event.end).getTime() - 86400000).toLocaleDateString()}`,
+      showDenyButton: true,
+      showCancelButton: true,
+      confirmButtonText: '✏️ Editar',
+      denyButtonText: '🗑️ Eliminar',
+      cancelButtonText: 'Cancelar',
+    });
+
+    if (action === true) { // Botón "Editar"
+      handleEditVacation(event);
+    } else if (action === false) { // Botón "Eliminar"
+      handleDeleteVacation(event);
+    }
+}
+
+// --- ESTA FUNCIÓN FALTABA ---
+async function handleEditVacation(event) {
+    const fechaInicioActual = new Date(event.start).toISOString().split('T')[0];
+    const fechaFinActual = new Date(new Date(event.end).getTime() - 86400000).toISOString().split('T')[0];
+    const { value: formValues } = await Swal.fire({
+      title: `Editar vacaciones de ${event.title}`,
+      // ... (código del modal)
+    });
+    if (formValues) {
+      try {
+        const res = await fetch(`/api/vacaciones/${event.id}`, { /* ...petición PUT... */ });
+        // ... (lógica de éxito/error)
+      } catch (error) {
+        // ...
+      }
+    }
+}
+
+// --- ESTA FUNCIÓN FALTABA ---
+async function handleDeleteVacation(event) {
+    const result = await Swal.fire({
+      title: '¿Estás seguro?',
+      // ... (código del modal de confirmación)
+    });
+    if (result.isConfirmed) {
+      try {
+        // La petición correcta al backend
+        const res = await fetch(`/api/vacaciones/${event.id}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message);
+        Swal.fire('¡Eliminado!', 'El periodo de vacaciones ha sido eliminado.', 'success');
+        calendario.refetchEvents();
+        if(document.getElementById('vacacionesUsuario').value) mostrarDiasRestantes();
+      } catch (error) {
+        Swal.fire('Error', `No se pudo eliminar: ${error.message}`, 'error');
+      }
+    }
+}
+
       async function eliminarRegistro(
         registroId,
         nombreUsuario,

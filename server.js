@@ -316,13 +316,19 @@ app.get('/api/dashboard', authenticateToken, async (req, res) => {
 // RUTAS PARA GESTIÓN DE VACACIONES (MODIFICADAS)
 // =================================================================
 
+// En server.js
+
 app.get('/api/vacaciones', authenticateToken, async (req, res) => {
-    if (req.user.rol !== 'admin' && req.user.rol !== 'gestor_vacaciones') return res.sendStatus(403);
+    // --- ¡VERIFICA ESTA LÍNEA! ---
+    if (req.user.rol !== 'admin' && req.user.rol !== 'gestor_vacaciones') {
+        return res.sendStatus(403);
+    }
+    
     try {
         const sql = `SELECT v.id, v.fecha_inicio, v.fecha_fin, u.nombre FROM vacaciones v JOIN usuarios u ON v.usuario_id = u.id WHERE v.estado = 'aprobada'`;
         const { rows } = await db.query(sql);
         res.json(rows);
-    } catch (err) { res.status(500).json({ message: 'Error al obtener vacaciones.' }); }
+    } catch(err) { res.status(500).json({ message: 'Error al obtener vacaciones.' }); }
 });
 
 // MODIFICADO: (ADMIN/GESTOR) Asigna vacaciones y valida saldo
