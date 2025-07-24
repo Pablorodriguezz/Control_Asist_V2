@@ -24,19 +24,18 @@ const init = async () => {
                 usuario TEXT UNIQUE NOT NULL,
                 password TEXT NOT NULL,
                 rol TEXT NOT NULL,
-                dias_vacaciones_anuales INTEGER DEFAULT 28
+                dias_vacaciones_anuales INTEGER DEFAULT 20
             );
         `);
 
         // --- ¡CAMBIO CLAVE! ---
-        // Este bloque se asegura de que el valor por defecto sea 28 en la tabla existente.
+        // Este bloque se asegura de que el valor por defecto sea 20 en la tabla existente.
         await pool.query(`
             ALTER TABLE usuarios 
-            ALTER COLUMN dias_vacaciones_anuales SET DEFAULT 28;
+            ALTER COLUMN dias_vacaciones_anuales SET DEFAULT 20;
         `);
-        console.log('Valor por defecto de "dias_vacaciones_anuales" asegurado en 28.');
+        console.log('Valor por defecto de "dias_vacaciones_anuales" asegurado en 20.');
 
-        // ... (el resto del código de `init` sigue igual) ...
         try {
             await pool.query(`ALTER TABLE usuarios DROP CONSTRAINT IF EXISTS usuarios_rol_check;`);
             await pool.query(`ALTER TABLE usuarios ADD CONSTRAINT usuarios_rol_check CHECK(rol IN ('empleado', 'admin', 'gestor_vacaciones'));`);

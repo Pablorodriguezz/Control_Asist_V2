@@ -1,4 +1,4 @@
-// server.js (COMPLETO CON EDICIÓN Y ELIMINACIÓN DE VACACIONES)
+// server.js (COMPLETO CON LÓGICA DE DÍAS LABORABLES)
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
@@ -10,7 +10,23 @@ const { Parser } = require('json2csv');
 const { DateTime } = require('luxon');
 const { S3Client, PutObjectCommand } = require("@aws-sdk/client-s3");
 const crypto = require('crypto');
-const calcularDiasNaturales = (fechaInicio, fechaFin) => DateTime.fromJSDate(new Date(fechaFin)).diff(DateTime.fromJSDate(new Date(fechaInicio)), 'days').toObject().days + 1;
+
+// --- NUEVA FUNCIÓN ---
+// Calcula solo días de Lunes a Viernes
+const calcularDiasLaborables = (fechaInicio, fechaFin) => {
+    let start = DateTime.fromISO(fechaInicio);
+    const end = DateTime.fromISO(fechaFin);
+    let count = 0;
+    while (start <= end) {
+        // weekday: 1 es Lunes, 7 es Domingo
+        if (start.weekday >= 1 && start.weekday <= 5) {
+            count++;
+        }
+        start = start.plus({ days: 1 });
+    }
+    return count;
+};
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'tu_secreto_super_secreto_y_largo_y_dificil_de_adivinar_987654';
@@ -47,7 +63,7 @@ function authenticateToken(req, res, next) {
 }
 
 // =================================================================
-// RUTAS PRINCIPALES
+// RUTAS DE USUARIOS Y FICHAR (sin cambios)
 // =================================================================
 app.post('/api/login', async (req, res) => {
     const { usuario, password } = req.body;
@@ -96,6 +112,7 @@ app.get('/api/estado', authenticateToken, async (req, res) => {
     } catch (err) { res.status(500).json({ message: 'Error al consultar el estado.' }); }
 });
 
+// ... (El resto de rutas de admin, usuarios, informes, etc. que no están relacionadas con vacaciones se mantienen igual. Las incluyo por completitud)
 app.get('/api/mis-registros', authenticateToken, async (req, res) => {
     const usuarioId = req.user.id;
     const { anio, mes } = req.query;
@@ -106,7 +123,6 @@ app.get('/api/mis-registros', authenticateToken, async (req, res) => {
         res.json(result.rows);
     } catch (err) { res.status(500).json({ message: "Error del servidor." }); }
 });
-
 app.get('/api/informe', authenticateToken, async (req, res) => {
     if (req.user.rol !== 'admin') return res.status(403).json({ message: 'Acceso denegado.' });
     const { fecha } = req.query;
@@ -117,16 +133,13 @@ app.get('/api/informe', authenticateToken, async (req, res) => {
         res.json(result.rows);
     } catch (err) { res.status(500).json({ message: 'Error al obtener informe.' }); }
 });
-
 app.get('/api/usuarios', authenticateToken, async (req, res) => {
-    // CAMBIO: Permitimos acceso a 'admin' Y 'gestor_vacaciones'
-if (req.user.rol !== 'admin' && req.user.rol !== 'gestor_vacaciones') return res.status(403);
+    if (req.user.rol !== 'admin' && req.user.rol !== 'gestor_vacaciones') return res.sendStatus(403);
     try {
-        const result = await db.query("SELECT id, nombre, usuario, rol FROM usuarios ORDER BY nombre");
+        const result = await db.query("SELECT id, nombre, usuario, rol, dias_vacaciones_anuales FROM usuarios ORDER BY nombre");
         res.json(result.rows);
     } catch(err) { res.status(500).json({ message: "Error al obtener usuarios." }); }
 });
-
 app.post('/api/usuarios', authenticateToken, async (req, res) => {
     if (req.user.rol !== 'admin') return res.status(403).json({ message: 'Acceso denegado.' });
     const { nombre, usuario, password, rol } = req.body;
@@ -140,7 +153,6 @@ app.post('/api/usuarios', authenticateToken, async (req, res) => {
         res.status(500).json({ message: 'Error al crear el usuario.' });
     }
 });
-
 app.put('/api/usuarios/:id/password', authenticateToken, async (req, res) => {
     if (req.user.rol !== 'admin') return res.status(403).json({ message: 'Acceso denegado.' });
     const { password } = req.body;
@@ -152,7 +164,6 @@ app.put('/api/usuarios/:id/password', authenticateToken, async (req, res) => {
         res.json({ message: 'Contraseña actualizada.' });
     } catch(err) { res.status(500).json({ message: 'Error al actualizar.' }); }
 });
-
 app.delete('/api/usuarios/:id', authenticateToken, async (req, res) => {
     if (req.user.rol !== 'admin') return res.status(403).json({ message: 'Acceso denegado.' });
     if (parseInt(req.params.id, 10) === req.user.id) return res.status(400).json({ message: 'No puedes eliminarte a ti mismo.' });
@@ -162,7 +173,6 @@ app.delete('/api/usuarios/:id', authenticateToken, async (req, res) => {
         res.json({ message: 'Usuario eliminado.' });
     } catch(err) { res.status(500).json({ message: 'Error al eliminar.' }); }
 });
-
 app.put('/api/registros/:id', authenticateToken, async (req, res) => {
     if (req.user.rol !== 'admin') return res.status(403).json({ message: 'Acceso denegado.' });
     const { nuevaFechaHora, motivo } = req.body;
@@ -174,7 +184,6 @@ app.put('/api/registros/:id', authenticateToken, async (req, res) => {
         res.json({ message: 'Registro actualizado.' });
     } catch(err) { res.status(500).json({ message: 'Error al actualizar registro.' }); }
 });
-
 app.delete('/api/registros/:id', authenticateToken, async (req, res) => {
     if (req.user.rol !== 'admin') return res.status(403).json({ message: 'Acceso denegado.' });
     try {
@@ -183,7 +192,6 @@ app.delete('/api/registros/:id', authenticateToken, async (req, res) => {
         res.json({ message: 'Registro eliminado.' });
     } catch(err) { res.status(500).json({ message: 'Error al eliminar registro.' }); }
 });
-
 app.post('/api/fichaje-manual', authenticateToken, async (req, res) => {
     if (req.user.rol !== 'admin') return res.status(403).json({ message: 'Acceso denegado.' });
     const { usuarioId, fechaHora, tipo, motivo } = req.body;
@@ -193,7 +201,6 @@ app.post('/api/fichaje-manual', authenticateToken, async (req, res) => {
         res.status(201).json({ message: 'Fichaje manual creado.' });
     } catch(err) { res.status(500).json({ message: 'Error al crear fichaje manual.' }); }
 });
-
 app.get('/api/informe-mensual', authenticateToken, async (req, res) => {
     if (req.user.rol !== 'admin') return res.status(403).json({ message: 'Acceso denegado.' });
     const { anio, mes, usuarioId } = req.query;
@@ -234,7 +241,6 @@ app.get('/api/informe-mensual', authenticateToken, async (req, res) => {
         res.json(informe);
     } catch(err) { res.status(500).json({ message: 'Error en informe mensual.' }); }
 });
-
 app.get('/api/exportar-csv', authenticateToken, async (req, res) => {
     if (req.user.rol !== 'admin') return res.status(403).json({ message: 'Acceso denegado.' });
     const { anio, mes, usuarioId } = req.query;
@@ -283,14 +289,32 @@ app.get('/api/exportar-csv', authenticateToken, async (req, res) => {
         res.send(csv);
     } catch(err) { res.status(500).json({ message: 'Error al exportar.' }); }
 });
+app.get('/api/dashboard', authenticateToken, async (req, res) => {
+    if (req.user.rol !== 'admin') {
+        return res.status(403).json({ message: 'Acceso denegado.' });
+    }
+    try {
+        const hoy = DateTime.local().toISODate();
+        const { rows: todosLosEmpleados } = await db.query("SELECT id, nombre FROM usuarios WHERE rol = 'empleado' ORDER BY nombre");
+        const { rows: ultimosFichajes } = await db.query(`SELECT DISTINCT ON (usuario_id) usuario_id, tipo FROM registros WHERE fecha_hora::date = $1 ORDER BY usuario_id, fecha_hora DESC`, [hoy]);
+        const { rows: ausenciasHoy } = await db.query(`SELECT u.nombre FROM vacaciones v JOIN usuarios u ON v.usuario_id = u.id WHERE $1 BETWEEN v.fecha_inicio AND v.fecha_fin AND v.estado = 'aprobada' AND u.rol = 'empleado'`, [hoy]);
+        const { rows: resumenFichajes } = await db.query(`SELECT COUNT(*) AS total_fichajes, COUNT(*) FILTER (WHERE es_modificado = TRUE) AS fichajes_manuales FROM registros WHERE fecha_hora::date = $1`, [hoy]);
+        const empleadosFichadosMap = new Map();
+        ultimosFichajes.forEach(fichaje => { if (fichaje.tipo === 'entrada') { empleadosFichadosMap.set(fichaje.usuario_id, true); } });
+        const empleadosDentro = [];
+        const empleadosFuera = [];
+        todosLosEmpleados.forEach(empleado => { (empleadosFichadosMap.has(empleado.id)) ? empleadosDentro.push(empleado.nombre) : empleadosFuera.push(empleado.nombre); });
+        res.json({ empleadosDentro, empleadosFuera, ausenciasHoy: ausenciasHoy.map(a => a.nombre), resumen: { totalFichajes: resumenFichajes[0]?.total_fichajes || 0, fichajesManuales: resumenFichajes[0]?.fichajes_manuales || 0 } });
+    } catch (err) {
+        console.error("Error al obtener datos del dashboard:", err);
+        res.status(500).json({ message: 'Error del servidor al cargar el dashboard.' });
+    }
+});
 
 
 // =================================================================
-// RUTAS PARA GESTIÓN DE VACACIONES
+// RUTAS PARA GESTIÓN DE VACACIONES (MODIFICADAS)
 // =================================================================
-
-
-
 
 app.get('/api/vacaciones', authenticateToken, async (req, res) => {
     if (req.user.rol !== 'admin' && req.user.rol !== 'gestor_vacaciones') return res.sendStatus(403);
@@ -298,223 +322,67 @@ app.get('/api/vacaciones', authenticateToken, async (req, res) => {
         const sql = `SELECT v.id, v.fecha_inicio, v.fecha_fin, u.nombre FROM vacaciones v JOIN usuarios u ON v.usuario_id = u.id WHERE v.estado = 'aprobada'`;
         const { rows } = await db.query(sql);
         res.json(rows);
-    } catch(err) { res.status(500).json({ message: 'Error al obtener vacaciones.' }); }
+    } catch (err) { res.status(500).json({ message: 'Error al obtener vacaciones.' }); }
 });
 
+// MODIFICADO: (ADMIN/GESTOR) Asigna vacaciones y valida saldo
 app.post('/api/vacaciones', authenticateToken, async (req, res) => {
     if (req.user.rol !== 'admin' && req.user.rol !== 'gestor_vacaciones') return res.sendStatus(403);
+    
     const { usuarioId, fechaInicio, fechaFin } = req.body;
+    const anioActual = new Date().getFullYear();
+
     try {
+        const diasAsignados = calcularDiasLaborables(fechaInicio, fechaFin);
+        
+        const resUsuario = await db.query('SELECT dias_vacaciones_anuales FROM usuarios WHERE id = $1', [usuarioId]);
+        const diasTotales = resUsuario.rows[0].dias_vacaciones_anuales || 20;
+
+        const resVacaciones = await db.query("SELECT fecha_inicio, fecha_fin FROM vacaciones WHERE usuario_id = $1 AND estado = 'aprobada' AND EXTRACT(YEAR FROM fecha_inicio) = $2", [usuarioId, anioActual]);
+        const diasGastados = resVacaciones.rows.reduce((total, vac) => total + calcularDiasLaborables(vac.fecha_inicio.toISOString().split('T')[0], vac.fecha_fin.toISOString().split('T')[0]), 0);
+        
+        if (diasAsignados > (diasTotales - diasGastados)) {
+            return res.status(400).json({ message: `Días insuficientes. El empleado tiene ${diasTotales - diasGastados} días restantes y estás intentando asignar ${diasAsignados}.` });
+        }
+
         await db.query("INSERT INTO vacaciones (usuario_id, fecha_inicio, fecha_fin, estado) VALUES ($1, $2, $3, 'aprobada')", [usuarioId, fechaInicio, fechaFin]);
         res.status(201).json({ message: 'Vacaciones registradas como aprobadas.' });
-    } catch(err) { res.status(500).json({ message: 'Error al registrar.' }); }
+    } catch (err) { 
+        console.error("Error asignando vacaciones (admin):", err);
+        res.status(500).json({ message: 'Error al registrar.' }); 
+    }
 });
 
+
+// MODIFICADO: Calcula el balance de vacaciones de un usuario usando días laborables
 app.get('/api/usuarios/:id/vacaciones-restantes', authenticateToken, async (req, res) => {
-    // CAMBIO: Permitimos acceso a 'admin' Y 'gestor_vacaciones'
-if (req.user.rol !== 'admin' && req.user.rol !== 'gestor_vacaciones') return res.sendStatus(403);
+    if (req.user.rol !== 'admin' && req.user.rol !== 'gestor_vacaciones') return res.sendStatus(403);
     const { id } = req.params;
     const anioActual = new Date().getFullYear();
     try {
         const resUsuario = await db.query('SELECT dias_vacaciones_anuales FROM usuarios WHERE id = $1', [id]);
         if (resUsuario.rowCount === 0) return res.status(404).json({ message: 'Usuario no encontrado.' });
-        const diasTotales = resUsuario.rows[0].dias_vacaciones_anuales === null ? 28 : resUsuario.rows[0].dias_vacaciones_anuales;
+        
+        const diasTotales = resUsuario.rows[0].dias_vacaciones_anuales || 20;
+        
         const sqlVacaciones = `SELECT fecha_inicio, fecha_fin FROM vacaciones WHERE usuario_id = $1 AND estado = 'aprobada' AND EXTRACT(YEAR FROM fecha_inicio) = $2`;
         const resVacaciones = await db.query(sqlVacaciones, [id, anioActual]);
+        
         let diasGastados = 0;
         resVacaciones.rows.forEach(vac => {
-            diasGastados += calcularDiasNaturales(vac.fecha_inicio, vac.fecha_fin);
+            // Usamos la nueva función de cálculo
+            diasGastados += calcularDiasLaborables(vac.fecha_inicio.toISOString().split('T')[0], vac.fecha_fin.toISOString().split('T')[0]);
         });
+        
         const diasRestantes = diasTotales - diasGastados;
         res.json({ diasTotales, diasGastados, diasRestantes });
-    } catch(err) {
+    } catch (err) {
         console.error("Error al calcular días restantes:", err);
         res.status(500).json({ message: 'Error al calcular días restantes.' });
     }
 });
 
-app.put('/api/vacaciones/:id', authenticateToken, async (req, res) => {
-    // CAMBIO: Permitimos acceso a 'admin' Y 'gestor_vacaciones'
-if (req.user.rol !== 'admin' && req.user.rol !== 'gestor_vacaciones') return res.sendStatus(403);
-    const { id } = req.params;
-    const { fechaInicio, fechaFin } = req.body;
-    if (!fechaInicio || !fechaFin) return res.status(400).json({ message: 'Faltan las fechas de inicio y fin.' });
-    try {
-        const sql = 'UPDATE vacaciones SET fecha_inicio = $1, fecha_fin = $2 WHERE id = $3';
-        const result = await db.query(sql, [fechaInicio, fechaFin, id]);
-        if (result.rowCount === 0) return res.status(404).json({ message: 'Periodo de vacaciones no encontrado.' });
-        res.json({ message: 'Vacaciones actualizadas correctamente.' });
-    } catch (err) {
-        console.error("Error en PUT /api/vacaciones/:id", err);
-        res.status(500).json({ message: 'Error al actualizar las vacaciones.' });
-    }
-});
-
-app.delete('/api/vacaciones/:id', authenticateToken, async (req, res) => {
-    // CAMBIO: Permitimos acceso a 'admin' Y 'gestor_vacaciones'
-if (req.user.rol !== 'admin' && req.user.rol !== 'gestor_vacaciones') return res.sendStatus(403);
-    const { id } = req.params;
-    try {
-        const sql = 'DELETE FROM vacaciones WHERE id = $1';
-        const result = await db.query(sql, [id]);
-        if (result.rowCount === 0) return res.status(404).json({ message: 'Periodo de vacaciones no encontrado.' });
-        res.json({ message: 'Vacaciones eliminadas correctamente.' });
-    } catch (err) {
-        console.error("Error en DELETE /api/vacaciones/:id", err);
-        res.status(500).json({ message: 'Error al eliminar las vacaciones.' });
-    }
-});
-
-app.get('/api/fix-vacation-days', authenticateToken, async(req, res) => {
-    if (req.user.rol !== 'admin') return res.sendStatus(403);
-    try {
-        await db.query("UPDATE usuarios SET dias_vacaciones_anuales = 28 WHERE rol = 'empleado' AND dias_vacaciones_anuales IS NULL");
-        res.send('Datos de vacaciones de usuarios existentes actualizados a 28.');
-    } catch (e) {
-        res.status(500).send('Error al actualizar: ' + e.message);
-    }
-});
-
-
-
-// =================================================================
-// RUTA PARA EL DASHBOARD
-// =================================================================
-app.get('/api/dashboard', authenticateToken, async (req, res) => {
-    if (req.user.rol !== 'admin') {
-        return res.status(403).json({ message: 'Acceso denegado.' });
-    }
-
-    try {
-        const hoy = DateTime.local().toISODate(); // Formato 'YYYY-MM-DD'
-
-        // 1. Obtener todos los empleados
-        const { rows: todosLosEmpleados } = await db.query(
-            "SELECT id, nombre FROM usuarios WHERE rol = 'empleado' ORDER BY nombre"
-        );
-
-        // 2. Obtener los últimos fichajes de hoy para cada empleado
-        const { rows: ultimosFichajes } = await db.query(`
-            SELECT DISTINCT ON (usuario_id) usuario_id, tipo
-            FROM registros
-            WHERE fecha_hora::date = $1
-            ORDER BY usuario_id, fecha_hora DESC
-        `, [hoy]);
-
-        // 3. Obtener ausencias (vacaciones) de hoy
-        const { rows: ausenciasHoy } = await db.query(`
-            SELECT u.nombre
-            FROM vacaciones v
-            JOIN usuarios u ON v.usuario_id = u.id
-            WHERE $1 BETWEEN v.fecha_inicio AND v.fecha_fin
-              AND v.estado = 'aprobada'
-              AND u.rol = 'empleado'
-        `, [hoy]);
-
-        // 4. Obtener widgets de resumen del día
-        const { rows: resumenFichajes } = await db.query(`
-            SELECT 
-                COUNT(*) AS total_fichajes,
-                COUNT(*) FILTER (WHERE es_modificado = TRUE) AS fichajes_manuales
-            FROM registros
-            WHERE fecha_hora::date = $1
-        `, [hoy]);
-        
-        // --- Procesamiento de datos ---
-
-        const empleadosFichadosMap = new Map();
-        ultimosFichajes.forEach(fichaje => {
-            if (fichaje.tipo === 'entrada') {
-                empleadosFichadosMap.set(fichaje.usuario_id, true);
-            }
-        });
-
-        const empleadosDentro = [];
-        const empleadosFuera = [];
-
-        todosLosEmpleados.forEach(empleado => {
-            if (empleadosFichadosMap.has(empleado.id)) {
-                empleadosDentro.push(empleado.nombre);
-            } else {
-                empleadosFuera.push(empleado.nombre);
-            }
-        });
-
-        res.json({
-            empleadosDentro,
-            empleadosFuera,
-            ausenciasHoy: ausenciasHoy.map(a => a.nombre),
-            resumen: {
-                totalFichajes: resumenFichajes[0]?.total_fichajes || 0,
-                fichajesManuales: resumenFichajes[0]?.fichajes_manuales || 0
-            }
-        });
-
-    } catch (err) {
-        console.error("Error al obtener datos del dashboard:", err);
-        res.status(500).json({ message: 'Error del servidor al cargar el dashboard.' });
-    }
-});
-
-app.get('/api/mis-vacaciones-restantes', authenticateToken, async (req, res) => {
-    const usuarioId = req.user.id; // Obtenemos el ID del token
-    const anioActual = new Date().getFullYear();
-
-    try {
-        const resUsuario = await db.query('SELECT dias_vacaciones_anuales FROM usuarios WHERE id = $1', [usuarioId]);
-        if (resUsuario.rowCount === 0) {
-            return res.status(404).json({ message: 'Usuario no encontrado.' });
-        }
-        
-        const diasTotales = resUsuario.rows[0].dias_vacaciones_anuales ?? 28;
-        
-        const sqlVacaciones = `SELECT fecha_inicio, fecha_fin FROM vacaciones WHERE usuario_id = $1 AND estado = 'aprobada' AND EXTRACT(YEAR FROM fecha_inicio) = $2`;
-        const resVacaciones = await db.query(sqlVacaciones, [usuarioId, anioActual]);
-        
-        let diasGastados = 0;
-        resVacaciones.rows.forEach(vac => {
-            // Reutilizamos la función de cálculo que ya tenías
-            const inicio = DateTime.fromJSDate(new Date(vac.fecha_inicio));
-            const fin = DateTime.fromJSDate(new Date(vac.fecha_fin));
-            diasGastados += fin.diff(inicio, 'days').toObject().days + 1;
-        });
-        
-        const diasRestantes = diasTotales - diasGastados;
-        res.json({ diasTotales, diasGastados, diasRestantes });
-
-    } catch(err) {
-        console.error("Error al calcular mis días restantes:", err);
-        res.status(500).json({ message: 'Error al calcular días restantes.' });
-    }
-});
-
-// =================================================================
-// NUEVA RUTA PARA QUE EL EMPLEADO VEA SU PROPIO CALENDARIO
-// =================================================================
-app.get('/api/mis-vacaciones', authenticateToken, async (req, res) => {
-    const usuarioId = req.user.id; // Obtenemos el ID del token del usuario logueado
-    
-    try {
-        const sql = `
-            SELECT 
-                id, 
-                'Mis Vacaciones' as title, 
-                fecha_inicio as start, 
-                fecha_fin as end
-            FROM vacaciones 
-            WHERE usuario_id = $1 AND estado = 'aprobada'
-        `;
-        const { rows } = await db.query(sql, [usuarioId]);
-        res.json(rows);
-    } catch(err) {
-        console.error("Error en GET /api/mis-vacaciones:", err); 
-        res.status(500).json({ message: 'Error al obtener mis vacaciones.' });
-    }
-});
-
-// (EMPLEADO) Nueva ruta para solicitar vacaciones
-// En server.js
-
+// MODIFICADO: (EMPLEADO) El empleado solicita vacaciones con nuevas reglas
 app.post('/api/solicitar-vacaciones', authenticateToken, async (req, res) => {
     const { fechaInicio, fechaFin } = req.body;
     const usuarioId = req.user.id;
@@ -525,32 +393,26 @@ app.post('/api/solicitar-vacaciones', authenticateToken, async (req, res) => {
     }
 
     try {
-        const diasSolicitados = calcularDiasNaturales(fechaInicio, fechaFin);
+        const diasLaborablesSolicitados = calcularDiasLaborables(fechaInicio, fechaFin);
 
-        // --- ¡VALIDACIÓN ACTUALIZADA AQUÍ! ---
-        if (diasSolicitados < 7) {
-            return res.status(400).json({ 
-                message: `Debes solicitar un mínimo de 7 días. Has solicitado ${diasSolicitados}.` 
-            });
+        if (diasLaborablesSolicitados < 5) {
+            return res.status(400).json({ message: `Debes solicitar un mínimo de 5 días laborables. Has solicitado ${diasLaborablesSolicitados}.` });
         }
-        if (diasSolicitados > 14) {
-            return res.status(400).json({
-                message: `Puedes solicitar un máximo de 14 días. Has solicitado ${diasSolicitados}.`
-            });
+        if (diasLaborablesSolicitados > 10) {
+            return res.status(400).json({ message: `Puedes solicitar un máximo de 10 días laborables. Has solicitado ${diasLaborablesSolicitados}.` });
         }
-        // --- FIN DE LA VALIDACIÓN ACTUALIZADA ---
 
         const resUsuario = await db.query('SELECT dias_vacaciones_anuales FROM usuarios WHERE id = $1', [usuarioId]);
-        const diasTotales = resUsuario.rows[0].dias_vacaciones_anuales ?? 28;
+        const diasTotales = resUsuario.rows[0].dias_vacaciones_anuales || 20;
 
         const resVacaciones = await db.query("SELECT fecha_inicio, fecha_fin FROM vacaciones WHERE usuario_id = $1 AND estado IN ('aprobada', 'pendiente') AND EXTRACT(YEAR FROM fecha_inicio) = $2", [usuarioId, anioActual]);
         
-        let diasComprometidos = resVacaciones.rows.reduce((total, vac) => total + calcularDiasNaturales(vac.fecha_inicio, vac.fecha_fin), 0);
+        const diasComprometidos = resVacaciones.rows.reduce((total, vac) => total + calcularDiasLaborables(vac.fecha_inicio.toISOString().split('T')[0], vac.fecha_fin.toISOString().split('T')[0]), 0);
         
         const diasRestantes = diasTotales - diasComprometidos;
 
-        if (diasSolicitados > diasRestantes) {
-            return res.status(400).json({ message: `Días insuficientes. Solicitas ${diasSolicitados} y solo te quedan ${diasRestantes} disponibles.` });
+        if (diasLaborablesSolicitados > diasRestantes) {
+            return res.status(400).json({ message: `Días insuficientes. Solicitas ${diasLaborablesSolicitados} días laborables y solo te quedan ${diasRestantes} disponibles (incluyendo otras solicitudes pendientes).` });
         }
         
         await db.query('INSERT INTO vacaciones (usuario_id, fecha_inicio, fecha_fin, estado) VALUES ($1, $2, $3, $4)', [usuarioId, fechaInicio, fechaFin, 'pendiente']);
@@ -562,9 +424,84 @@ app.post('/api/solicitar-vacaciones', authenticateToken, async (req, res) => {
     }
 });
 
-  
+// MODIFICADO: (EMPLEADO) Calcula su propio balance usando días laborables
+app.get('/api/mis-vacaciones-restantes', authenticateToken, async (req, res) => {
+    const usuarioId = req.user.id;
+    const anioActual = new Date().getFullYear();
+    try {
+        const resUsuario = await db.query('SELECT dias_vacaciones_anuales FROM usuarios WHERE id = $1', [usuarioId]);
+        if (resUsuario.rowCount === 0) return res.status(404).json({ message: 'Usuario no encontrado.' });
+        
+        const diasTotales = resUsuario.rows[0].dias_vacaciones_anuales || 20;
+        
+        const sqlVacaciones = `SELECT fecha_inicio, fecha_fin FROM vacaciones WHERE usuario_id = $1 AND estado = 'aprobada' AND EXTRACT(YEAR FROM fecha_inicio) = $2`;
+        const resVacaciones = await db.query(sqlVacaciones, [usuarioId, anioActual]);
+        
+        let diasGastados = 0;
+        resVacaciones.rows.forEach(vac => {
+            diasGastados += calcularDiasLaborables(vac.fecha_inicio.toISOString().split('T')[0], vac.fecha_fin.toISOString().split('T')[0]);
+        });
+        
+        const diasRestantes = diasTotales - diasGastados;
+        res.json({ diasTotales, diasGastados, diasRestantes });
+    } catch(err) {
+        console.error("Error al calcular mis días restantes:", err);
+        res.status(500).json({ message: 'Error al calcular días restantes.' });
+    }
+});
 
-// (ADMIN) Nueva ruta para ver solicitudes pendientes
+
+// --- RUTAS SIN CAMBIOS NECESARIOS ---
+app.put('/api/vacaciones/:id', authenticateToken, async (req, res) => {
+    if (req.user.rol !== 'admin' && req.user.rol !== 'gestor_vacaciones') return res.sendStatus(403);
+    const { id } = req.params;
+    const { fechaInicio, fechaFin } = req.body;
+    if (!fechaInicio || !fechaFin) return res.status(400).json({ message: 'Faltan las fechas de inicio y fin.' });
+    try {
+        const sql = 'UPDATE vacaciones SET fecha_inicio = $1, fecha_fin = $2 WHERE id = $3';
+        const result = await db.query(sql, [fechaInicio, fechaFin, id]);
+        if (result.rowCount === 0) return res.status(404).json({ message: 'Periodo de vacaciones no encontrado.' });
+        res.json({ message: 'Vacaciones actualizadas correctamente.' });
+    } catch (err) {
+        res.status(500).json({ message: 'Error al actualizar las vacaciones.' });
+    }
+});
+
+app.delete('/api/vacaciones/:id', authenticateToken, async (req, res) => {
+    if (req.user.rol !== 'admin' && req.user.rol !== 'gestor_vacaciones') return res.sendStatus(403);
+    const { id } = req.params;
+    try {
+        const sql = 'DELETE FROM vacaciones WHERE id = $1';
+        const result = await db.query(sql, [id]);
+        if (result.rowCount === 0) return res.status(404).json({ message: 'Periodo de vacaciones no encontrado.' });
+        res.json({ message: 'Vacaciones eliminadas correctamente.' });
+    } catch (err) {
+        res.status(500).json({ message: 'Error al eliminar las vacaciones.' });
+    }
+});
+
+app.get('/api/fix-vacation-days', authenticateToken, async(req, res) => {
+    if (req.user.rol !== 'admin') return res.sendStatus(403);
+    try {
+        // MODIFICADO: Actualiza a 20 días
+        await db.query("UPDATE usuarios SET dias_vacaciones_anuales = 20 WHERE rol = 'empleado' AND (dias_vacaciones_anuales IS NULL OR dias_vacaciones_anuales != 20)");
+        res.send('Datos de vacaciones de usuarios existentes actualizados a 20 días laborables.');
+    } catch (e) {
+        res.status(500).send('Error al actualizar: ' + e.message);
+    }
+});
+
+app.get('/api/mis-vacaciones', authenticateToken, async (req, res) => {
+    const usuarioId = req.user.id;
+    try {
+        const sql = `SELECT id, 'Mis Vacaciones' as title, fecha_inicio as start, fecha_fin as end FROM vacaciones WHERE usuario_id = $1 AND estado = 'aprobada'`;
+        const { rows } = await db.query(sql, [usuarioId]);
+        res.json(rows);
+    } catch(err) {
+        res.status(500).json({ message: 'Error al obtener mis vacaciones.' });
+    }
+});
+
 app.get('/api/vacaciones-pendientes', authenticateToken, async (req, res) => {
     if (req.user.rol !== 'admin' && req.user.rol !== 'gestor_vacaciones') return res.sendStatus(403);
     try {
@@ -573,7 +510,6 @@ app.get('/api/vacaciones-pendientes', authenticateToken, async (req, res) => {
     } catch(err) { res.status(500).json({ message: 'Error al obtener solicitudes.' }); }
 });
 
-// (ADMIN) Nueva ruta para gestionar (aprobar/rechazar) solicitudes
 app.put('/api/vacaciones/:id/gestionar', authenticateToken, async (req, res) => {
     if (req.user.rol !== 'admin' && req.user.rol !== 'gestor_vacaciones') return res.sendStatus(403);
     const { nuevoEstado } = req.body;
@@ -585,15 +521,12 @@ app.put('/api/vacaciones/:id/gestionar', authenticateToken, async (req, res) => 
     } catch(err) { res.status(500).json({ message: 'Error al gestionar.' }); }
 });
 
-// (EMPLEADO) Nueva ruta para ver el estado de SUS solicitudes
 app.get('/api/mis-solicitudes', authenticateToken, async (req, res) => {
     try {
         const { rows } = await db.query("SELECT fecha_inicio, fecha_fin, estado FROM vacaciones WHERE usuario_id = $1 ORDER BY fecha_inicio DESC", [req.user.id]);
         res.json(rows);
     } catch(err) { res.status(500).json({ message: 'Error al obtener tus solicitudes.' }); }
 });
-
-
 
 // =================================================================
 // INICIO DEL SERVIDOR

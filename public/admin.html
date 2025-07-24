@@ -31,7 +31,7 @@
       </nav>
 
       <!-- ===================================== -->
-      <!-- NUEVO: DASHBOARD DE ESTADO EN TIEMPO REAL -->
+      <!-- DASHBOARD DE ESTADO EN TIEMPO REAL -->
       <!-- ===================================== -->
       <section id="dashboard">
         <h2>Panel de Control en Tiempo Real</h2>
@@ -243,6 +243,27 @@
       const selectMes = document.getElementById("selectMes");
       const btnExportar = document.getElementById("btnExportar");
       let calendario;
+      let vacationData; // Variable global para guardar datos de vacaciones del usuario seleccionado
+
+      // --- NUEVA FUNCIÓN ---
+      // Calcula días laborables (Lunes a Viernes)
+      function calcularDiasLaborables(fechaInicio, fechaFin) {
+            const inicio = new Date(fechaInicio);
+            const fin = new Date(fechaFin);
+            let count = 0;
+            // Usamos UTC para evitar problemas con zonas horarias que pueden desfasar el día
+            const curDate = new Date(Date.UTC(inicio.getUTCFullYear(), inicio.getUTCMonth(), inicio.getUTCDate()));
+            const finalDate = new Date(Date.UTC(fin.getUTCFullYear(), fin.getUTCMonth(), fin.getUTCDate()));
+
+            while (curDate <= finalDate) {
+                const dayOfWeek = curDate.getUTCDay(); // 0 = Domingo, 6 = Sábado
+                if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+                    count++;
+                }
+                curDate.setUTCDate(curDate.getUTCDate() + 1);
+            }
+            return count;
+      }
 
       function logout() {
         localStorage.removeItem("token");
@@ -250,7 +271,7 @@
       }
 
       // ===================================================
-      // NUEVO: LÓGICA PARA CARGAR EL DASHBOARD
+      // LÓGICA PARA CARGAR EL DASHBOARD
       // ===================================================
       async function cargarDashboard() {
         const ids = {
@@ -268,11 +289,10 @@
           if (!res.ok) throw new Error("No se pudo cargar el dashboard.");
           const data = await res.json();
 
-          // Función auxiliar para rellenar listas
           const rellenarLista = (ulElement, items) => {
-            ulElement.innerHTML = ""; // Limpiar "Cargando..."
+            ulElement.innerHTML = "";
             if (items.length === 0) {
-              ulElement.innerHTML = "<li></li>"; // Para que muestre el mensaje de "No hay datos" del CSS
+              ulElement.innerHTML = "<li></li>";
             } else {
               items.forEach((item) => {
                 const li = document.createElement("li");
@@ -282,7 +302,6 @@
             }
           };
 
-          // Rellenar widgets
           rellenarLista(ids.dentro, data.empleadosDentro);
           rellenarLista(ids.fuera, data.empleadosFuera);
           rellenarLista(ids.ausencias, data.ausenciasHoy);
@@ -291,7 +310,6 @@
           ids.manuales.textContent = data.resumen.fichajesManuales;
         } catch (error) {
           console.error("Error en cargarDashboard:", error);
-          // Mostrar mensaje de error en los widgets
           Object.values(ids).forEach((el) => {
             if (el.tagName === "UL") el.innerHTML = "<li>Error al cargar</li>";
             else if (el.tagName === "SPAN") el.textContent = "Error";
@@ -743,7 +761,7 @@
         });
 
       // ==================================================
-      // LÓGICA PARA GESTIÓN DE VACACIONES
+      // LÓGICA PARA GESTIÓN DE VACACIONES (MODIFICADA)
       // ==================================================
       function inicializarCalendario() {
         const calendarioEl = document.getElementById("calendarioVacaciones");
@@ -849,10 +867,10 @@
         const { value: formValues } = await Swal.fire({
           title: `Editar vacaciones de ${event.title}`,
           html: `
-                    <label for="swal-fecha-inicio" style="display: block; text-align: left; margin-top: 1rem;">Fecha de Inicio:</label>
-                    <input id="swal-fecha-inicio" type="date" class="swal2-input" value="${fechaInicioActual}">
-                    <label for="swal-fecha-fin" style="display: block; text-align: left; margin-top: 1rem;">Fecha de Fin:</label>
-                    <input id="swal-fecha-fin" type="date" class="swal2-input" value="${fechaFinActual}">`,
+            <label for="swal-fecha-inicio" style="display: block; text-align: left; margin-top: 1rem;">Fecha de Inicio:</label>
+            <input id="swal-fecha-inicio" type="date" class="swal2-input" value="${fechaInicioActual}">
+            <label for="swal-fecha-fin" style="display: block; text-align: left; margin-top: 1rem;">Fecha de Fin:</label>
+            <input id="swal-fecha-fin" type="date" class="swal2-input" value="${fechaFinActual}">`,
           focusConfirm: false,
           showCancelButton: true,
           confirmButtonText: "Guardar Cambios",
@@ -925,6 +943,7 @@
         const infoSpan = document.getElementById("infoDiasRestantes");
         if (!usuarioId) {
           infoSpan.textContent = "";
+          window.vacationData = null; // Limpiar datos si se deselecciona
           return;
         }
         try {
@@ -934,44 +953,46 @@
           );
           const data = await res.json();
           if (!res.ok) throw new Error(data.message);
-          infoSpan.innerHTML = `Disponibles: <span style="color: green;">${data.diasRestantes}</span> / ${data.diasTotales} (Gastados: ${data.diasGastados})`;
+          window.vacationData = data; // Guardamos los datos para usarlos en el submit
+          infoSpan.innerHTML = `Disponibles (laborables): <span style="color: green;">${data.diasRestantes}</span> / ${data.diasTotales} (Gastados: ${data.diasGastados})`;
         } catch (error) {
           infoSpan.textContent = "Error al calcular días.";
           infoSpan.style.color = "red";
+          window.vacationData = null;
         }
       }
 
       async function cargarSolicitudesPendientes() {
-    const tbody = document.querySelector("#tablaSolicitudes tbody");
-    tbody.innerHTML = '<tr><td colspan="3">Cargando...</td></tr>';
-    try {
-        const res = await fetch('/api/vacaciones-pendientes', { headers: { Authorization: `Bearer ${token}` } });
-        const solicitudes = await res.json();
-        tbody.innerHTML = '';
-        if(solicitudes.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="3">No hay solicitudes pendientes.</td></tr>';
-            return;
-        }
-        solicitudes.forEach(sol => {
-            const tr = document.createElement('tr');
-            const fInicio = new Date(sol.fecha_inicio).toLocaleDateString('es-ES');
-            const fFin = new Date(sol.fecha_fin).toLocaleDateString('es-ES');
-            tr.innerHTML = `<td>${sol.nombre}</td><td>Del ${fInicio} al ${fFin}</td><td><button class="action-btn btn-success" onclick="gestionarSolicitud(${sol.id}, 'aprobada')">Aprobar</button><button class="action-btn btn-delete" onclick="gestionarSolicitud(${sol.id}, 'rechazada')">Rechazar</button></td>`;
-            tbody.appendChild(tr);
-        });
-    } catch(error) { tbody.innerHTML = '<tr><td colspan="3">Error al cargar.</td></tr>'; }
-}
+        const tbody = document.querySelector("#tablaSolicitudes tbody");
+        tbody.innerHTML = '<tr><td colspan="3">Cargando...</td></tr>';
+        try {
+            const res = await fetch('/api/vacaciones-pendientes', { headers: { Authorization: `Bearer ${token}` } });
+            const solicitudes = await res.json();
+            tbody.innerHTML = '';
+            if(solicitudes.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="3">No hay solicitudes pendientes.</td></tr>';
+                return;
+            }
+            solicitudes.forEach(sol => {
+                const tr = document.createElement('tr');
+                const fInicio = new Date(sol.fecha_inicio).toLocaleDateString('es-ES');
+                const fFin = new Date(sol.fecha_fin).toLocaleDateString('es-ES');
+                tr.innerHTML = `<td>${sol.nombre}</td><td>Del ${fInicio} al ${fFin}</td><td><button class="action-btn btn-success" onclick="gestionarSolicitud(${sol.id}, 'aprobada')">Aprobar</button><button class="action-btn btn-delete" onclick="gestionarSolicitud(${sol.id}, 'rechazada')">Rechazar</button></td>`;
+                tbody.appendChild(tr);
+            });
+        } catch(error) { tbody.innerHTML = '<tr><td colspan="3">Error al cargar.</td></tr>'; }
+      }
 
-async function gestionarSolicitud(id, nuevoEstado) {
-    try {
-        const res = await fetch(`/api/vacaciones/${id}/gestionar`, { method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ nuevoEstado }) });
-        const data = await res.json();
-        if(!res.ok) throw new Error(data.message);
-        Swal.fire('¡Gestionado!', data.message, 'success');
-        cargarSolicitudesPendientes();
-        calendario.refetchEvents();
-    } catch(error) { Swal.fire('Error', error.message, 'error'); }
-}
+      async function gestionarSolicitud(id, nuevoEstado) {
+          try {
+              const res = await fetch(`/api/vacaciones/${id}/gestionar`, { method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ nuevoEstado }) });
+              const data = await res.json();
+              if(!res.ok) throw new Error(data.message);
+              Swal.fire('¡Gestionado!', data.message, 'success');
+              cargarSolicitudesPendientes();
+              calendario.refetchEvents();
+          } catch(error) { Swal.fire('Error', error.message, 'error'); }
+      }
 
       document
         .getElementById("vacacionesUsuario")
@@ -984,6 +1005,28 @@ async function gestionarSolicitud(id, nuevoEstado) {
           const usuarioId = document.getElementById("vacacionesUsuario").value;
           const fechaInicio = document.getElementById("fechaInicio").value;
           const fechaFin = document.getElementById("fechaFin").value;
+          
+          if (!usuarioId || !fechaInicio || !fechaFin) {
+              Swal.fire('Atención', 'Debes seleccionar un trabajador y ambas fechas.', 'warning');
+              return;
+          }
+
+          // Para Admin/Gestor, no hay restricción de min/max días, pero se puede añadir una advertencia.
+          const diasLaborablesAsignados = calcularDiasLaborables(fechaInicio, fechaFin);
+          if (window.vacationData && diasLaborablesAsignados > window.vacationData.diasRestantes) {
+              const confirmation = await Swal.fire({
+                  icon: 'warning',
+                  title: 'Saldo insuficiente',
+                  html: `Estás asignando <strong>${diasLaborablesAsignados}</strong> días laborables, pero al trabajador solo le quedan <strong>${window.vacationData.diasRestantes}</strong> disponibles.<br><br>¿Deseas continuar de todos modos?`,
+                  showCancelButton: true,
+                  confirmButtonText: 'Sí, asignar',
+                  cancelButtonText: 'Cancelar'
+              });
+              if (!confirmation.isConfirmed) {
+                  return;
+              }
+          }
+
           try {
             const res = await fetch("/api/vacaciones", {
               method: "POST",
@@ -997,8 +1040,8 @@ async function gestionarSolicitud(id, nuevoEstado) {
             if (!res.ok) throw new Error(data.message);
             Swal.fire("¡Éxito!", "Vacaciones asignadas.", "success");
             e.target.reset();
-            document.getElementById("infoDiasRestantes").textContent = "";
             calendario.refetchEvents();
+            mostrarDiasRestantes(); // Actualizamos el contador
           } catch (error) {
             Swal.fire("Error", `No se pudo asignar: ${error.message}`, "error");
           }
@@ -1016,7 +1059,7 @@ async function gestionarSolicitud(id, nuevoEstado) {
           hoy.getMonth() + 1
         ).padStart(2, "0")}`;
 
-        cargarDashboard(); // Cargar el nuevo dashboard
+        cargarDashboard();
         getReport();
         loadUsers();
         poblarSelectorUsuarios("selectUsuario");
@@ -1030,8 +1073,10 @@ async function gestionarSolicitud(id, nuevoEstado) {
         fechaInicioInput.addEventListener("change", () => {
           const fechaInicioSeleccionada = fechaInicioInput.value;
           if (fechaInicioSeleccionada) {
-            fechaFinInput.value = fechaInicioSeleccionada;
             fechaFinInput.min = fechaInicioSeleccionada;
+            if (new Date(fechaFinInput.value) < new Date(fechaInicioSeleccionada)) {
+                fechaFinInput.value = fechaInicioSeleccionada;
+            }
           }
         });
       }
