@@ -82,6 +82,55 @@ app.post('/api/login', async (req, res) => {
     } catch (err) { res.status(500).json({ message: 'Error del servidor' }); }
 });
 
+// En server.js
+
+// ... (después de la ruta /api/login)
+
+// --- NUEVA RUTA PÚBLICA PARA OBTENER EMPLEADOS ---
+// No necesita autenticación porque es para la pantalla de inicio.
+app.get('/api/empleados-para-fichaje', async (req, res) => {
+    try {
+        // Obtenemos solo los empleados activos para el fichaje
+        const result = await db.query("SELECT id, nombre FROM usuarios WHERE rol = 'empleado' ORDER BY nombre ASC");
+        res.json(result.rows);
+    } catch (err) {
+        console.error("Error al obtener la lista de empleados para fichaje:", err);
+        res.status(500).json({ message: "Error del servidor." });
+    }
+});
+
+// --- NUEVA RUTA PARA PROCESAR EL FICHAJE RÁPIDO ---
+// Usa el mismo middleware de 'upload' que la ruta '/api/fichar'
+app.post('/api/fichar-rapido', upload.single('foto'), async (req, res) => {
+    // Obtenemos el ID del usuario desde el cuerpo de la petición, no del token
+    const { tipo, usuarioId } = req.body;
+    const fecha_hora = new Date();
+
+    if (!usuarioId) return res.status(400).json({ message: 'Falta el ID del empleado.' });
+    if (!req.file) return res.status(400).json({ message: 'La foto es obligatoria para el fichaje.' });
+    if (!tipo || (tipo !== 'entrada' && tipo !== 'salida')) return res.status(400).json({ message: 'Tipo de fichaje inválido.' });
+
+    try {
+        const fileName = `${crypto.randomBytes(16).toString('hex')}.jpeg`;
+        const putCommand = new PutObjectCommand({
+            Bucket: process.env.R2_BUCKET_NAME,
+            Key: fileName,
+            Body: req.file.buffer,
+            ContentType: req.file.mimetype
+        });
+        await s3Client.send(putCommand);
+        
+        const foto_path = `${process.env.R2_PUBLIC_URL}/${fileName}`;
+        const sql = 'INSERT INTO registros (usuario_id, fecha_hora, tipo, foto_path) VALUES ($1, $2, $3, $4)';
+        await db.query(sql, [usuarioId, fecha_hora, tipo, foto_path]);
+
+        res.json({ message: `Fichaje de ${tipo} registrado correctamente.` });
+    } catch (err) {
+        console.error("Error al procesar el fichaje rápido:", err);
+        res.status(500).json({ message: 'Error al procesar el fichaje.' });
+    }
+});
+
 app.post('/api/fichar', authenticateToken, upload.single('foto'), async (req, res) => {
     const { tipo } = req.body;
     const usuario_id = req.user.id;

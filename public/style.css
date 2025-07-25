@@ -177,6 +177,37 @@ button:disabled { background-color: #85c1e9 !important; cursor: not-allowed; opa
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
+/* En style.css */
+
+.btn-secundario {
+    background-color: #f0f0f0;
+    color: #333;
+    border: 1px solid #ccc;
+}
+.btn-secundario:hover {
+    background-color: #e0e0e0;
+}
+
+.employee-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 15px;
+    margin-top: 20px;
+}
+
+.btn-empleado {
+    padding: 20px 10px;
+    font-size: 1rem;
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+.btn-empleado:hover {
+    background-color: var(--primary-dark);
+}
 
 /* Estilos para la pestaña de solicitudes del empleado */
 .solicitudes-section form { margin-top: 15px; }
