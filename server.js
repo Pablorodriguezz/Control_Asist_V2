@@ -11,6 +11,31 @@ const { DateTime } = require('luxon');
 const { S3Client, PutObjectCommand } = require("@aws-sdk/client-s3");
 const crypto = require('crypto');
 
+// En server.js, pégalo después de la línea de 'crypto'
+
+const calcularBalance = async (usuarioId, anioActual) => {
+    const resUsuario = await db.query('SELECT dias_vacaciones_anuales, dias_compensatorios, fecha_contratacion FROM usuarios WHERE id = $1', [usuarioId]);
+    if (resUsuario.rowCount === 0) throw new Error('Usuario no encontrado');
+    
+    const usuario = resUsuario.rows[0];
+    let diasAnualesBase = usuario.dias_vacaciones_anuales || 20;
+
+    // Prorrateo de días si el usuario fue contratado este año
+    if (usuario.fecha_contratacion && new Date(usuario.fecha_contratacion).getFullYear() === anioActual) {
+        const fechaInicio = DateTime.fromJSDate(new Date(usuario.fecha_contratacion));
+        const finDeAnio = DateTime.fromObject({ year: anioActual, month: 12, day: 31 });
+        const diasTrabajados = finDeAnio.diff(fechaInicio, 'days').toObject().days + 1;
+        const diasDelAnio = DateTime.fromObject({ year: anioActual }).isInLeapYear ? 366 : 365;
+        const diasProrrateados = (diasTrabajados / diasDelAnio) * (usuario.dias_vacaciones_anuales || 20);
+        // Redondear al medio día más cercano (e.g., 10.3 -> 10.5, 10.1 -> 10.0)
+        diasAnualesBase = Math.round(diasProrrateados * 2) / 2;
+    }
+
+    const compensatorios = usuario.dias_compensatorios || 0;
+    const diasTotales = diasAnualesBase + compensatorios;
+    return diasTotales;
+};
+
 // --- NUEVA FUNCIÓN ---
 // Calcula solo días de Lunes a Viernes
 const calcularDiasLaborables = (fechaInicio, fechaFin) => {
