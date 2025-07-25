@@ -395,28 +395,37 @@ app.get('/api/vacaciones', authenticateToken, async (req, res) => {
 });
 
 // MODIFICADO: (ADMIN/GESTOR) Asigna vacaciones y valida saldo
-app.post('/api/vacaciones', authenticateToken, async (req, res) => { /* ...código sin cambios... */ });
-
-const calcularBalance = async (usuarioId, anioActual) => {
-    const resUsuario = await db.query('SELECT dias_vacaciones_anuales, dias_compensatorios, fecha_contratacion FROM usuarios WHERE id = $1', [usuarioId]);
-    if (resUsuario.rowCount === 0) throw new Error('Usuario no encontrado');
-    
-    const usuario = resUsuario.rows[0];
-    let diasAnualesBase = usuario.dias_vacaciones_anuales || 20;
-
-    if (usuario.fecha_contratacion && new Date(usuario.fecha_contratacion).getFullYear() === anioActual) {
-        const fechaInicio = DateTime.fromJSDate(new Date(usuario.fecha_contratacion));
-        const finDeAnio = DateTime.fromObject({ year: anioActual, month: 12, day: 31 });
-        const diasTrabajados = finDeAnio.diff(fechaInicio, 'days').toObject().days + 1;
-        const diasDelAnio = DateTime.fromObject({ year: anioActual }).isInLeapYear ? 366 : 365;
-        const diasProrrateados = (diasTrabajados / diasDelAnio) * (usuario.dias_vacaciones_anuales || 20);
-        diasAnualesBase = Math.round(diasProrrateados * 2) / 2;
+// MODIFICADO: (ADMIN/GESTOR) Asigna vacaciones y valida saldo
+app.post('/api/vacaciones', authenticateToken, async (req, res) => {
+    // Solo admin y gestor pueden asignar vacaciones directamente
+    if (req.user.rol !== 'admin' && req.user.rol !== 'gestor_vacaciones') {
+        return res.status(403).json({ message: 'Acceso denegado.' });
     }
 
-    const compensatorios = usuario.dias_compensatorios || 0;
-    const diasTotales = diasAnualesBase + compensatorios;
-    return diasTotales;
-};
+    const { usuarioId, fechaInicio, fechaFin } = req.body;
+
+    // Validación de datos
+    if (!usuarioId || !fechaInicio || !fechaFin) {
+        return res.status(400).json({ message: 'Faltan datos para asignar las vacaciones.' });
+    }
+    if (new Date(fechaFin) < new Date(fechaInicio)) {
+        return res.status(400).json({ message: 'La fecha de fin no puede ser anterior a la fecha de inicio.' });
+    }
+
+    try {
+        const sql = `
+            INSERT INTO vacaciones (usuario_id, fecha_inicio, fecha_fin, estado) 
+            VALUES ($1, $2, $3, 'aprobada')
+        `;
+        // Como un admin las asigna, se aprueban directamente.
+        await db.query(sql, [usuarioId, fechaInicio, fechaFin]);
+        
+        res.status(201).json({ message: 'Vacaciones asignadas correctamente.' });
+    } catch (err) {
+        console.error("Error al asignar vacaciones:", err);
+        res.status(500).json({ message: 'Error del servidor al intentar asignar las vacaciones.' });
+    }
+});
 
 
 // MODIFICADO: Calcula el balance de vacaciones de un usuario usando días laborables
