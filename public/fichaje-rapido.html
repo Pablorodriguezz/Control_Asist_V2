@@ -17,20 +17,16 @@
             <!-- CÓDIGO A MODIFICAR en fichaje-rapido.html -->
 <div class="fichaje-actions">
     <div class="action-button-wrapper">
-        <!-- Añadimos 'disabled' al botón -->
         <button id="btnEntrada" class="action-button primary entrada" onclick="iniciarFichaje('entrada')" disabled>
             <i class="bi bi-plus-lg"></i>
         </button>
-        <!-- Cambiamos el texto inicial -->
-        <span id="labelEntrada" class="action-label">Cargando...</span>
+        <span class="action-label">Entrada</span>
     </div>
     <div class="action-button-wrapper">
-        <!-- Añadimos 'disabled' al botón -->
         <button id="btnSalida" class="action-button primary salida" onclick="iniciarFichaje('salida')" disabled>
             <i class="bi bi-dash-lg"></i>
         </button>
-        <!-- Cambiamos el texto inicial -->
-        <span id="labelSalida" class="action-label">Cargando...</span>
+        <span class="action-label">Salida</span>
     </div>
 </div>
         </div>
@@ -46,13 +42,12 @@
 <script>
     const nombreEmpleadoSpan = document.getElementById('nombreEmpleado');
     const [btnEntrada, btnSalida] = [document.getElementById('btnEntrada'), document.getElementById('btnSalida')];
-    // CORRECCIÓN: Los 'labels' que modificaste no existen en el HTML original. 
-    // Los quitamos para evitar errores. El estado se mostrará en los botones (disabled).
     const [cameraModal, video, canvas] = [document.getElementById('cameraModal'), document.getElementById('video'), document.getElementById('canvas')];
     let stream;
     let userId;
 
     function actualizarBotones(estado) {
+        // Habilita o deshabilita los botones según el estado
         if (estado === 'entrada') {
             btnEntrada.disabled = true;
             btnSalida.disabled = false;
@@ -64,35 +59,31 @@
 
     document.addEventListener('DOMContentLoaded', async () => {
         const params = new URLSearchParams(window.location.search);
-        userId = params.get('id');
+        let rawUserId = params.get('id'); // Obtenemos el ID "crudo"
         const nombre = params.get('nombre');
 
-        // --- VALIDACIÓN MEJORADA ---
-        // Comprobamos si userId es null, undefined, o una cadena "null" o "undefined"
-        if (!userId || userId === 'null' || userId === 'undefined' || !nombre) {
+        // --- VALIDACIÓN Y LIMPIEZA DEL ID (LA CLAVE DE LA SOLUCIÓN) ---
+        if (!rawUserId || rawUserId === 'null' || !nombre) {
             Swal.fire({
-                icon: 'error',
-                title: 'Error de Carga',
-                text: 'No se pudo obtener la información del empleado. Por favor, vuelve a la pantalla de inicio.',
-                allowOutsideClick: false,
+                icon: 'error', title: 'Error de Carga',
+                text: 'No se pudo obtener la información del empleado.',
                 confirmButtonText: 'Volver'
-            }).then(() => {
-                window.location.href = '/index.html';
-            });
+            }).then(() => { window.location.href = '/index.html'; });
             return;
         }
-        // --- FIN DE LA VALIDACIÓN MEJORADA ---
+
+        // Limpiamos el ID por si viene con caracteres extra como ":1"
+        userId = rawUserId.split(':')[0];
+        console.log(`ID Original: ${rawUserId}, ID Limpio: ${userId}`); // Para depuración
+        // --- FIN DE LA VALIDACIÓN Y LIMPIEZA ---
 
         nombreEmpleadoSpan.textContent = nombre;
 
-        // Deshabilitamos botones mientras cargamos
-        btnEntrada.disabled = true;
-        btnSalida.disabled = true;
-
         try {
+            // Usamos el userId ya limpio para la petición
             const res = await fetch(`/api/estado-empleado/${userId}`);
             if (!res.ok) {
-                 const errorData = await res.json().catch(() => ({ message: 'No se pudo obtener el estado.' }));
+                 const errorData = await res.json().catch(() => ({ message: 'Respuesta no válida del servidor.' }));
                  throw new Error(errorData.message);
             }
             const data = await res.json();
@@ -107,6 +98,8 @@
         window.location.href = '/index.html';
     });
 
+    // El resto de las funciones (iniciarFichaje, tomarFotoYFichar, enviarFichaje) 
+    // permanecen exactamente iguales a las que ya tenías.
     async function iniciarFichaje(tipo) {
         cameraModal.style.display = 'flex';
         try {
