@@ -57,42 +57,46 @@
         }
     }
 
-    document.addEventListener('DOMContentLoaded', async () => {
-        const params = new URLSearchParams(window.location.search);
-        let rawUserId = params.get('id'); // Obtenemos el ID "crudo"
-        const nombre = params.get('nombre');
+    // REEMPLAZA ESTE BLOQUE EN fichaje-rapido.html
+document.addEventListener('DOMContentLoaded', async () => {
+    const params = new URLSearchParams(window.location.search);
+    let rawUserId = params.get('id');
+    const nombre = params.get('nombre');
 
-        // --- VALIDACIÓN Y LIMPIEZA DEL ID (LA CLAVE DE LA SOLUCIÓN) ---
-        if (!rawUserId || rawUserId === 'null' || !nombre) {
-            Swal.fire({
-                icon: 'error', title: 'Error de Carga',
-                text: 'No se pudo obtener la información del empleado.',
-                confirmButtonText: 'Volver'
-            }).then(() => { window.location.href = '/index.html'; });
-            return;
+    if (!rawUserId || rawUserId === 'null' || !nombre) {
+        Swal.fire({
+            icon: 'error', title: 'Error de Carga',
+            text: 'No se pudo obtener la información del empleado.',
+            confirmButtonText: 'Volver'
+        }).then(() => { window.location.href = '/index.html'; });
+        return;
+    }
+
+    userId = rawUserId;
+    console.log(`ID de usuario recibido: ${userId}`);
+
+    nombreEmpleadoSpan.textContent = nombre;
+
+    try {
+        // --- LÍNEA MODIFICADA PARA CONSTRUIR LA URL DE FORMA SEGURA ---
+        const apiUrl = '/api/estado-empleado/' + encodeURIComponent(userId);
+        // -------------------------------------------------------------
+        
+        console.log('Llamando a la API:', apiUrl); // Para depuración
+        
+        const res = await fetch(apiUrl); // Usamos la nueva variable
+
+        if (!res.ok) {
+             const errorData = await res.json().catch(() => ({ message: 'Respuesta no válida del servidor.' }));
+             throw new Error(errorData.message);
         }
-
-        // Limpiamos el ID por si viene con caracteres extra como ":1"
-        userId = rawUserId.split(':')[0];
-        console.log(`ID Original: ${rawUserId}, ID Limpio: ${userId}`); // Para depuración
-        // --- FIN DE LA VALIDACIÓN Y LIMPIEZA ---
-
-        nombreEmpleadoSpan.textContent = nombre;
-
-        try {
-            // Usamos el userId ya limpio para la petición
-            const res = await fetch(`/api/estado-empleado/${userId}`);
-            if (!res.ok) {
-                 const errorData = await res.json().catch(() => ({ message: 'Respuesta no válida del servidor.' }));
-                 throw new Error(errorData.message);
-            }
-            const data = await res.json();
-            actualizarBotones(data.estado);
-        } catch (error) {
-            console.error(error);
-            Swal.fire('Error', 'No se pudo verificar el estado del empleado. Inténtalo de nuevo.', 'error');
-        }
-    });
+        const data = await res.json();
+        actualizarBotones(data.estado);
+    } catch (error) {
+        console.error(error);
+        Swal.fire('Error', 'No se pudo verificar el estado del empleado. Inténtalo de nuevo.', 'error');
+    }
+});
 
     document.getElementById('btnNoSoyYo').addEventListener('click', () => {
         window.location.href = '/index.html';
