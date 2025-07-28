@@ -42,28 +42,24 @@
     <div id="cameraModal" class="modal"><div class="modal-content"><h2>Sonríe para la foto</h2><video id="video" autoplay playsinline></video><p>Tomando foto en 3 segundos...</p></div></div>
     <canvas id="canvas" style="display:none;"></canvas>
 
+
 <script>
     const nombreEmpleadoSpan = document.getElementById('nombreEmpleado');
     const [btnEntrada, btnSalida] = [document.getElementById('btnEntrada'), document.getElementById('btnSalida')];
-    const [labelEntrada, labelSalida] = [document.getElementById('labelEntrada'), document.getElementById('labelSalida')];
+    // CORRECCIÓN: Los 'labels' que modificaste no existen en el HTML original. 
+    // Los quitamos para evitar errores. El estado se mostrará en los botones (disabled).
     const [cameraModal, video, canvas] = [document.getElementById('cameraModal'), document.getElementById('video'), document.getElementById('canvas')];
     let stream;
     let userId;
 
-    // --- NUEVA FUNCIÓN PARA ACTUALIZAR BOTONES ---
     function actualizarBotones(estado) {
         if (estado === 'entrada') {
-            // El usuario ya está dentro, solo puede salir
             btnEntrada.disabled = true;
             btnSalida.disabled = false;
         } else {
-            // El usuario está fuera (o es su primer fichaje), solo puede entrar
             btnEntrada.disabled = false;
             btnSalida.disabled = true;
         }
-        // Restauramos las etiquetas originales
-        labelEntrada.textContent = 'Entrada';
-        labelSalida.textContent = 'Salida';
     }
 
     document.addEventListener('DOMContentLoaded', async () => {
@@ -71,25 +67,38 @@
         userId = params.get('id');
         const nombre = params.get('nombre');
 
-        if (!userId || !nombre) {
-            alert('Error: No se ha seleccionado un empleado.');
-            window.location.href = '/index.html';
+        // --- VALIDACIÓN MEJORADA ---
+        // Comprobamos si userId es null, undefined, o una cadena "null" o "undefined"
+        if (!userId || userId === 'null' || userId === 'undefined' || !nombre) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Error de Carga',
+                text: 'No se pudo obtener la información del empleado. Por favor, vuelve a la pantalla de inicio.',
+                allowOutsideClick: false,
+                confirmButtonText: 'Volver'
+            }).then(() => {
+                window.location.href = '/index.html';
+            });
             return;
         }
+        // --- FIN DE LA VALIDACIÓN MEJORADA ---
 
         nombreEmpleadoSpan.textContent = nombre;
 
-        // --- NUEVA LÓGICA PARA CONSULTAR EL ESTADO ---
+        // Deshabilitamos botones mientras cargamos
+        btnEntrada.disabled = true;
+        btnSalida.disabled = true;
+
         try {
             const res = await fetch(`/api/estado-empleado/${userId}`);
-            if (!res.ok) throw new Error('No se pudo obtener el estado.');
+            if (!res.ok) {
+                 const errorData = await res.json().catch(() => ({ message: 'No se pudo obtener el estado.' }));
+                 throw new Error(errorData.message);
+            }
             const data = await res.json();
             actualizarBotones(data.estado);
         } catch (error) {
             console.error(error);
-            // Si hay un error, por seguridad, bloqueamos ambos y mostramos un mensaje
-            labelEntrada.textContent = 'Error';
-            labelSalida.textContent = 'Error';
             Swal.fire('Error', 'No se pudo verificar el estado del empleado. Inténtalo de nuevo.', 'error');
         }
     });
