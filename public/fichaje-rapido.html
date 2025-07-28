@@ -39,6 +39,7 @@
     <canvas id="canvas" style="display:none;"></canvas>
 
 
+// REEMPLAZA TU SCRIPT ACTUAL CON ESTE CÓDIGO COMPLETO Y DEFINITIVO
 <script>
     const nombreEmpleadoSpan = document.getElementById('nombreEmpleado');
     const [btnEntrada, btnSalida] = [document.getElementById('btnEntrada'), document.getElementById('btnSalida')];
@@ -47,7 +48,6 @@
     let userId;
 
     function actualizarBotones(estado) {
-        // Habilita o deshabilita los botones según el estado
         if (estado === 'entrada') {
             btnEntrada.disabled = true;
             btnSalida.disabled = false;
@@ -57,53 +57,51 @@
         }
     }
 
-    // REEMPLAZA ESTE BLOQUE EN fichaje-rapido.html
-document.addEventListener('DOMContentLoaded', async () => {
-    const params = new URLSearchParams(window.location.search);
-    let rawUserId = params.get('id');
-    const nombre = params.get('nombre');
+    document.addEventListener('DOMContentLoaded', async () => {
+        const params = new URLSearchParams(window.location.search);
+        userId = params.get('id');
+        const nombre = params.get('nombre');
 
-    if (!rawUserId || rawUserId === 'null' || !nombre) {
-        Swal.fire({
-            icon: 'error', title: 'Error de Carga',
-            text: 'No se pudo obtener la información del empleado.',
-            confirmButtonText: 'Volver'
-        }).then(() => { window.location.href = '/index.html'; });
-        return;
-    }
-
-    userId = rawUserId;
-    console.log(`ID de usuario recibido: ${userId}`);
-
-    nombreEmpleadoSpan.textContent = nombre;
-
-    try {
-        // --- LÍNEA MODIFICADA PARA CONSTRUIR LA URL DE FORMA SEGURA ---
-        const apiUrl = '/api/estado-empleado/' + encodeURIComponent(userId);
-        // -------------------------------------------------------------
-        
-        console.log('Llamando a la API:', apiUrl); // Para depuración
-        
-        const res = await fetch(apiUrl); // Usamos la nueva variable
-
-        if (!res.ok) {
-             const errorData = await res.json().catch(() => ({ message: 'Respuesta no válida del servidor.' }));
-             throw new Error(errorData.message);
+        if (!userId || userId === 'null' || !nombre) {
+            Swal.fire({
+                icon: 'error', title: 'Error de Carga',
+                text: 'No se pudo obtener la información del empleado.',
+                confirmButtonText: 'Volver'
+            }).then(() => { window.location.href = '/index.html'; });
+            return;
         }
-        const data = await res.json();
-        actualizarBotones(data.estado);
-    } catch (error) {
-        console.error(error);
-        Swal.fire('Error', 'No se pudo verificar el estado del empleado. Inténtalo de nuevo.', 'error');
-    }
-});
+        
+        nombreEmpleadoSpan.textContent = nombre;
+
+        try {
+            // --- LA SOLUCIÓN: CONSTRUIR UNA URL ABSOLUTA ---
+            // Esto obtiene "https://tu-dominio.railway.app" o "http://localhost:3000"
+            const origin = window.location.origin; 
+            const apiUrl = `${origin}/api/estado-empleado/${encodeURIComponent(userId)}`;
+            // -------------------------------------------------------------------
+            
+            console.log('Llamando a la API con URL absoluta:', apiUrl); // Nuevo log para confirmar
+            
+            const res = await fetch(apiUrl);
+
+            if (!res.ok) {
+                 const errorText = await res.text(); // Obtener texto plano para depurar
+                 console.error("Error del servidor:", res.status, errorText);
+                 throw new Error('El servidor respondió con un error.');
+            }
+            const data = await res.json();
+            actualizarBotones(data.estado);
+        } catch (error) {
+            console.error(error);
+            Swal.fire('Error', 'No se pudo verificar el estado del empleado. Inténtalo de nuevo.', 'error');
+        }
+    });
 
     document.getElementById('btnNoSoyYo').addEventListener('click', () => {
         window.location.href = '/index.html';
     });
 
-    // El resto de las funciones (iniciarFichaje, tomarFotoYFichar, enviarFichaje) 
-    // permanecen exactamente iguales a las que ya tenías.
+    // Las demás funciones (iniciarFichaje, tomarFotoYFichar, enviarFichaje) no cambian.
     async function iniciarFichaje(tipo) {
         cameraModal.style.display = 'flex';
         try {
@@ -135,8 +133,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     async function enviarFichaje(formData) {
+        const origin = window.location.origin;
         try {
-            const res = await fetch('/api/fichar-rapido', {
+            const res = await fetch(`${origin}/api/fichar-rapido`, { // Usamos URL absoluta aquí también
                 method: 'POST',
                 body: formData
             });
@@ -144,23 +143,16 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (!res.ok) throw new Error(data.message);
 
             Swal.fire({
-                icon: 'success',
-                title: '¡Fichaje Correcto!',
-                text: data.message,
-                timer: 2500,
+                icon: 'success', title: '¡Fichaje Correcto!',
+                text: data.message, timer: 2500,
                 showConfirmButton: false,
-                willClose: () => {
-                    window.location.href = '/index.html';
-                }
+                willClose: () => { window.location.href = '/index.html'; }
             });
         } catch (error) {
             Swal.fire({
-                icon: 'error',
-                title: 'Error en el Fichaje',
+                icon: 'error', title: 'Error en el Fichaje',
                 text: error.message || 'Hubo un problema al registrar el fichaje.'
-            }).then(() => {
-                window.location.href = '/index.html';
-            });
+            }).then(() => { window.location.href = '/index.html'; });
         }
     }
 </script>
