@@ -420,6 +420,16 @@ th { background-color: #ecf0f1; }
     display: block; /* Muestra solo la pestaña activa */
 }
 
+/* En tu archivo style.css */
+.action-button.disabled {
+    background-color: #bdc3c7; /* Un color gris */
+    cursor: not-allowed; /* Cambia el cursor para indicar que no se puede hacer clic */
+    box-shadow: none;
+}
+.action-button.disabled:hover {
+    transform: none; /* Evita el efecto de hover */
+}
+
 /* Ajuste para la barra de navegación con 3 items */
 .bottom-nav {
     padding: 0; /* Quitamos el padding anterior para que se distribuya bien */

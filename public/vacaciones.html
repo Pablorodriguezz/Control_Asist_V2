@@ -112,6 +112,24 @@
             else if (action === false) handleDeleteVacation(event);
         }
 
+        // Añade esto en el <script> de vacaciones.html
+function calcularDiasLaborables(fechaInicio, fechaFin) {
+    const inicio = new Date(fechaInicio);
+    const fin = new Date(fechaFin);
+    let count = 0;
+    const curDate = new Date(Date.UTC(inicio.getUTCFullYear(), inicio.getUTCMonth(), inicio.getUTCDate()));
+    const finalDate = new Date(Date.UTC(fin.getUTCFullYear(), fin.getUTCMonth(), fin.getUTCDate()));
+
+    while (curDate <= finalDate) {
+        const dayOfWeek = curDate.getUTCDay();
+        if (dayOfWeek !== 0 && dayOfWeek !== 6) { // 0=Domingo, 6=Sábado
+            count++;
+        }
+        curDate.setUTCDate(curDate.getUTCDate() + 1);
+    }
+    return count;
+}
+
         async function handleEditVacation(event) {
             const fechaInicioActual = new Date(event.start).toISOString().split('T')[0];
             const fechaFinActual = new Date(new Date(event.end).getTime() - 86400000).toISOString().split('T')[0];
@@ -213,42 +231,50 @@
 
         document.getElementById('vacacionesUsuario').addEventListener('change', mostrarDiasRestantes);
 
-        document.getElementById('formVacaciones').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const usuarioId = document.getElementById('vacacionesUsuario').value;
-            const fechaInicio = document.getElementById('fechaInicio').value;
-            const fechaFin = document.getElementById('fechaFin').value;
-            
-            if (!window.vacationData || !usuarioId || !fechaInicio || !fechaFin) {
-                Swal.fire('Error', 'Por favor, selecciona un trabajador y las fechas.', 'error');
-                return;
-            }
-            const inicio = new Date(fechaInicio);
-            const fin = new Date(fechaFin);
-            const diffTime = Math.abs(fin - inicio);
-            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-            if (diffDays > window.vacationData.diasRestantes) {
-                Swal.fire({ icon: 'warning', title: 'Días insuficientes', text: `Estás intentando asignar ${diffDays} días, pero al trabajador solo le quedan ${window.vacationData.diasRestantes} disponibles.` });
-                return;
-            }
+        // REEMPLAZA TU 'addEventListener' actual en vacaciones.html por este
+document.getElementById('formVacaciones').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const usuarioId = document.getElementById('vacacionesUsuario').value;
+    const fechaInicio = document.getElementById('fechaInicio').value;
+    const fechaFin = document.getElementById('fechaFin').value;
+    
+    if (!window.vacationData || !usuarioId || !fechaInicio || !fechaFin) {
+        Swal.fire('Error', 'Por favor, selecciona un trabajador y las fechas.', 'error');
+        return;
+    }
 
-            try {
-                const res = await fetch('/api/vacaciones', { 
-                    method: 'POST', 
-                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, 
-                    body: JSON.stringify({ usuarioId, fechaInicio, fechaFin }) 
-                });
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.message);
-                
-                Swal.fire('¡Éxito!', 'Vacaciones asignadas.', 'success');
-                e.target.reset();
-                document.getElementById('infoDiasRestantes').textContent = '';
-                calendario.refetchEvents();
-            } catch (error) { 
-                Swal.fire('Error', `No se pudo asignar: ${error.message}`, 'error'); 
-            }
+    // --- LÓGICA DE VALIDACIÓN CORREGIDA ---
+    const diasLaborablesAsignados = calcularDiasLaborables(fechaInicio, fechaFin);
+
+    if (diasLaborablesAsignados > window.vacationData.diasRestantes) {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Días insuficientes',
+            html: `Estás intentando asignar <strong>${diasLaborablesAsignados}</strong> días laborables, pero al trabajador solo le quedan <strong>${window.vacationData.diasRestantes}</strong> disponibles.`
         });
+        return;
+    }
+    // --- FIN DE LA LÓGICA CORREGIDA ---
+
+    try {
+        const res = await fetch('/api/vacaciones', { 
+            method: 'POST', 
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, 
+            body: JSON.stringify({ usuarioId, fechaInicio, fechaFin }) 
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message);
+        
+        Swal.fire('¡Éxito!', 'Vacaciones asignadas.', 'success');
+        e.target.reset();
+        document.getElementById('infoDiasRestantes').textContent = '';
+        calendario.refetchEvents();
+        // Opcional: podrías volver a llamar a mostrarDiasRestantes() para actualizar el contador
+        mostrarDiasRestantes(); 
+    } catch (error) { 
+        Swal.fire('Error', `No se pudo asignar: ${error.message}`, 'error'); 
+    }
+});
         
         function inicializarPagina() {
             poblarSelectorUsuarios('vacacionesUsuario');

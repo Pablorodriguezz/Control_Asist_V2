@@ -33,89 +33,136 @@
     <div id="cameraModal" class="modal"><div class="modal-content"><h2>Sonríe para la foto</h2><video id="video" autoplay playsinline></video><p>Tomando foto en 3 segundos...</p></div></div>
     <canvas id="canvas" style="display:none;"></canvas>
 
-    <script>
-        const nombreEmpleadoSpan = document.getElementById('nombreEmpleado');
-        const [cameraModal, video, canvas] = [document.getElementById('cameraModal'), document.getElementById('video'), document.getElementById('canvas')];
-        let stream;
-        let userId; // Guardaremos el ID del usuario aquí
+    <!-- En fichaje-rapido.html -->
+<script>
+    const nombreEmpleadoSpan = document.getElementById('nombreEmpleado');
+    // --- OBTENEMOS LOS BOTONES ---
+    const btnEntrada = document.getElementById('btnEntrada');
+    const btnSalida = document.getElementById('btnSalida');
+    const [cameraModal, video, canvas] = [document.getElementById('cameraModal'), document.getElementById('video'), document.getElementById('canvas')];
+    let stream;
+    let userId; 
 
-        document.addEventListener('DOMContentLoaded', () => {
-            const params = new URLSearchParams(window.location.search);
-            userId = params.get('id');
-            const nombre = params.get('nombre');
+    // --- CONVERTIMOS EL EVENT LISTENER EN ASYNC PARA USAR AWAIT ---
+    document.addEventListener('DOMContentLoaded', async () => {
+        const params = new URLSearchParams(window.location.search);
+        userId = params.get('id');
+        const nombre = params.get('nombre');
 
-            if (!userId || !nombre) {
-                alert('Error: No se ha seleccionado un empleado.');
-                window.location.href = '/index.html';
-                return;
-            }
-
-            nombreEmpleadoSpan.textContent = nombre;
-        });
-
-        document.getElementById('btnNoSoyYo').addEventListener('click', () => {
+        if (!userId || !nombre) {
+            alert('Error: No se ha seleccionado un empleado.');
             window.location.href = '/index.html';
-        });
-
-        async function iniciarFichaje(tipo) {
-            cameraModal.style.display = 'flex';
-            try {
-                stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
-                video.srcObject = stream;
-                setTimeout(() => tomarFotoYFichar(tipo), 3000);
-            } catch (err) {
-                Swal.fire('Error', 'No se pudo acceder a la cámara. Asegúrate de dar permisos.', 'error');
-                cameraModal.style.display = 'none';
-            }
+            return;
         }
 
-        function tomarFotoYFichar(tipo) {
-            const context = canvas.getContext('2d');
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            context.drawImage(video, 0, 0, canvas.width, canvas.height);
-            if (stream) {
-                stream.getTracks().forEach(track => track.stop());
+        nombreEmpleadoSpan.textContent = nombre;
+
+        // ==========================================================
+        // ===== NUEVA LÓGICA PARA HABILITAR/DESHABILITAR BOTONES =====
+        // ==========================================================
+        
+        // 1. Deshabilitamos ambos botones al principio para evitar clics accidentales
+        btnEntrada.disabled = true;
+        btnSalida.disabled = true;
+        btnEntrada.classList.add('disabled');
+        btnSalida.classList.add('disabled');
+
+        try {
+            // 2. Llamamos a nuestra nueva ruta para saber el estado del empleado
+            const res = await fetch(`/api/estado-rapido?usuarioId=${userId}`);
+            if (!res.ok) {
+                const errData = await res.json();
+                throw new Error(errData.message || 'No se pudo obtener el estado del fichaje.');
             }
+            const data = await res.json();
+            const estadoActual = data.estado; // Esto será 'entrada' o 'salida'
+
+            // 3. Aplicamos la lógica para habilitar solo el botón correcto
+            if (estadoActual === 'entrada') {
+                // Si el último fichaje fue una entrada, solo puede fichar la salida
+                btnSalida.disabled = false;
+                btnSalida.classList.remove('disabled');
+            } else { 
+                // Si fue una salida (o no ha fichado hoy), solo puede fichar la entrada
+                btnEntrada.disabled = false;
+                btnEntrada.classList.remove('disabled');
+            }
+
+        } catch (error) {
+            console.error('Error al obtener estado de fichaje:', error);
+            Swal.fire({
+                icon: 'error',
+                title: 'Error de Conexión',
+                text: error.message,
+                willClose: () => { window.location.href = '/index.html'; }
+            });
+            // Si hay un error, los botones permanecerán deshabilitados
+        }
+    });
+
+    document.getElementById('btnNoSoyYo').addEventListener('click', () => {
+        window.location.href = '/index.html';
+    });
+
+    async function iniciarFichaje(tipo) {
+        cameraModal.style.display = 'flex';
+        try {
+            stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+            video.srcObject = stream;
+            setTimeout(() => tomarFotoYFichar(tipo), 3000);
+        } catch (err) {
+            Swal.fire('Error', 'No se pudo acceder a la cámara. Asegúrate de dar permisos.', 'error');
             cameraModal.style.display = 'none';
-            canvas.toBlob(blob => {
-                const formData = new FormData();
-                formData.append('tipo', tipo);
-                formData.append('foto', blob, 'fichaje.jpeg');
-                formData.append('usuarioId', userId); // <-- AÑADIMOS EL ID DEL USUARIO
-                enviarFichaje(formData);
-            }, 'image/jpeg');
         }
+    }
 
-        async function enviarFichaje(formData) {
-            try {
-                const res = await fetch('/api/fichar-rapido', { // <-- Usamos la nueva ruta
-                    method: 'POST',
-                    body: formData
-                });
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.message);
-
-                Swal.fire({
-                    icon: 'success',
-                    title: '¡Fichaje Correcto!',
-                    text: data.message,
-                    timer: 2500,
-                    showConfirmButton: false,
-                    willClose: () => {
-                        window.location.href = '/index.html'; // Redirigir al inicio
-                    }
-                });
-            } catch (error) {
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error en el Fichaje',
-                    text: error.message || 'Hubo un problema al registrar el fichaje.'
-                }).then(() => {
-                    window.location.href = '/index.html'; // Redirigir también en caso de error
-                });
-            }
+    function tomarFotoYFichar(tipo) {
+        const context = canvas.getContext('2d');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        if (stream) {
+            stream.getTracks().forEach(track => track.stop());
         }
-    </script>
+        cameraModal.style.display = 'none';
+        canvas.toBlob(blob => {
+            const formData = new FormData();
+            formData.append('tipo', tipo);
+            formData.append('foto', blob, 'fichaje.jpeg');
+            formData.append('usuarioId', userId);
+            enviarFichaje(formData);
+        }, 'image/jpeg');
+    }
+
+    async function enviarFichaje(formData) {
+        try {
+            const res = await fetch('/api/fichar-rapido', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message);
+
+            Swal.fire({
+                icon: 'success',
+                title: '¡Fichaje Correcto!',
+                text: data.message,
+                timer: 2500,
+                showConfirmButton: false,
+                willClose: () => {
+                    window.location.href = '/index.html';
+                }
+            });
+        } catch (error) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Error en el Fichaje',
+                text: error.message || 'Hubo un problema al registrar el fichaje.'
+            }).then(() => {
+                window.location.href = '/index.html';
+            });
+        }
+    }
+</script>
 </body>
 </html>

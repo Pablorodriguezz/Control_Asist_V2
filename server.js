@@ -588,6 +588,33 @@ app.get('/api/fix-vacation-days', authenticateToken, async(req, res) => {
 });
 
 // En server.js
+
+// --- NUEVA RUTA: Obtener estado de fichaje para un usuario específico (pública) ---
+app.get('/api/estado-rapido', async (req, res) => {
+    const { usuarioId } = req.query; // Obtenemos el ID del empleado desde la URL
+
+    if (!usuarioId) {
+        return res.status(400).json({ message: 'Falta el ID del empleado.' });
+    }
+
+    // La consulta es similar a la de /api/estado, pero usando el ID que nos pasan
+    const sql = `SELECT tipo FROM registros WHERE usuario_id = $1 AND fecha_hora::date = CURRENT_DATE ORDER BY fecha_hora DESC LIMIT 1`;
+    try {
+        const result = await db.query(sql, [usuarioId]);
+        
+        // Si no hay registros hoy, su estado es 'salida' (listo para entrar)
+        const ultimoEstado = result.rows.length > 0 ? result.rows[0].tipo : 'salida';
+        
+        res.json({ estado: ultimoEstado });
+    } catch (err) {
+        console.error("Error al consultar el estado rápido:", err);
+        res.status(500).json({ message: 'Error del servidor al consultar el estado.' });
+    }
+});
+
+// ... el resto de tu código de server.js
+
+// En server.js
 // --- LÓGICA RESTAURADA A LA VERSIÓN CORRECTA ---
 app.get('/api/mis-vacaciones', authenticateToken, async (req, res) => {
     const usuarioId = req.user.id;
