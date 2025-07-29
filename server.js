@@ -1,4 +1,3 @@
-// server.js (COMPLETO CON LÓGICA DE DÍAS LABORABLES)
 const express = require('express');
 const cors = require('cors');
 const path = require('path');

@@ -1,4 +1,3 @@
-// database.js (COMPLETO Y FINAL)
 const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 

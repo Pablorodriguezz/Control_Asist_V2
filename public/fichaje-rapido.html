@@ -14,21 +14,16 @@
         <h1>Fichaje para <span id="nombreEmpleado" style="color: var(--primary-color);">...</span></h1>
         
         <div class="fichaje-section" style="margin-top: 2rem;">
-            <!-- CÓDIGO A MODIFICAR en fichaje-rapido.html -->
-<div class="fichaje-actions">
-    <div class="action-button-wrapper">
-        <button id="btnEntrada" class="action-button primary entrada" onclick="iniciarFichaje('entrada')" disabled>
-            <i class="bi bi-plus-lg"></i>
-        </button>
-        <span class="action-label">Entrada</span>
-    </div>
-    <div class="action-button-wrapper">
-        <button id="btnSalida" class="action-button primary salida" onclick="iniciarFichaje('salida')" disabled>
-            <i class="bi bi-dash-lg"></i>
-        </button>
-        <span class="action-label">Salida</span>
-    </div>
-</div>
+            <div class="fichaje-actions">
+                <div class="action-button-wrapper">
+                    <button id="btnEntrada" class="action-button primary entrada" onclick="iniciarFichaje('entrada')"><i class="bi bi-plus-lg"></i></button>
+                    <span class="action-label">Entrada</span>
+                </div>
+                <div class="action-button-wrapper">
+                    <button id="btnSalida" class="action-button primary salida" onclick="iniciarFichaje('salida')"><i class="bi bi-dash-lg"></i></button>
+                    <span class="action-label">Salida</span>
+                </div>
+            </div>
         </div>
 
         <button id="btnNoSoyYo" class="btn-secundario" style="margin-top: 30px;">No soy yo, volver</button>
@@ -38,123 +33,89 @@
     <div id="cameraModal" class="modal"><div class="modal-content"><h2>Sonríe para la foto</h2><video id="video" autoplay playsinline></video><p>Tomando foto en 3 segundos...</p></div></div>
     <canvas id="canvas" style="display:none;"></canvas>
 
+    <script>
+        const nombreEmpleadoSpan = document.getElementById('nombreEmpleado');
+        const [cameraModal, video, canvas] = [document.getElementById('cameraModal'), document.getElementById('video'), document.getElementById('canvas')];
+        let stream;
+        let userId; // Guardaremos el ID del usuario aquí
 
-// REEMPLAZA TU SCRIPT ACTUAL CON ESTE CÓDIGO COMPLETO Y DEFINITIVO
-<script>
-    const nombreEmpleadoSpan = document.getElementById('nombreEmpleado');
-    const [btnEntrada, btnSalida] = [document.getElementById('btnEntrada'), document.getElementById('btnSalida')];
-    const [cameraModal, video, canvas] = [document.getElementById('cameraModal'), document.getElementById('video'), document.getElementById('canvas')];
-    let stream;
-    let userId;
+        document.addEventListener('DOMContentLoaded', () => {
+            const params = new URLSearchParams(window.location.search);
+            userId = params.get('id');
+            const nombre = params.get('nombre');
 
-    function actualizarBotones(estado) {
-        if (estado === 'entrada') {
-            btnEntrada.disabled = true;
-            btnSalida.disabled = false;
-        } else {
-            btnEntrada.disabled = false;
-            btnSalida.disabled = true;
-        }
-    }
-
-    document.addEventListener('DOMContentLoaded', async () => {
-        const params = new URLSearchParams(window.location.search);
-        userId = params.get('id');
-        const nombre = params.get('nombre');
-
-        if (!userId || userId === 'null' || !nombre) {
-            Swal.fire({
-                icon: 'error', title: 'Error de Carga',
-                text: 'No se pudo obtener la información del empleado.',
-                confirmButtonText: 'Volver'
-            }).then(() => { window.location.href = '/index.html'; });
-            return;
-        }
-        
-        nombreEmpleadoSpan.textContent = nombre;
-
-        try {
-            // --- LA SOLUCIÓN: CONSTRUIR UNA URL ABSOLUTA ---
-            // Esto obtiene "https://tu-dominio.railway.app" o "http://localhost:3000"
-            const origin = window.location.origin; 
-            const apiUrl = `${origin}/api/estado-empleado/${encodeURIComponent(userId)}`;
-            // -------------------------------------------------------------------
-            
-            console.log('Llamando a la API con URL absoluta:', apiUrl); // Nuevo log para confirmar
-            
-            const res = await fetch(apiUrl);
-
-            if (!res.ok) {
-                 const errorText = await res.text(); // Obtener texto plano para depurar
-                 console.error("Error del servidor:", res.status, errorText);
-                 throw new Error('El servidor respondió con un error.');
+            if (!userId || !nombre) {
+                alert('Error: No se ha seleccionado un empleado.');
+                window.location.href = '/index.html';
+                return;
             }
-            const data = await res.json();
-            actualizarBotones(data.estado);
-        } catch (error) {
-            console.error(error);
-            Swal.fire('Error', 'No se pudo verificar el estado del empleado. Inténtalo de nuevo.', 'error');
+
+            nombreEmpleadoSpan.textContent = nombre;
+        });
+
+        document.getElementById('btnNoSoyYo').addEventListener('click', () => {
+            window.location.href = '/index.html';
+        });
+
+        async function iniciarFichaje(tipo) {
+            cameraModal.style.display = 'flex';
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+                video.srcObject = stream;
+                setTimeout(() => tomarFotoYFichar(tipo), 3000);
+            } catch (err) {
+                Swal.fire('Error', 'No se pudo acceder a la cámara. Asegúrate de dar permisos.', 'error');
+                cameraModal.style.display = 'none';
+            }
         }
-    });
 
-    document.getElementById('btnNoSoyYo').addEventListener('click', () => {
-        window.location.href = '/index.html';
-    });
-
-    // Las demás funciones (iniciarFichaje, tomarFotoYFichar, enviarFichaje) no cambian.
-    async function iniciarFichaje(tipo) {
-        cameraModal.style.display = 'flex';
-        try {
-            stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
-            video.srcObject = stream;
-            setTimeout(() => tomarFotoYFichar(tipo), 3000);
-        } catch (err) {
-            Swal.fire('Error', 'No se pudo acceder a la cámara. Asegúrate de dar permisos.', 'error');
+        function tomarFotoYFichar(tipo) {
+            const context = canvas.getContext('2d');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
             cameraModal.style.display = 'none';
+            canvas.toBlob(blob => {
+                const formData = new FormData();
+                formData.append('tipo', tipo);
+                formData.append('foto', blob, 'fichaje.jpeg');
+                formData.append('usuarioId', userId); // <-- AÑADIMOS EL ID DEL USUARIO
+                enviarFichaje(formData);
+            }, 'image/jpeg');
         }
-    }
 
-    function tomarFotoYFichar(tipo) {
-        const context = canvas.getContext('2d');
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        context.drawImage(video, 0, 0, canvas.width, canvas.height);
-        if (stream) {
-            stream.getTracks().forEach(track => track.stop());
+        async function enviarFichaje(formData) {
+            try {
+                const res = await fetch('/api/fichar-rapido', { // <-- Usamos la nueva ruta
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.message);
+
+                Swal.fire({
+                    icon: 'success',
+                    title: '¡Fichaje Correcto!',
+                    text: data.message,
+                    timer: 2500,
+                    showConfirmButton: false,
+                    willClose: () => {
+                        window.location.href = '/index.html'; // Redirigir al inicio
+                    }
+                });
+            } catch (error) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error en el Fichaje',
+                    text: error.message || 'Hubo un problema al registrar el fichaje.'
+                }).then(() => {
+                    window.location.href = '/index.html'; // Redirigir también en caso de error
+                });
+            }
         }
-        cameraModal.style.display = 'none';
-        canvas.toBlob(blob => {
-            const formData = new FormData();
-            formData.append('tipo', tipo);
-            formData.append('foto', blob, 'fichaje.jpeg');
-            formData.append('usuarioId', userId);
-            enviarFichaje(formData);
-        }, 'image/jpeg');
-    }
-
-    async function enviarFichaje(formData) {
-        const origin = window.location.origin;
-        try {
-            const res = await fetch(`${origin}/api/fichar-rapido`, { // Usamos URL absoluta aquí también
-                method: 'POST',
-                body: formData
-            });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.message);
-
-            Swal.fire({
-                icon: 'success', title: '¡Fichaje Correcto!',
-                text: data.message, timer: 2500,
-                showConfirmButton: false,
-                willClose: () => { window.location.href = '/index.html'; }
-            });
-        } catch (error) {
-            Swal.fire({
-                icon: 'error', title: 'Error en el Fichaje',
-                text: error.message || 'Hubo un problema al registrar el fichaje.'
-            }).then(() => { window.location.href = '/index.html'; });
-        }
-    }
-</script>
+    </script>
 </body>
 </html>

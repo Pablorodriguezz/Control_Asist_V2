@@ -101,18 +101,14 @@
 
       // Evento para mostrar la pantalla de fichaje rápido
       btnFichajeRapido.addEventListener("click", async () => {
-    loginNormalContainer.style.display = "none";
-    fichajeRapidoContainer.style.display = "block";
-    listaEmpleadosDiv.innerHTML = "<p>Cargando empleados...</p>";
+        loginNormalContainer.style.display = "none";
+        fichajeRapidoContainer.style.display = "block";
+        listaEmpleadosDiv.innerHTML = "<p>Cargando empleados...</p>";
 
-    try {
-        const res = await fetch("/api/empleados-para-fichaje");
-        if (!res.ok) throw new Error("No se pudo cargar la lista.");
-        const empleados = await res.json();
-
-        // --- LÍNEA AÑADIDA PARA DIAGNÓSTICO ---
-        console.log("Empleados recibidos del backend:", empleados); 
-
+        try {
+          const res = await fetch("/api/empleados-para-fichaje");
+          if (!res.ok) throw new Error("No se pudo cargar la lista.");
+          const empleados = await res.json();
 
           listaEmpleadosDiv.innerHTML = ""; // Limpiar
           if (empleados.length === 0) {
