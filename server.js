@@ -587,7 +587,7 @@ app.get('/api/fix-vacation-days', authenticateToken, async(req, res) => {
     }
 });
 
-// En server.js
+// En server.js ss
 
 // --- NUEVA RUTA: Obtener estado de fichaje para un usuario específico (pública) ---
 app.get('/api/estado-rapido', async (req, res) => {
