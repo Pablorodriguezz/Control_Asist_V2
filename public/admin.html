@@ -354,34 +354,36 @@
         }
       }
 
-            async function abrirModalEdicion(
+                  async function abrirModalEdicion(
         registroId,
         fechaHoraActual,
         nombreUsuario
       ) {
-        // --- INICIO DE LA CORRECCIÓN ---
+        // --- INICIO DE LA NUEVA CORRECCIÓN (MÉTODO MÁS FIABLE) ---
 
-        // 1. Creamos el objeto Date a partir del string que llega del servidor.
+        // 1. Creamos el objeto Date. Javascript lo interpretará correctamente
+        //    y sus métodos devolverán los valores en la zona horaria local del navegador.
         const fechaActualDate = new Date(fechaHoraActual);
 
-        // 2. Obtenemos el desfase de la zona horaria del navegador en minutos.
-        //    (Ej: para UTC+2, el valor es -120)
-        const offset = fechaActualDate.getTimezoneOffset();
+        // 2. Obtenemos cada componente de la fecha en la hora LOCAL.
+        const year = fechaActualDate.getFullYear();
+        // getMonth() es 0-indexado (0 = Enero), por eso sumamos 1.
+        const month = String(fechaActualDate.getMonth() + 1).padStart(2, '0');
+        const day = String(fechaActualDate.getDate()).padStart(2, '0');
+        const hours = String(fechaActualDate.getHours()).padStart(2, '0');
+        const minutes = String(fechaActualDate.getMinutes()).padStart(2, '0');
         
-        // 3. Creamos una nueva fecha ajustada, restando el desfase para que represente la hora local.
-        const fechaLocalCorregida = new Date(fechaActualDate.getTime() - (offset * 60 * 1000));
-        
-        // 4. Ahora sí, convertimos esta fecha local corregida al formato del input.
-        const fechaParaInput = fechaLocalCorregida.toISOString().slice(0, 16);
+        // 3. Construimos la cadena en el formato exacto que necesita 'datetime-local'.
+        const fechaParaInput = `${year}-${month}-${day}T${hours}:${minutes}`;
 
         // --- FIN DE LA CORRECCIÓN ---
 
         const { value: formValues } = await Swal.fire({
           title: `Editar fichaje de ${nombreUsuario}`,
-          // La línea de abajo no cambia, pero ahora usa la variable 'fechaParaInput' correctamente calculada
-          html: `<p style="margin-bottom: 1rem;">Fecha y Hora Actual: ${new Date(
-            fechaHoraActual
-          ).toLocaleString()}</p><label for="swal-input-fecha">Nueva Fecha y Hora:</label><input id="swal-input-fecha" type="datetime-local" value="${fechaParaInput}" class="swal2-input" style="width: auto; margin-top: 0.5rem;"><textarea id="swal-input-motivo" class="swal2-textarea" placeholder="Motivo de la edición (obligatorio)" style="margin-top: 1rem;"></textarea>`,
+          html: `<p style="margin-bottom: 1rem;">Fecha y Hora Actual: ${fechaActualDate.toLocaleString()}</p>
+                 <label for="swal-input-fecha">Nueva Fecha y Hora:</label>
+                 <input id="swal-input-fecha" type="datetime-local" value="${fechaParaInput}" class="swal2-input" style="width: auto; margin-top: 0.5rem;">
+                 <textarea id="swal-input-motivo" class="swal2-textarea" placeholder="Motivo de la edición (obligatorio)" style="margin-top: 1rem;"></textarea>`,
           focusConfirm: false,
           showCancelButton: true,
           confirmButtonText: "Guardar Cambios",
