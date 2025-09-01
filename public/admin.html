@@ -354,16 +354,31 @@
         }
       }
 
-      async function abrirModalEdicion(
+            async function abrirModalEdicion(
         registroId,
         fechaHoraActual,
         nombreUsuario
       ) {
-        const fechaParaInput = new Date(fechaHoraActual)
-          .toISOString()
-          .slice(0, 16);
+        // --- INICIO DE LA CORRECCIÓN ---
+
+        // 1. Creamos el objeto Date a partir del string que llega del servidor.
+        const fechaActualDate = new Date(fechaHoraActual);
+
+        // 2. Obtenemos el desfase de la zona horaria del navegador en minutos.
+        //    (Ej: para UTC+2, el valor es -120)
+        const offset = fechaActualDate.getTimezoneOffset();
+        
+        // 3. Creamos una nueva fecha ajustada, restando el desfase para que represente la hora local.
+        const fechaLocalCorregida = new Date(fechaActualDate.getTime() - (offset * 60 * 1000));
+        
+        // 4. Ahora sí, convertimos esta fecha local corregida al formato del input.
+        const fechaParaInput = fechaLocalCorregida.toISOString().slice(0, 16);
+
+        // --- FIN DE LA CORRECCIÓN ---
+
         const { value: formValues } = await Swal.fire({
           title: `Editar fichaje de ${nombreUsuario}`,
+          // La línea de abajo no cambia, pero ahora usa la variable 'fechaParaInput' correctamente calculada
           html: `<p style="margin-bottom: 1rem;">Fecha y Hora Actual: ${new Date(
             fechaHoraActual
           ).toLocaleString()}</p><label for="swal-input-fecha">Nueva Fecha y Hora:</label><input id="swal-input-fecha" type="datetime-local" value="${fechaParaInput}" class="swal2-input" style="width: auto; margin-top: 0.5rem;"><textarea id="swal-input-motivo" class="swal2-textarea" placeholder="Motivo de la edición (obligatorio)" style="margin-top: 1rem;"></textarea>`,
@@ -413,7 +428,6 @@
           }
         }
       }
-
       // --- ESTA FUNCIÓN FALTABA ---
 async function handleEventClick(event) {
     const { value: action } = await Swal.fire({
