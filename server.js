@@ -479,6 +479,74 @@ app.get('/api/justificantes', authenticateToken, async (req, res) => {
     }
 });
 
+app.put('/api/justificantes/:id', authenticateToken, async (req, res) => {
+    if (req.user.rol !== 'admin') {
+        return res.status(403).json({ message: 'Acceso denegado.' });
+    }
+    const { id } = req.params;
+    const { fechaInicio, fechaFin, motivo } = req.body;
+    
+    if (!fechaInicio || !fechaFin) {
+        return res.status(400).json({ message: 'Las fechas son obligatorias.' });
+    }
+
+    try {
+        const sql = `
+            UPDATE justificantes 
+            SET fecha_inicio = $1, fecha_fin = $2, motivo = $3
+            WHERE id = $4
+        `;
+        const result = await db.query(sql, [fechaInicio, fechaFin, motivo, id]);
+
+        if (result.rowCount === 0) {
+            return res.status(404).json({ message: 'Justificante no encontrado.' });
+        }
+
+        res.json({ message: 'Justificante actualizado correctamente.' });
+    } catch (err) {
+        console.error("Error al actualizar el justificante:", err);
+        res.status(500).json({ message: 'Error del servidor.' });
+    }
+});
+
+// --- NUEVO: RUTA PARA ELIMINAR UN JUSTIFICANTE ---
+app.delete('/api/justificantes/:id', authenticateToken, async (req, res) => {
+    if (req.user.rol !== 'admin') {
+        return res.status(403).json({ message: 'Acceso denegado.' });
+    }
+    const { id } = req.params;
+
+    try {
+        // 1. Obtener la ruta del archivo para poder borrarlo de R2
+        const selectRes = await db.query('SELECT archivo_path FROM justificantes WHERE id = $1', [id]);
+        if (selectRes.rowCount === 0) {
+            return res.status(404).json({ message: 'Justificante no encontrado.' });
+        }
+        
+        const filePath = selectRes.rows[0].archivo_path;
+        if (filePath) {
+            const fileName = path.basename(filePath); // Extrae el nombre del archivo de la URL
+            const deleteCommand = new DeleteObjectCommand({
+                Bucket: process.env.R2_BUCKET_NAME,
+                Key: fileName,
+            });
+            await s3Client.send(deleteCommand); // Eliminar de R2
+        }
+
+        // 2. Eliminar el registro de la base de datos
+        const deleteRes = await db.query('DELETE FROM justificantes WHERE id = $1', [id]);
+        
+        if (deleteRes.rowCount === 0) {
+            // Esto no debería pasar si el SELECT funcionó, pero es una buena práctica
+            return res.status(404).json({ message: 'Justificante no encontrado.' });
+        }
+
+        res.json({ message: 'Justificante eliminado correctamente.' });
+    } catch (err) {
+        console.error("Error al eliminar el justificante:", err);
+        res.status(500).json({ message: 'Error del servidor.' });
+    }
+});
 
 // =================================================================
 // RUTAS PARA GESTIÓN DE VACACIONES (MODIFICADAS)

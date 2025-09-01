@@ -104,6 +104,7 @@
                         <th>Motivo</th>
                         <th>Fecha de Envío</th>
                         <th>Archivo</th>
+                        <th>Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -491,14 +492,14 @@ async function handleEditVacation(event) {
 
 async function cargarJustificantes() {
         const tbody = document.querySelector("#tablaJustificantes tbody");
-        tbody.innerHTML = '<tr><td colspan="5">Cargando justificantes...</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6">Cargando justificantes...</td></tr>';
         try {
             const res = await fetch('/api/justificantes', { headers: { 'Authorization': `Bearer ${token}` } });
             if (!res.ok) throw new Error('No se pudieron cargar los justificantes.');
             const justificantes = await res.json();
             tbody.innerHTML = '';
             if (justificantes.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="5">No se han recibido justificantes.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="6">No se han recibido justificantes.</td></tr>';
                 return;
             }
             justificantes.forEach(j => {
@@ -506,21 +507,102 @@ async function cargarJustificantes() {
                 const fInicio = new Date(j.fecha_inicio).toLocaleDateString('es-ES');
                 const fFin = new Date(j.fecha_fin).toLocaleDateString('es-ES');
                 const fSubida = new Date(j.fecha_subida).toLocaleString('es-ES');
+
+                // Escapar comillas en el motivo para evitar problemas en el HTML
+                const motivoEscapado = j.motivo ? j.motivo.replace(/'/g, "\\'").replace(/"/g, '&quot;') : '';
+
                 tr.innerHTML = `
                     <td>${j.nombre_empleado}</td>
                     <td>Del ${fInicio} al ${fFin}</td>
                     <td>${j.motivo || 'N/A'}</td>
                     <td>${fSubida}</td>
-                    <td><a href="${j.archivo_path}" class="action-btn" target="_blank" rel="noopener noreferrer">Ver/Descargar</a></td>
+                    <td><a href="${j.archivo_path}" class="action-btn" target="_blank" rel="noopener noreferrer">Ver</a></td>
+                    <td>
+                        <button class="action-btn btn-reset" onclick="editarJustificante(${j.id}, '${j.fecha_inicio}', '${j.fecha_fin}', '${motivoEscapado}', '${j.nombre_empleado}')">Editar</button>
+                        <button class="action-btn btn-delete" onclick="eliminarJustificante(${j.id}, '${j.nombre_empleado}')">Eliminar</button>
+                    </td>
                 `;
                 tbody.appendChild(tr);
             });
         } catch (error) {
-            tbody.innerHTML = `<tr><td colspan="5">Error al cargar los justificantes: ${error.message}</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="6">Error al cargar los justificantes: ${error.message}</td></tr>`;
         }
       }
 
+       async function editarJustificante(id, fechaInicio, fechaFin, motivo, nombreEmpleado) {
+        // Formatear las fechas para los inputs de tipo 'date' (YYYY-MM-DD)
+        const fechaInicioInput = new Date(fechaInicio).toISOString().split('T')[0];
+        const fechaFinInput = new Date(fechaFin).toISOString().split('T')[0];
 
+        const { value: formValues } = await Swal.fire({
+            title: `Editar justificante de ${nombreEmpleado}`,
+            html: `
+                <label for="swal-fecha-inicio" style="display: block; text-align: left; margin-top: 1rem;">Fecha de Inicio:</label>
+                <input id="swal-fecha-inicio" type="date" class="swal2-input" value="${fechaInicioInput}">
+                
+                <label for="swal-fecha-fin" style="display: block; text-align: left; margin-top: 1rem;">Fecha de Fin:</label>
+                <input id="swal-fecha-fin" type="date" class="swal2-input" value="${fechaFinInput}">
+
+                <label for="swal-motivo" style="display: block; text-align: left; margin-top: 1rem;">Motivo:</label>
+                <textarea id="swal-motivo" class="swal2-textarea">${motivo}</textarea>
+            `,
+            focusConfirm: false,
+            showCancelButton: true,
+            confirmButtonText: 'Guardar Cambios',
+            preConfirm: () => {
+                return {
+                    fechaInicio: document.getElementById('swal-fecha-inicio').value,
+                    fechaFin: document.getElementById('swal-fecha-fin').value,
+                    motivo: document.getElementById('swal-motivo').value
+                };
+            }
+        });
+
+        if (formValues) {
+            try {
+                const res = await fetch(`/api/justificantes/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify(formValues)
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.message);
+                Swal.fire('¡Actualizado!', 'El justificante ha sido modificado.', 'success');
+                cargarJustificantes(); // Recargar la tabla
+            } catch (error) {
+                Swal.fire('Error', `No se pudo actualizar: ${error.message}`, 'error');
+            }
+        }
+      }
+
+      // --- NUEVO: FUNCIÓN PARA ELIMINAR UN JUSTIFICANTE ---
+      async function eliminarJustificante(id, nombreEmpleado) {
+        const result = await Swal.fire({
+            title: '¿Estás seguro?',
+            text: `Se eliminará permanentemente el justificante de ${nombreEmpleado}. ¡Esta acción no se puede revertir!`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#3085d6',
+            confirmButtonText: 'Sí, ¡eliminar!',
+            cancelButtonText: 'Cancelar'
+        });
+
+        if (result.isConfirmed) {
+            try {
+                const res = await fetch(`/api/justificantes/${id}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.message);
+                Swal.fire('¡Eliminado!', 'El justificante ha sido eliminado.', 'success');
+                cargarJustificantes(); // Recargar la tabla
+            } catch (error) {
+                Swal.fire('Error', `No se pudo eliminar: ${error.message}`, 'error');
+            }
+        }
+      }
 
 // --- ESTA FUNCIÓN FALTABA ---
 async function handleDeleteVacation(event) {
