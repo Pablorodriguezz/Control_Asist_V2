@@ -89,6 +89,20 @@ const init = async () => {
         await pool.query("ALTER TABLE vacaciones DROP CONSTRAINT IF EXISTS vacaciones_estado_check;");
         await pool.query("ALTER TABLE vacaciones ADD CONSTRAINT vacaciones_estado_check CHECK(estado IN ('aprobada', 'pendiente', 'rechazada'));");
         console.log('Tabla "vacaciones" actualizada con estados.');
+
+        // --- NUEVO: CREACIÓN DE LA TABLA DE JUSTIFICANTES ---
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS justificantes (
+                id SERIAL PRIMARY KEY,
+                usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+                fecha_inicio DATE NOT NULL,
+                fecha_fin DATE NOT NULL,
+                motivo TEXT,
+                archivo_path VARCHAR(255) NOT NULL,
+                fecha_subida TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+            );
+        `);
+        console.log('Tabla "justificantes" asegurada.');
         
         // --- CREACIÓN DEL USUARIO ADMIN POR DEFECTO ---
         const adminUser = 'admin';

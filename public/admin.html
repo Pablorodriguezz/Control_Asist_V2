@@ -27,6 +27,7 @@
           <li><a href="#fichaje-manual">Fichaje Manual</a></li>
           <li><a href="#gestion-vacaciones">Gestión Vacaciones</a></li>
           <li><a href="#solicitudes-pendientes">Solicitudes Pendientes</a></li>
+          <li><a href="#gestion-justificantes">Justificantes</a></li>
         </ul>
       </nav>
 
@@ -88,6 +89,27 @@
             </thead>
             <tbody></tbody>
           </table>
+        </div>
+      </section>
+      <hr />
+
+       <section id="gestion-justificantes">
+        <h2>Justificantes Recibidos</h2>
+        <div class="table-container">
+            <table id="tablaJustificantes">
+                <thead>
+                    <tr>
+                        <th>Empleado</th>
+                        <th>Periodo Ausencia</th>
+                        <th>Motivo</th>
+                        <th>Fecha de Envío</th>
+                        <th>Archivo</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Los datos se cargarán aquí con JavaScript -->
+                </tbody>
+            </table>
         </div>
       </section>
       <hr />
@@ -466,6 +488,39 @@ async function handleEditVacation(event) {
       }
     }
 }
+
+async function cargarJustificantes() {
+        const tbody = document.querySelector("#tablaJustificantes tbody");
+        tbody.innerHTML = '<tr><td colspan="5">Cargando justificantes...</td></tr>';
+        try {
+            const res = await fetch('/api/justificantes', { headers: { 'Authorization': `Bearer ${token}` } });
+            if (!res.ok) throw new Error('No se pudieron cargar los justificantes.');
+            const justificantes = await res.json();
+            tbody.innerHTML = '';
+            if (justificantes.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5">No se han recibido justificantes.</td></tr>';
+                return;
+            }
+            justificantes.forEach(j => {
+                const tr = document.createElement('tr');
+                const fInicio = new Date(j.fecha_inicio).toLocaleDateString('es-ES');
+                const fFin = new Date(j.fecha_fin).toLocaleDateString('es-ES');
+                const fSubida = new Date(j.fecha_subida).toLocaleString('es-ES');
+                tr.innerHTML = `
+                    <td>${j.nombre_empleado}</td>
+                    <td>Del ${fInicio} al ${fFin}</td>
+                    <td>${j.motivo || 'N/A'}</td>
+                    <td>${fSubida}</td>
+                    <td><a href="${j.archivo_path}" class="action-btn" target="_blank" rel="noopener noreferrer">Ver/Descargar</a></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        } catch (error) {
+            tbody.innerHTML = `<tr><td colspan="5">Error al cargar los justificantes: ${error.message}</td></tr>`;
+        }
+      }
+
+
 
 // --- ESTA FUNCIÓN FALTABA ---
 async function handleDeleteVacation(event) {
@@ -1189,6 +1244,7 @@ async function ajustarDiasCompensatorios(userId, userName, currentDays) {
         poblarSelectorUsuarios("manualUsuario");
         poblarSelectorUsuarios("vacacionesUsuario");
         cargarSolicitudesPendientes();
+        cargarJustificantes();
         inicializarCalendario();
 
         const fechaInicioInput = document.getElementById("fechaInicio"),

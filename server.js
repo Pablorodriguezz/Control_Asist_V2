@@ -420,6 +420,66 @@ app.get('/api/dashboard', authenticateToken, async (req, res) => {
 });
 
 
+// --- NUEVO: RUTAS PARA GESTIÓN DE JUSTIFICANTES ---
+app.post('/api/justificantes', authenticateToken, upload.single('justificante'), async (req, res) => {
+    const { fechaInicio, fechaFin, motivo } = req.body;
+    const usuario_id = req.user.id;
+
+    if (!req.file) {
+        return res.status(400).json({ message: 'El archivo del justificante es obligatorio.' });
+    }
+    if (!fechaInicio || !fechaFin) {
+        return res.status(400).json({ message: 'Las fechas de inicio y fin son obligatorias.' });
+    }
+
+    try {
+        const fileExtension = path.extname(req.file.originalname);
+        const fileName = `${crypto.randomBytes(16).toString('hex')}${fileExtension}`;
+
+        const putCommand = new PutObjectCommand({
+            Bucket: process.env.R2_BUCKET_NAME,
+            Key: fileName,
+            Body: req.file.buffer,
+            ContentType: req.file.mimetype
+        });
+        await s3Client.send(putCommand);
+        
+        const archivo_path = `${process.env.R2_PUBLIC_URL}/${fileName}`;
+
+        const sql = `
+            INSERT INTO justificantes (usuario_id, fecha_inicio, fecha_fin, motivo, archivo_path) 
+            VALUES ($1, $2, $3, $4, $5)
+        `;
+        await db.query(sql, [usuario_id, fechaInicio, fechaFin, motivo, archivo_path]);
+
+        res.status(201).json({ message: 'Justificante subido correctamente.' });
+    } catch (err) {
+        console.error("Error al subir el justificante:", err);
+        res.status(500).json({ message: 'Error del servidor al procesar el justificante.' });
+    }
+});
+
+app.get('/api/justificantes', authenticateToken, async (req, res) => {
+    if (req.user.rol !== 'admin') {
+        return res.status(403).json({ message: 'Acceso denegado.' });
+    }
+
+    try {
+        const sql = `
+            SELECT j.id, u.nombre AS nombre_empleado, j.fecha_inicio, j.fecha_fin, j.motivo, j.archivo_path, j.fecha_subida
+            FROM justificantes j
+            JOIN usuarios u ON j.usuario_id = u.id
+            ORDER BY j.fecha_subida DESC
+        `;
+        const { rows } = await db.query(sql);
+        res.json(rows);
+    } catch (err) {
+        console.error("Error al obtener justificantes:", err);
+        res.status(500).json({ message: 'Error del servidor.' });
+    }
+});
+
+
 // =================================================================
 // RUTAS PARA GESTIÓN DE VACACIONES (MODIFICADAS)
 // =================================================================

@@ -105,30 +105,51 @@
             </section>
         </div>
 
-        <!-- PESTAÑA 4: SOLICITUDES (NUEVA) -->
-<div id="solicitudes-content" class="tab-content">
-    <section class="solicitudes-section">
-        <h2>Solicitar Vacaciones</h2>
-        <p id="info-dias-solicitud" class="vacation-counter">Cargando días...</p>
-        <form id="solicitarVacacionesForm">
-            <label for="fechaInicioSolicitud">Fecha de Inicio:</label>
-            <input type="date" id="fechaInicioSolicitud" required>
-            <label for="fechaFinSolicitud">Fecha de Fin:</label>
-            <input type="date" id="fechaFinSolicitud" required>
-            <button type="submit">Enviar Solicitud</button>
-        </form>
-    </section>
-    <hr>
-    <section>
-        <h2>Estado de mis Solicitudes</h2>
-        <div class="table-container">
-            <table id="misSolicitudesTable">
-                <thead><tr><th>Periodo</th><th>Estado</th></tr></thead>
-                <tbody></tbody>
-            </table>
+        <!-- PESTAÑA 4: SOLICITUDES -->
+        <div id="solicitudes-content" class="tab-content">
+            <section class="solicitudes-section">
+                <h2>Solicitar Vacaciones</h2>
+                <p id="info-dias-solicitud" class="vacation-counter">Cargando días...</p>
+                <form id="solicitarVacacionesForm">
+                    <label for="fechaInicioSolicitud">Fecha de Inicio:</label>
+                    <input type="date" id="fechaInicioSolicitud" required>
+                    <label for="fechaFinSolicitud">Fecha de Fin:</label>
+                    <input type="date" id="fechaFinSolicitud" required>
+                    <button type="submit">Enviar Solicitud</button>
+                </form>
+            </section>
+            <hr>
+            <section>
+                <h2>Estado de mis Solicitudes</h2>
+                <div class="table-container">
+                    <table id="misSolicitudesTable">
+                        <thead><tr><th>Periodo</th><th>Estado</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </section>
+            
+            <!-- --- NUEVO: SECCIÓN PARA SUBIR JUSTIFICANTE --- -->
+            <hr>
+            <section id="subir-justificante" class="solicitudes-section">
+                <h2><i class="bi bi-file-earmark-medical"></i> Enviar Justificante Médico</h2>
+                <form id="formJustificante">
+                    <label for="fechaInicioJustificante">Fecha de Inicio de la Ausencia:</label>
+                    <input type="date" id="fechaInicioJustificante" required>
+
+                    <label for="fechaFinJustificante">Fecha de Fin de la Ausencia:</label>
+                    <input type="date" id="fechaFinJustificante" required>
+
+                    <label for="motivoJustificante">Motivo (opcional):</label>
+                    <textarea id="motivoJustificante" placeholder="Ej: Visita médica, baja por enfermedad..."></textarea>
+
+                    <label for="archivoJustificante">Seleccionar Archivo (PDF, JPG, PNG):</label>
+                    <input type="file" id="archivoJustificante" accept=".pdf,.jpg,.jpeg,.png" required>
+
+                    <button type="submit">Enviar Justificante</button>
+                </form>
+            </section>
         </div>
-    </section>
-</div>
     </main>
     
     <!-- ===== BARRA DE NAVEGACIÓN INFERIOR ===== -->
@@ -142,7 +163,7 @@
     <div id="cameraModal" class="modal"><div class="modal-content"><h2>Sonríe para la foto</h2><video id="video" autoplay playsinline></video><p>Tomando foto en 3 segundos...</p></div></div>
     <canvas id="canvas" style="display:none;"></canvas>
 
-        <script>
+    <script>
         const token = localStorage.getItem('token');
         if (!token) window.location.href = '/index.html';
 
@@ -151,7 +172,6 @@
         let stream;
         let miCalendario;
 
-        // --- NUEVA FUNCIÓN ---
         function calcularDiasLaborables(fechaInicio, fechaFin) {
             const inicio = new Date(fechaInicio);
             const fin = new Date(fechaFin);
@@ -159,7 +179,7 @@
             const curDate = new Date(inicio.getTime());
             while (curDate <= fin) {
                 const dayOfWeek = curDate.getDay();
-                if (dayOfWeek !== 0 && dayOfWeek !== 6) { // 0 = Domingo, 6 = Sábado
+                if (dayOfWeek !== 0 && dayOfWeek !== 6) {
                     count++;
                 }
                 curDate.setDate(curDate.getDate() + 1);
@@ -174,9 +194,7 @@
             }).then((result) => { if (result.isConfirmed) logout(); });
         }
         function logout() { localStorage.removeItem('token'); window.location.href = '/index.html'; }
-
         
-
         async function cargarHistorialCompleto() {
             const mesValue = document.getElementById('selectMesHistorial').value;
             if (!mesValue) return;
@@ -213,7 +231,6 @@
                 const res = await fetch('/api/mis-vacaciones-restantes', { headers: { 'Authorization': `Bearer ${token}` } });
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.message);
-                 // MODIFICADO: Claridad en el texto
                 infoP.innerHTML = `Disponibles (laborables): <span class="dias-restantes">${data.diasRestantes}</span> / ${data.diasTotales} (Gastados: ${data.diasGastados})`;
             } catch (error) {
                 console.error('Error al cargar el contador de vacaciones:', error);
@@ -245,33 +262,33 @@
             });
             miCalendario.render();
         }
-        // --- ESTA FUNCIÓN COMPLETA FUE RESTAURADA ---
-async function cargarDatosSolicitudes() {
-    const infoP = document.getElementById('info-dias-solicitud');
-    const tbody = document.querySelector("#misSolicitudesTable tbody");
-    infoP.textContent = 'Cargando...';
-    tbody.innerHTML = '<tr><td colspan="2">Cargando...</td></tr>';
-    try {
-        const [resDias, resSol] = await Promise.all([
-            fetch('/api/mis-vacaciones-restantes', { headers: { Authorization: `Bearer ${token}` } }),
-            fetch('/api/mis-solicitudes', { headers: { Authorization: `Bearer ${token}` } })
-        ]);
+        
+        async function cargarDatosSolicitudes() {
+            const infoP = document.getElementById('info-dias-solicitud');
+            const tbody = document.querySelector("#misSolicitudesTable tbody");
+            infoP.textContent = 'Cargando...';
+            tbody.innerHTML = '<tr><td colspan="2">Cargando...</td></tr>';
+            try {
+                const [resDias, resSol] = await Promise.all([
+                    fetch('/api/mis-vacaciones-restantes', { headers: { Authorization: `Bearer ${token}` } }),
+                    fetch('/api/mis-solicitudes', { headers: { Authorization: `Bearer ${token}` } })
+                ]);
 
-        const dataDias = await resDias.json();
-        infoP.innerHTML = `Disponibles (laborables): <span class="dias-restantes">${dataDias.diasRestantes.toFixed(1)}</span> / ${dataDias.diasTotales.toFixed(1)}`;
-        const dataSol = await resSol.json();
-        tbody.innerHTML = "";
-        if (dataSol.length > 0) {
-            dataSol.forEach(sol => {
-                const tr = document.createElement('tr');
-                const fInicio = new Date(sol.fecha_inicio).toLocaleDateString('es-ES');
-                const fFin = new Date(sol.fecha_fin).toLocaleDateString('es-ES');
-                tr.innerHTML = `<td>Del ${fInicio} al ${fFin}</td><td><span class="status-${sol.estado}">${sol.estado}</span></td>`;
-                tbody.appendChild(tr);
-            });
-        } else { tbody.innerHTML = '<tr><td colspan="2">No tienes solicitudes.</td></tr>'; }
-    } catch (error) { console.error('Error cargando solicitudes:', error); }
-}
+                const dataDias = await resDias.json();
+                infoP.innerHTML = `Disponibles (laborables): <span class="dias-restantes">${dataDias.diasRestantes.toFixed(1)}</span> / ${dataDias.diasTotales.toFixed(1)}`;
+                const dataSol = await resSol.json();
+                tbody.innerHTML = "";
+                if (dataSol.length > 0) {
+                    dataSol.forEach(sol => {
+                        const tr = document.createElement('tr');
+                        const fInicio = new Date(sol.fecha_inicio).toLocaleDateString('es-ES');
+                        const fFin = new Date(sol.fecha_fin).toLocaleDateString('es-ES');
+                        tr.innerHTML = `<td>Del ${fInicio} al ${fFin}</td><td><span class="status-${sol.estado}">${sol.estado}</span></td>`;
+                        tbody.appendChild(tr);
+                    });
+                } else { tbody.innerHTML = '<tr><td colspan="2">No tienes solicitudes.</td></tr>'; }
+            } catch (error) { console.error('Error cargando solicitudes:', error); }
+        }
 
         async function inicializarPanel() {
              try {
@@ -310,7 +327,6 @@ async function cargarDatosSolicitudes() {
                 
                 if (dataVac.fechaContratacion) {
                     const container = document.getElementById('seniority-container');
-                    // Usamos el objeto global 'luxon' que ahora está disponible
                     const start = luxon.DateTime.fromISO(dataVac.fechaContratacion);
                     const now = luxon.DateTime.now();
                     const diff = now.diff(start, ['years', 'months', 'days']).toObject();
@@ -334,7 +350,8 @@ async function cargarDatosSolicitudes() {
                     ultimoFichajeDiv.innerHTML = '<p>No hay información disponible</p>';
                 }
             } catch (error) { console.error('Error cargando datos de inicio:', error); }
-        }       async function enviarFichaje(formData) {
+        }       
+        async function enviarFichaje(formData) {
             const tipo = formData.get('tipo'); const button = tipo === 'entrada' ? btnEntrada : btnSalida;
             button.innerHTML = '<div class="loader"></div>'; button.disabled = true;
             try {
@@ -373,7 +390,6 @@ async function cargarDatosSolicitudes() {
                 });
             });
 
-            // --- MODIFICADO: Event listener para el formulario de solicitud con validación de días laborables ---
             document.getElementById('solicitarVacacionesForm').addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const fechaInicio = document.getElementById('fechaInicioSolicitud').value;
@@ -384,7 +400,6 @@ async function cargarDatosSolicitudes() {
                     return;
                 }
 
-                // --- ¡VALIDACIÓN ACTUALIZADA EN EL FRONTEND! ---
                 const diasLaborablesSeleccionados = calcularDiasLaborables(fechaInicio, fechaFin);
                 if (diasLaborablesSeleccionados < 5) {
                     Swal.fire({
@@ -422,6 +437,44 @@ async function cargarDatosSolicitudes() {
                 } finally {
                     btn.disabled = false;
                     btn.textContent = 'Enviar Solicitud';
+                }
+            });
+
+            // --- NUEVO: EVENT LISTENER PARA EL FORMULARIO DE JUSTIFICANTE ---
+            document.getElementById('formJustificante').addEventListener('submit', async (e) => {
+                e.preventDefault();
+
+                const form = e.target;
+                const formData = new FormData();
+
+                formData.append('fechaInicio', form.fechaInicioJustificante.value);
+                formData.append('fechaFin', form.fechaFinJustificante.value);
+                formData.append('motivo', form.motivoJustificante.value);
+                formData.append('justificante', form.archivoJustificante.files[0]);
+
+                Swal.fire({
+                    title: 'Subiendo justificante...',
+                    text: 'Por favor, espera.',
+                    allowOutsideClick: false,
+                    didOpen: () => {
+                        Swal.showLoading();
+                    }
+                });
+
+                try {
+                    const res = await fetch('/api/justificantes', {
+                        method: 'POST',
+                        headers: { 'Authorization': `Bearer ${token}` },
+                        body: formData
+                    });
+
+                    const data = await res.json();
+                    if (!res.ok) throw new Error(data.message);
+
+                    Swal.fire('¡Éxito!', 'Tu justificante ha sido enviado correctamente.', 'success');
+                    form.reset();
+                } catch (error) {
+                    Swal.fire('Error', `No se pudo enviar el justificante: ${error.message}`, 'error');
                 }
             });
 
