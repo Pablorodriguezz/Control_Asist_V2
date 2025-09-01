@@ -267,13 +267,19 @@ app.delete('/api/usuarios/:id', authenticateToken, async (req, res) => {
 app.put('/api/registros/:id', authenticateToken, async (req, res) => {
     if (req.user.rol !== 'admin') return res.status(403).json({ message: 'Acceso denegado.' });
     const { nuevaFechaHora, motivo } = req.body;
+    const timeZone = 'Europe/Madrid';
+    const fechaCorregida = DateTime.fromISO(nuevaFechaHora, { zone: timeZone }).toJSDate();
     try {
-        const registroOriginal = await db.query('SELECT fecha_hora FROM registros WHERE id = $1', [req.params.id]);
+         const registroOriginal = await db.query('SELECT fecha_hora FROM registros WHERE id = $1', [req.params.id]);
         if (registroOriginal.rows.length === 0) return res.status(404).json({ message: 'Registro no encontrado.' });
+        
         const sql = `UPDATE registros SET fecha_hora = $1, es_modificado = TRUE, fecha_hora_original = $2, modificado_por_admin_id = $3, fecha_modificacion = $4, motivo_modificacion = $5 WHERE id = $6`;
-        await db.query(sql, [new Date(nuevaFechaHora), registroOriginal.rows[0].fecha_hora, req.user.id, new Date(), motivo, req.params.id]);
+        // Usamos la fecha corregida en la consulta
+        await db.query(sql, [fechaCorregida, registroOriginal.rows[0].fecha_hora, req.user.id, new Date(), motivo, req.params.id]);
+        
         res.json({ message: 'Registro actualizado.' });
-    } catch(err) { res.status(500).json({ message: 'Error al actualizar registro.' }); }
+    } catch(err) { console.error("Error al actualizar registro:", err); // Añadido para mejor depuración
+        res.status(500).json({ message: 'Error al actualizar registro.' });  }
 });
 app.delete('/api/registros/:id', authenticateToken, async (req, res) => {
     if (req.user.rol !== 'admin') return res.status(403).json({ message: 'Acceso denegado.' });
@@ -286,11 +292,22 @@ app.delete('/api/registros/:id', authenticateToken, async (req, res) => {
 app.post('/api/fichaje-manual', authenticateToken, async (req, res) => {
     if (req.user.rol !== 'admin') return res.status(403).json({ message: 'Acceso denegado.' });
     const { usuarioId, fechaHora, tipo, motivo } = req.body;
+
+    // --- INICIO DE LA CORRECCIÓN ---
+    const timeZone = 'Europe/Madrid';
+    // Hacemos lo mismo que en la edición: interpretamos la fecha como hora de Madrid.
+    const fechaCorregida = DateTime.fromISO(fechaHora, { zone: timeZone }).toJSDate();
+    // --- FIN DE LA CORRECCIÓN ---
+
     const sql = `INSERT INTO registros (usuario_id, fecha_hora, tipo, foto_path, es_modificado, fecha_hora_original, modificado_por_admin_id, fecha_modificacion, motivo_modificacion) VALUES ($1, $2, $3, $4, TRUE, NULL, $5, $6, $7)`;
     try {
-        await db.query(sql, [usuarioId, new Date(fechaHora), tipo, null, req.user.id, new Date(), `Creación manual: ${motivo}`]);
+        // Usamos la fecha corregida
+        await db.query(sql, [usuarioId, fechaCorregida, tipo, null, req.user.id, new Date(), `Creación manual: ${motivo}`]);
         res.status(201).json({ message: 'Fichaje manual creado.' });
-    } catch(err) { res.status(500).json({ message: 'Error al crear fichaje manual.' }); }
+    } catch(err) { 
+        console.error("Error al crear fichaje manual:", err); // Añadido para mejor depuración
+        res.status(500).json({ message: 'Error al crear fichaje manual.' }); 
+    }
 });
 app.get('/api/informe-mensual', authenticateToken, async (req, res) => {
     if (req.user.rol !== 'admin') return res.status(403).json({ message: 'Acceso denegado.' });
