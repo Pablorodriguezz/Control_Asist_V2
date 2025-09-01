@@ -7,7 +7,8 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { Parser } = require('json2csv');
 const { DateTime } = require('luxon');
-const { S3Client, PutObjectCommand } = require("@aws-sdk/client-s3");
+// --- LÍNEA CORREGIDA ---
+const { S3Client, PutObjectCommand, DeleteObjectCommand } = require("@aws-sdk/client-s3");
 const crypto = require('crypto');
 
 // En server.js, pégalo después de la línea de 'crypto'
@@ -420,7 +421,7 @@ app.get('/api/dashboard', authenticateToken, async (req, res) => {
 });
 
 
-// --- NUEVO: RUTAS PARA GESTIÓN DE JUSTIFICANTES ---
+// --- RUTAS PARA GESTIÓN DE JUSTIFICANTES ---
 app.post('/api/justificantes', authenticateToken, upload.single('justificante'), async (req, res) => {
     const { fechaInicio, fechaFin, motivo } = req.body;
     const usuario_id = req.user.id;
@@ -547,6 +548,7 @@ app.delete('/api/justificantes/:id', authenticateToken, async (req, res) => {
         res.status(500).json({ message: 'Error del servidor.' });
     }
 });
+
 
 // =================================================================
 // RUTAS PARA GESTIÓN DE VACACIONES (MODIFICADAS)
