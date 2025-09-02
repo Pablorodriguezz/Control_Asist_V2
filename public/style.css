@@ -410,27 +410,30 @@ hr { border: none; border-top: 1px solid #eee; margin: 25px 0; }
     border-top: 1px solid #34495e;
 }
 
-/* --- ESTILOS PARA EL BOTÓN DE VER CONTRASEÑA EN EL LOGIN --- */
-
+/* 1. El contenedor debe ser un bloque de posicionamiento */
 .password-wrapper {
-    position: relative;
+    position: relative; /* ¡Esto es crucial! */
     width: 100%;
+    margin-bottom: 15px; /* Mantiene el espaciado entre campos */
 }
 
-.password-wrapper input[type="password"],
-.password-wrapper input[type="text"] {
-    /* Añadimos espacio a la derecha para que el texto no se solape con el icono */
-    padding-right: 45px;
+/* 2. El input dentro del wrapper ya no necesita margen inferior */
+.password-wrapper input {
+    margin-bottom: 0; /* Quitamos el margen para que no afecte al contenedor */
+    /* Añadimos padding a la derecha para que el texto no se escriba encima del icono */
+    padding-right: 45px !important;
 }
 
+/* 3. El icono (ojo) se posiciona de forma absoluta DENTRO del wrapper */
 .password-wrapper #togglePassword {
     position: absolute;
     top: 50%;
     right: 15px;
-    transform: translateY(-50%);
+    transform: translateY(-50%); /* Centrado vertical perfecto */
     cursor: pointer;
-    color: var(--text-color-secondary);
+    color: #888; /* Un color gris estándar */
     font-size: 1.2rem;
+    z-index: 2; /* Asegura que esté por encima del input */
 }
 
 }
