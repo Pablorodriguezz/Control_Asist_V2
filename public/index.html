@@ -21,13 +21,16 @@
             required
             autocomplete="username"
           />
-          <input
-            type="password"
-            id="password"
-            placeholder="Contraseña"
-            required
-            autocomplete="current-password"
-          />
+          <div class="password-wrapper">
+  <input
+    type="password"
+    id="password"
+    placeholder="Contraseña"
+    required
+    autocomplete="current-password"
+  />
+  <i class="bi bi-eye-slash-fill" id="togglePassword"></i>
+</div>
           <button type="submit" class="btn-principal">Entrar</button>
         </form>
         <hr style="margin: 20px 0" />
@@ -98,6 +101,24 @@
       const btnFichajeRapido = document.getElementById("btnFichajeRapido");
       const btnVolverLogin = document.getElementById("btnVolverLogin");
       const listaEmpleadosDiv = document.getElementById("listaEmpleados");
+
+            // =======================================================
+      // === NUEVA LÓGICA PARA MOSTRAR/OCULTAR CONTRASEÑA ===
+      // =======================================================
+      const togglePassword = document.querySelector('#togglePassword');
+      const passwordInput = document.querySelector('#password');
+
+      if (togglePassword && passwordInput) {
+        togglePassword.addEventListener('click', function () {
+            // Cambia el tipo del input (de password a text o viceversa)
+            const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+            passwordInput.setAttribute('type', type);
+            
+            // Cambia el icono del ojo
+            this.classList.toggle('bi-eye-slash-fill');
+            this.classList.toggle('bi-eye-fill');
+        });
+      }
 
       // Evento para mostrar la pantalla de fichaje rápido
       btnFichajeRapido.addEventListener("click", async () => {

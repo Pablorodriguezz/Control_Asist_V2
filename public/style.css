@@ -409,4 +409,28 @@ hr { border: none; border-top: 1px solid #eee; margin: 25px 0; }
     margin-top: auto;
     border-top: 1px solid #34495e;
 }
+
+/* --- ESTILOS PARA EL BOTÓN DE VER CONTRASEÑA EN EL LOGIN --- */
+
+.password-wrapper {
+    position: relative;
+    width: 100%;
+}
+
+.password-wrapper input[type="password"],
+.password-wrapper input[type="text"] {
+    /* Añadimos espacio a la derecha para que el texto no se solape con el icono */
+    padding-right: 45px;
+}
+
+.password-wrapper #togglePassword {
+    position: absolute;
+    top: 50%;
+    right: 15px;
+    transform: translateY(-50%);
+    cursor: pointer;
+    color: var(--text-color-secondary);
+    font-size: 1.2rem;
+}
+
 }
