@@ -602,6 +602,8 @@
             item.classList.add("active");
             if (targetId === "historial-content") {
               cargarHistorialCompleto();
+            } else if (targetId === "nominas-content") { // <-- AÑADE ESTA LÍNEA
+              cargarNominas();                        // <-- Y ESTA OTRA
             } else if (targetId === "calendario-content") {
               cargarContadorVacaciones();
               if (!miCalendario) {
@@ -727,12 +729,33 @@
             }
           });
 
-        // JavaScript para panel.html (pegar dentro del script)
-        async function cargarNominas() {
-          /* ... (código de la respuesta anterior) ... */
+              async function cargarNominas() {
+        const tbody = document.querySelector("#misNominasTable tbody");
+        tbody.innerHTML = '<tr><td colspan="2">Cargando tus nóminas...</td></tr>';
+        try {
+            const res = await fetch('/api/mis-nominas', { headers: { Authorization: `Bearer ${token}` } });
+            const nominas = await res.json();
+            if (!res.ok) throw new Error(nominas.message);
+
+            tbody.innerHTML = '';
+            if (nominas.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="2">Aún no tienes nóminas disponibles.</td></tr>';
+                return;
+            }
+
+            const meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+            nominas.forEach(n => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${meses[n.mes - 1]} ${n.anio}</td>
+                    <td><a href="${n.archivo_path}" class="action-btn btn-download" target="_blank" download>Descargar <i class="bi bi-download"></i></a></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        } catch (error) {
+            tbody.innerHTML = `<tr><td colspan="2">Error al cargar las nóminas.</td></tr>`;
         }
-        // Y modifica el event listener de las pestañas para incluir:
-        // else if (targetId === 'nominas-content') { cargarNominas(); }
+      }
 
         function inicializarPaginaEmpleado() {
           const hoy = new Date();
