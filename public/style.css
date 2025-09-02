@@ -1,342 +1,496 @@
 /* =================================
-   ESTILOS GENERALES Y RESET BÁSICO
+   ESTILOS GENERALES Y MOBILE FIRST
    ================================= */
 
-/* --- NUEVA PALETA DE COLORES PARA EL PANEL DE ADMIN --- */
+/* --- PALETA DE COLORES ROSADOS --- */
 :root {
-  /* Paleta principal (Profesional/Azul) */
-  --admin-primary: #3498db;
-  --admin-primary-dark: #2980b9;
-  --admin-sidebar-bg: #2c3e50;
-  --admin-sidebar-text: #ecf0f1;
-  --admin-sidebar-text-hover: #ffffff;
-  --admin-sidebar-active-bg: #34495e;
-  
-  /* Paleta semántica */
-  --admin-success: #2ecc71;
-  --admin-danger: #e74c3c;
-  --admin-warning: #f39c12;
-  --admin-info: #3498db;
-
-  /* Fondos y bordes */
-  --admin-bg-light: #f4f6f9;
-  --admin-card-bg: #ffffff;
-  --admin-border-color: #e9ecef;
-
-  /* Textos */
-  --admin-text-primary: #34495e;
-  --admin-text-secondary: #7f8c8d;
-}
-
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
+  --primary-color: #e91e63; /* Rosa principal */
+  --primary-dark: #c2185b;  /* Rosa oscuro para hover/active */
+  --secondary-color: #fce4ec; /* Rosa muy claro para fondos */
+  --background-color: #f4f6f9; /* Un gris muy claro de fondo */
+  --text-color-primary: #333;
+  --text-color-secondary: #888;
+  --success-color: #4caf50;
+  --danger-color: #f44336;
 }
 
 html {
-  scroll-behavior: smooth;
-  scroll-padding-top: 20px;
+    scroll-behavior: smooth;
+    scroll-padding-top: 80px; /* Espacio para el header fijo */
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  color: var(--admin-text-primary);
-  background-color: var(--admin-bg-light);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    margin: 0;
+    color: var(--text-color-primary);
+    background-color: var(--background-color);
+    padding-bottom: 80px; /* Espacio para la barra de navegación inferior */
+}
+
+.container {
+    background-color: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    padding: 20px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.1);
+    width: 90%;
+    max-width: 900px;
+    text-align: center;
+    margin: 20px auto;
 }
 
 /* =================================
-   ESTRUCTURA PRINCIPAL DEL LAYOUT
+   ESTILOS PARA EL PANEL DE EMPLEADO (DISEÑO MyEra)
    ================================= */
-.admin-layout {
-  display: grid;
-  grid-template-columns: 260px 1fr; /* Sidebar fija y contenido flexible */
-  min-height: 100vh;
-}
 
 .main-content {
-  padding: 30px;
+    width: 100%;
+    max-width: 500px;
+    padding-top: 70px;
+    margin: 0 auto;
+    padding-left: 15px;
+    padding-right: 15px;
+    box-sizing: border-box;
 }
 
-/* =================================
-   ESTILOS DE LA BARRA LATERAL (SIDEBAR)
-   ================================= */
-.sidebar {
-  background-color: var(--admin-sidebar-bg);
-  color: var(--admin-sidebar-text);
-  display: flex;
-  flex-direction: column;
-  position: sticky;
-  top: 0;
-  height: 100vh;
+.main-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 20px;
+    background-color: rgba(244, 246, 249, 0.8);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    z-index: 900;
+    border-bottom: 1px solid #e0e0e0;
+    box-sizing: border-box;
+}
+.logo-container { display: flex; align-items: center; }
+.header-logo { height: 40px; margin-right: 12px; }
+.header-title { font-weight: bold; color: var(--text-color-primary); }
+.profile-btn {
+    background: none; border: none; font-size: 28px; padding: 0;
+    color: var(--primary-color);
 }
 
-.sidebar-header {
-  padding: 20px;
-  text-align: center;
-  border-bottom: 1px solid var(--admin-sidebar-active-bg);
-}
-.sidebar-title {
-    font-size: 1.5rem;
-    color: #fff;
-    border: none; /* Resetear estilos de h2 */
+h1, h2 {
+    font-size: 1.2rem;
+    color: var(--text-color-primary);
+    margin-bottom: 15px;
+    border: none;
+    text-align: left;
     padding: 0;
-    text-align: center;
-}
-.sidebar-header span {
-  font-size: 0.9rem;
-  color: var(--admin-text-secondary);
+    border-bottom: 2px solid var(--primary-color);
+    padding-bottom: 10px;
 }
 
-.sidebar-nav {
-  flex-grow: 1; /* Ocupa el espacio disponible */
-  overflow-y: auto;
-}
-.sidebar-nav ul {
-  list-style-type: none;
-}
-.sidebar-nav li a {
-  display: flex;
-  align-items: center;
-  gap: 15px;
-  padding: 15px 20px;
-  color: var(--admin-sidebar-text);
-  text-decoration: none;
-  font-weight: 500;
-  transition: background-color 0.2s, color 0.2s;
-  border-left: 4px solid transparent;
-}
-.sidebar-nav li a:hover {
-  background-color: var(--admin-sidebar-active-bg);
-  color: var(--admin-sidebar-text-hover);
-}
-.sidebar-nav li a:hover, .sidebar-nav li a:focus {
-    border-left-color: var(--admin-primary);
-}
-.sidebar-nav i {
-  font-size: 1.2rem;
-  width: 20px; /* Alineación de iconos */
-  text-align: center;
-}
-.sidebar-footer {
-  padding: 20px;
-  border-top: 1px solid var(--admin-sidebar-active-bg);
-}
+h2 { font-size: 1.2rem; border-bottom: none; }
 
-/* =================================
-   ESTILOS DE "TARJETAS" PARA SECCIONES
-   ================================= */
-.admin-card {
-  background-color: var(--admin-card-bg);
-  border-radius: 12px;
-  padding: 25px;
-  margin-bottom: 30px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-}
-
-.admin-card h2 {
-  font-size: 1.3rem;
-  color: var(--admin-text-primary);
-  margin-top: 0;
-  margin-bottom: 20px;
-  padding-bottom: 10px;
-  border: none;
-  border-bottom: 1px solid var(--admin-border-color);
-  text-align: left;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.admin-card h2 i {
-  color: var(--admin-primary);
-}
-
-
-/* =================================
-   COMPONENTES REUTILIZABLES (BOTONES, INPUTS, TABLAS)
-   ================================= */
-
-/* --- Inputs y Formularios --- */
 label {
-  display: block;
-  margin-bottom: 8px;
-  font-weight: 600;
-  text-align: left;
-  color: #555;
-  font-size: 0.9rem;
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+    text-align: left;
+    color: #555;
 }
 input[type="date"], input[type="text"], input[type="password"], input[type="month"], input[type="datetime-local"], textarea, select {
-  width: 100%;
-  padding: 12px;
-  margin-bottom: 15px;
-  border: 1px solid #ccc;
-  border-radius: 8px;
-  font-size: 1rem;
-  box-sizing: border-box;
-  transition: border-color 0.2s, box-shadow 0.2s;
-}
-input:focus, select:focus, textarea:focus {
-    outline: none;
-    border-color: var(--admin-primary);
-    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.2);
-}
-
-/* --- Botones --- */
-.btn {
-  padding: 12px 20px;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 1rem;
-  font-weight: bold;
-  transition: all 0.2s;
-  text-decoration: none;
-  display: inline-block;
-  margin-right: 5px;
-}
-.btn:hover { transform: translateY(-1px); box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
-.btn:disabled { cursor: not-allowed; opacity: 0.7; transform: none; box-shadow: none; }
-.btn-full-width { width: 100%; }
-
-.btn-primary { background-color: var(--admin-primary); color: white; }
-.btn-secondary { background-color: #ecf0f1; color: var(--admin-text-primary); }
-.btn-success { background-color: var(--admin-success); color: white; }
-.btn-danger { background-color: var(--admin-danger); color: white; }
-.btn-warning { background-color: var(--admin-warning); color: white; }
-.btn-info { background-color: var(--admin-info); color: white; }
-
-.logout-btn { /* Botón de la sidebar */
     width: 100%;
     padding: 12px;
-    background-color: transparent;
-    border: 1px solid var(--admin-danger);
-    color: var(--admin-danger);
-    font-size: 1rem;
-    cursor: pointer;
+    margin-bottom: 15px;
+    border: 1px solid #ccc;
     border-radius: 8px;
-    transition: all 0.2s;
+    font-size: 16px;
+    box-sizing: border-box;
 }
-.logout-btn:hover { background-color: var(--admin-danger); color: white; }
-
-/* --- Tablas --- */
-.table-container { overflow-x: auto; }
-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-th, td { border: 1px solid var(--admin-border-color); padding: 12px 15px; text-align: left; vertical-align: middle; }
-thead th { 
-    background-color: #f8f9fa;
-    font-weight: 600;
-    color: var(--admin-text-primary);
-}
-tbody tr:nth-child(even) { background-color: #fdfdfd; }
-tbody tr:hover { background-color: #f1f5f9; }
-.photo-thumbnail { width: 40px; height: 40px; object-fit: cover; border-radius: 50%; }
-
-/* Clases de botones de acciones en tablas */
-td .btn { font-size: 12px; padding: 6px 10px; }
-
-
-/* =================================
-   ESTILOS ESPECÍFICOS POR SECCIÓN
-   ================================= */
-
-/* --- Dashboard --- */
-.dashboard-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 20px;
-}
-.widget {
-  background-color: #f8f9fa;
-  border: 1px solid var(--admin-border-color);
-  border-left: 4px solid var(--admin-primary);
-  border-radius: 8px;
-  padding: 20px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.03);
-}
-.widget h3 {
-  font-size: 1.1rem;
-  color: var(--admin-text-primary);
-  border: none; padding: 0;
-  margin-top: 0; margin-bottom: 15px;
-  display: flex; align-items: center;
-}
-.widget h3 i { margin-right: 10px; color: var(--admin-text-secondary); font-size: 1.3rem; }
-.widget p { font-size: 1rem; color: #555; line-height: 1.6; }
-.widget p span { font-weight: bold; color: var(--admin-text-primary); }
-.employee-list {
-  list-style-type: none;
-  max-height: 200px;
-  overflow-y: auto;
-}
-.employee-list li { padding: 8px 5px; border-bottom: 1px solid var(--admin-border-color); font-size: 0.95rem; }
-.employee-list li:last-child { border-bottom: none; }
-.employee-list li:empty::before { content: "No hay datos."; color: #999; font-style: italic; }
-
-/* --- Calendario de Vacaciones --- */
-.calendar-container {
-    margin-top: 25px;
-    border-top: 1px solid var(--admin-border-color);
-    padding-top: 25px;
-}
-
-/* =================================
-   UTILIDADES Y OTROS
-   ================================= */
-
-#scrollTopBtn {
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    z-index: 99;
-    background-color: var(--admin-primary);
+button {
+    padding: 12px 20px;
+    border: none;
     color: white;
+    border-radius: 8px;
     cursor: pointer;
-    padding: 10px 15px;
+    font-size: 16px;
+    font-weight: bold;
+    transition: all 0.2s;
+    background-color: var(--primary-color);
+}
+button:hover { opacity: 0.85; }
+button:disabled { background-color: #85c1e9 !important; cursor: not-allowed; opacity: 0.7; }
+
+/* Widgets de Destacados */
+.widget-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+}
+.widget-card {
+    background-color: white;
+    border-radius: 12px;
+    padding: 15px;
+    text-align: center;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+.widget-value {
+    display: block;
+    font-size: 2rem;
+    font-weight: bold;
+    color: #2c3e50;
+}
+.widget-label {
+    font-size: 0.9rem;
+    color: #7f8c8d;
+}
+.seniority-card {
+    background-color: white;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    text-align: center;
+}
+
+.seniority-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 60px;
+}
+
+.seniority-value {
+    font-size: 2.2rem;
+    font-weight: 700;
+    color: var(--primary-color);
+    line-height: 1;
+}
+
+.seniority-label {
+    font-size: 0.8rem;
+    color: var(--text-color-secondary);
+    margin-top: 5px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+/* En style.css */
+
+.btn-secundario {
+    background-color: #f0f0f0;
+    color: #333;
+    border: 1px solid #ccc;
+}
+.btn-secundario:hover {
+    background-color: #e0e0e0;
+}
+
+.employee-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 15px;
+    margin-top: 20px;
+}
+
+.btn-empleado {
+    padding: 20px 10px;
+    font-size: 1rem;
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+.btn-empleado:hover {
+    background-color: var(--primary-dark);
+}
+
+/* Estilos para la pestaña de solicitudes del empleado */
+.solicitudes-section form { margin-top: 15px; }
+.status-aprobada { color: var(--success-color); font-weight: bold; }
+.status-pendiente { color: #f39c12; font-weight: bold; }
+.status-rechazada { color: var(--danger-color); font-weight: bold; text-decoration: line-through; }
+
+/* Nuevo color de botón para "Aprobar" en el panel de admin */
+.btn-success { background-color: var(--success-color); }
+
+/* Botones de Fichaje */
+.fichaje-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    max-width: 200px;
+    margin: 0 auto 20px auto;
+}
+.action-button-wrapper { text-align: center; }
+.action-button {
+    width: 60px;
+    height: 60px;
     border-radius: 50%;
-    font-size: 20px;
-    width: 50px;
-    height: 50px;
+    border: none;
     display: flex;
     justify-content: center;
     align-items: center;
+    margin: 0 auto 5px auto;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+.action-button:active { transform: scale(0.95); }
+.action-button i { font-size: 24px; color: white; }
+.action-label { font-size: 0.8rem; color: #555; }
+
+.action-button.primary.entrada { background-color: var(--success-color); }
+.action-button.primary.salida { background-color: var(--danger-color); }
+.action-button:disabled {
+    background-color: #e0e0e0 !important;
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+.action-button .loader {
+    border: 3px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    border-top: 3px solid #fff;
+    width: 24px;
+    height: 24px;
+    animation: spin 1s linear infinite;
+}
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+/* Tarjeta de Último Fichaje */
+.ultimo-fichaje-card {
+    background: white;
+    padding: 15px;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    text-align: center;
+    font-size: 1rem;
+}
+.ultimo-fichaje-card p { margin: 0; }
+.ultimo-fichaje-card i { margin-right: 10px; font-size: 1.2rem; }
+.ver-mas-link {
+    display: block;
+    text-align: right;
+    margin-top: 10px;
+    color: var(--primary-color);
+    text-decoration: none;
+    font-weight: 500;
+}
+
+/* Historial Completo */
+.historial-completo-section { margin-top: 30px; }
+.table-container { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+th, td { border: 1px solid #ddd; padding: 12px; text-align: left; vertical-align: middle; }
+th { background-color: #ecf0f1; }
+.photo-thumbnail { width: 50px; height: 50px; object-fit: cover; border-radius: 50%; }
+
+/* --- NUEVO BOTÓN DE CERRAR SESIÓN INFERIOR --- */
+.btn-logout-bottom {
+    display: block;
+    width: 100%;
+    max-width: 300px;
+    margin: 30px auto 10px auto;
+    padding: 12px;
+    background-color: var(--secondary-color);
+    color: var(--primary-color);
+    border: 1px solid var(--primary-color);
+    border-radius: 8px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.btn-logout-bottom:hover {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+/* Barra de navegación inferior */
+.bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 65px;
+    background-color: #ffffff;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    box-shadow: 0 -2px 10px rgba(0,0,0,0.08);
+    z-index: 1000;
+    padding: 0 20%;
+    box-sizing: border-box;
+}
+.nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    color: #95a5a6;
+    text-decoration: none;
+    font-size: 0.7rem;
+}
+.nav-item i { font-size: 1.5rem; margin-bottom: 2px; }
+.nav-item.active { color: var(--primary-color); }
+
+/* --- ESTILOS PARA LA PARTE DE ADMINISTRACIÓN --- */
+.admin-nav {
+    margin-bottom: 25px;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 15px;
+}
+.admin-nav ul {
+    list-style-type: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+}
+.admin-nav li a {
+    display: block;
+    background-color: #ecf0f1;
+    color: #2c3e50;
+    padding: 10px 15px;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 500;
+    font-size: 14px;
+    transition: background-color 0.2s, color 0.2s;
+    border: 1px solid #bdc3c7;
+}
+.admin-nav li a:hover, .admin-nav li a.active {
+    background-color: var(--primary-color);
+    color: white;
+    border-color: var(--primary-dark);
+}
+.logout-btn { background: none; border: none; color: var(--primary-color); cursor: pointer; text-decoration: underline; width: auto; padding: 10px; float: right; font-size: 14px; }
+.action-btn { font-size: 12px; padding: 8px 12px; width: auto; margin-right: 5px; }
+.btn-reset { background-color: #f39c12; }
+.btn-delete { background-color: var(--danger-color); }
+.btn-create { width: 100%; }
+
+/* --- ESTILOS PARA EL DASHBOARD DE ADMIN --- */
+#panel-control { text-align: left; }
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+}
+.widget {
+    background-color: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    padding: 15px 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+.widget h3 {
+    font-size: 1.1rem;
+    color: #34495e;
+    border-bottom: none;
+    margin-top: 0;
+    margin-bottom: 15px;
+    display: flex;
+    align-items: center;
+}
+.widget h3 i { margin-right: 10px; color: var(--primary-color); font-size: 1.3rem; }
+.widget p { font-size: 1rem; color: #555; line-height: 1.6; }
+.widget p span { font-weight: bold; color: #2c3e50; }
+.employee-list {
+    list-style-type: none;
+    padding: 0;
+    margin: 0;
+    max-height: 200px;
+    overflow-y: auto;
+}
+.employee-list li { padding: 8px 5px; border-bottom: 1px solid #eee; font-size: 0.95rem; }
+.employee-list li:last-child { border-bottom: none; }
+.employee-list li:empty::before { content: "No hay datos."; color: #999; font-style: italic; }
+/* Añade esto a tu style.css */
+
+/* --- ESTILOS PARA LA NAVEGACIÓN POR PESTAÑAS --- */
+.tab-content {
+    display: none; /* Oculta todas las pestañas por defecto */
+}
+.tab-content.active {
+    display: block; /* Muestra solo la pestaña activa */
+}
+
+/* En tu archivo style.css */
+.action-button.disabled {
+    background-color: #bdc3c7; /* Un color gris */
+    cursor: not-allowed; /* Cambia el cursor para indicar que no se puede hacer clic */
+    box-shadow: none;
+}
+.action-button.disabled:hover {
+    transform: none; /* Evita el efecto de hover */
+}
+
+/* Ajuste para la barra de navegación con 3 items */
+.bottom-nav {
+    padding: 0; /* Quitamos el padding anterior para que se distribuya bien */
+}
+
+/* Estilos para el contenedor del calendario */
+.calendario-section {
+    background-color: white;
+    padding: 15px;
+    border-radius: 12px;
+    margin-top: 20px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+#miCalendario {
+    margin-top: 15px;
+}
+
+/* --- UTILIDADES Y OTROS --- */
+.status-message { font-weight: bold; margin-top: 10px; padding: 10px; border-radius: 4px; }
+.success { color: #27ae60; background-color: #e9f7ef; }
+.error { color: #c0392b; background-color: #f9ebea; }
+hr { border: none; border-top: 1px solid #eee; margin: 25px 0; }
+.modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.6); justify-content: center; align-items: center; }
+.modal-content { background: white; padding: 20px; border-radius: 12px; text-align: center; }
+#video { width: 100%; max-width: 320px; border-radius: 8px; transform: scaleX(-1); }
+
+/* --- BOTÓN "VOLVER ARRIBA" --- */
+#scrollTopBtn {
+    position: fixed;
+    bottom: 85px; /* Ajustado para no superponerse con la barra inferior */
+    right: 20px;
+    z-index: 99;
+    border: none;
+    outline: none;
+    background-color: var(--primary-color);
+    color: white;
+    cursor: pointer;
+    padding: 12px 15px;
+    border-radius: 10px;
+    font-size: 18px;
+    width: auto;
     opacity: 0;
     pointer-events: none;
-    transition: opacity 0.3s, transform 0.3s;
-    border: none;
+    transition: opacity 0.3s ease-in-out;
 }
-#scrollTopBtn.show { opacity: 1; pointer-events: auto; transform: translateY(0); }
-#scrollTopBtn:hover { background-color: var(--admin-primary-dark); }
+#scrollTopBtn.show { opacity: 1; pointer-events: auto; }
+#scrollTopBtn:hover { background-color: var(--primary-dark); }
 
-/* --- Estilos SweetAlert2 --- */
-.swal2-confirm { background-color: var(--admin-primary) !important; }
+/* --- ESTILOS DE SWEETALERT2 --- */
+.swal2-confirm { background-color: var(--primary-color) !important; }
+.swal2-cancel, .swal2-deny { background-color: #aaa !important; }
 
-/* --- Media Queries para Responsive --- */
-@media (max-width: 992px) {
-    .admin-layout {
-        grid-template-columns: 1fr; /* Apila el contenido en pantallas pequeñas */
-    }
-    .sidebar {
-        position: static; /* La sidebar ya no es fija */
-        height: auto;
-        flex-direction: row; /* La hacemos horizontal */
-        flex-wrap: wrap; /* Para que los items se ajusten */
-        align-items: center;
-        justify-content: space-between;
-    }
-    .sidebar-header {
-      padding: 15px;
-      border: none;
-    }
-    .sidebar-nav {
-      /* Aquí se podría implementar un menú hamburguesa con JS,
-         pero por ahora lo ocultamos para simplificar */
-      display: none;
-    }
-    .sidebar-footer {
-        padding: 15px;
-        border: none;
+/* --- MEDIA QUERIES PARA ADAPTACIÓN --- */
+@media (min-width: 768px) {
+    .container {
+        padding: 40px;
     }
     .main-content {
-        padding: 15px;
+        max-width: 900px;
     }
+    button { width: auto; }
+    form button[type="submit"] { width: 100%; }
 }
