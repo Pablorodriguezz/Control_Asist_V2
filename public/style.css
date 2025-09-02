@@ -326,100 +326,87 @@ hr { border: none; border-top: 1px solid #eee; margin: 25px 0; }
         transform: translateX(0);
     }
     /* ================================================= */
-/* === NUEVOS ESTILOS MEJORADOS PARA NÓMINAS (ADMIN) === */
+/* ================================================= */
+/* === ESTILOS MEJORADOS PARA LA BARRA LATERAL (ADMIN) === */
 /* ================================================= */
 
-/* Contenedor principal de la sección */
-.admin-page #gestion-nominas h2 i {
-    color: var(--primary-color);
+/* Contenedor de la barra lateral */
+.admin-page .sidebar {
+    background-color: #2c3e50; /* Un azul marino oscuro y profesional */
+    color: #ecf0f1; /* Un blanco suave para el texto */
+    height: 100vh;
+    position: sticky;
+    top: 0;
+    display: flex;
+    flex-direction: column;
 }
 
-/* Estructura y diseño del formulario de subida */
-.admin-page #gestion-nominas .form-nominas {
-    background-color: #f8f9fa;
-    border: 1px solid #e9ecef;
-    border-radius: 12px;
-    padding: 25px;
-    margin-bottom: 30px;
-    display: grid;
-    grid-template-columns: 1fr 1fr; /* Dos columnas por defecto */
-    gap: 20px 25px;
+/* Cabecera con el título "Panel Admin" */
+.admin-page .sidebar-header {
+    padding: 20px;
+    text-align: center;
+    border-bottom: 1px solid #34495e; /* Una línea sutil de separación */
 }
 
-.admin-page #gestion-nominas .form-nominas h3 {
-    grid-column: 1 / -1; /* El título ocupa toda la fila */
-    margin: 0 0 10px 0;
+.admin-page .sidebar-header h1 {
+    font-size: 1.6rem;
+    color: white;
+    font-weight: 600; /* Un grosor de fuente más limpio */
     padding: 0;
     border: none;
-    font-size: 1.1rem;
-    color: var(--text-color-primary);
+    text-align: center;
+    margin: 0;
 }
 
-.admin-page .form-nominas .form-group {
-    text-align: left;
-}
-.admin-page .form-nominas .submit-group {
-    grid-column: 1 / -1; /* El botón de subir ocupa toda la fila */
-}
-.admin-page .form-nominas button[type="submit"] {
-    width: 100%;
-    padding: 14px;
+/* Estilos de la lista de navegación */
+.admin-page .sidebar .admin-nav {
+    padding: 15px 0;
+    border: none;
+    margin-bottom: 0;
+    flex-grow: 1; /* Ocupa el espacio disponible */
 }
 
-/* --- Estilos para el botón de archivo personalizado --- */
-.admin-page .file-upload-container {
+.admin-page .sidebar .admin-nav ul {
+    flex-direction: column;
+    gap: 4px; /* Un pequeño espacio entre elementos */
+}
+
+/* Estilos de cada enlace del menú */
+.admin-page .sidebar .admin-nav li a {
+    background-color: transparent;
+    border: none;
+    border-radius: 4px; /* Bordes ligeramente redondeados */
+    margin: 0 10px; /* Margen a los lados */
     display: flex;
     align-items: center;
-    gap: 15px;
-    margin-top: 5px;
+    gap: 15px; /* Espacio entre el icono y el texto */
+    color: #bdc3c7; /* Un color de texto grisáceo, menos intenso */
+    padding: 12px 15px;
+    font-size: 15px;
+    font-weight: 500; /* Un peso de fuente medio, fácil de leer */
+    text-decoration: none;
+    border-left: 4px solid transparent; /* Borde invisible para el efecto hover */
+    transition: all 0.2s ease-in-out;
 }
 
-/* Esta es la LABEL que se ve como un botón */
-.admin-page .custom-file-upload {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 10px 15px;
-    background-color: #ecf0f1;
-    color: #2c3e50;
-    border: 1px solid #bdc3c7;
-    border-radius: 8px;
-    cursor: pointer;
-    font-weight: 500;
-    font-size: 0.9rem;
-    transition: background-color 0.2s;
-    white-space: nowrap;
-}
-.admin-page .custom-file-upload:hover {
-    background-color: #dde1e2;
-}
-.admin-page .custom-file-upload i {
-    font-size: 1.1em;
+/* Efecto al pasar el ratón por encima (hover) */
+.admin-page .sidebar .admin-nav li a:hover {
+    background-color: #34495e; /* Un fondo ligeramente más claro */
+    color: white; /* El texto se vuelve blanco brillante */
+    border-left-color: var(--primary-color); /* Aparece la línea de color rosa */
 }
 
-/* Este es el SPAN que muestra el nombre del archivo */
-.admin-page .file-name-display {
-    font-size: 0.9rem;
-    color: #555;
-    font-style: italic;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis; /* Pone "..." si el nombre del archivo es muy largo */
+/* Iconos dentro de los enlaces */
+.admin-page .sidebar .admin-nav i {
+    font-size: 1.2rem;
+    width: 20px;
+    text-align: center;
 }
 
-/* Mejoras para la tabla del historial */
-.admin-page .historial-nominas h3 {
-    font-size: 1.1rem;
-    margin-bottom: 15px;
-    border-bottom: 1px solid #eee;
-    padding-bottom: 10px;
+/* Footer de la barra lateral */
+.admin-page .sidebar-footer {
+    padding: 20px;
+    margin-top: auto;
+    border-top: 1px solid #34495e;
 }
-
-/* Responsive para el formulario en pantallas pequeñas */
-@media (max-width: 768px) {
-    .admin-page #gestion-nominas .form-nominas {
-        grid-template-columns: 1fr; /* Una sola columna en móvil */
-    }
-}
-
 }
