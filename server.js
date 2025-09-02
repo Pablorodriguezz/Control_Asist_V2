@@ -734,8 +734,6 @@ app.get('/api/fix-vacation-days', authenticateToken, async(req, res) => {
     }
 });
 
-// En server.js ss
-
 // --- NUEVA RUTA: Obtener estado de fichaje para un usuario específico (pública) ---
 app.get('/api/estado-rapido', async (req, res) => {
     const { usuarioId } = req.query; // Obtenemos el ID del empleado desde la URL
@@ -759,7 +757,6 @@ app.get('/api/estado-rapido', async (req, res) => {
     }
 });
 
-// ... el resto de tu código de server.js
 
 // En server.js
 // --- LÓGICA RESTAURADA A LA VERSIÓN CORRECTA ---
