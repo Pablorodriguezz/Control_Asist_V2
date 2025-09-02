@@ -144,14 +144,38 @@
 
         <hr />
 <section id="gestion-nominas">
-  <h2>Gestión de Nóminas</h2>
+  <h2><i class="bi bi-file-earmark-text-fill"></i> Gestión de Nóminas</h2>
+
+  <!-- Formulario para subir nueva nómina -->
   <form id="formSubirNomina" class="form-nominas">
     <h3>Subir Nueva Nómina</h3>
-    <div><label for="nominaUsuario">Selecciona Empleado:</label><select id="nominaUsuario" required><option value="">-- Selecciona un trabajador --</option></select></div>
-    <div><label for="nominaMesAnio">Selecciona Mes y Año:</label><input type="month" id="nominaMesAnio" required></div>
-    <div><label for="nominaArchivo">Selecciona Archivo (PDF):</label><input type="file" id="nominaArchivo" accept=".pdf" required></div>
+    <!-- Campo Empleado -->
+    <div>
+      <label for="nominaUsuario">Selecciona Empleado</label>
+      <select id="nominaUsuario" required>
+        <option value="">-- Selecciona un trabajador --</option>
+      </select>
+    </div>
+    <!-- Campo Mes y Año -->
+    <div>
+      <label for="nominaMesAnio">Selecciona Mes y Año</label>
+      <input type="month" id="nominaMesAnio" required>
+    </div>
+    <!-- NUEVO CAMPO DE ARCHIVO PERSONALIZADO -->
+    <div class="custom-file-input-wrapper">
+      <label for="nominaArchivo">Selecciona Archivo (PDF)</label>
+      <div class="custom-file-input">
+        <!-- El input real estará oculto -->
+        <input type="file" id="nominaArchivo" accept=".pdf" required>
+        <!-- Esto es lo que el usuario verá -->
+        <span class="file-label-button"><i class="bi bi-upload"></i> Seleccionar archivo</span>
+        <span class="file-name-display">Ningún archivo seleccionado</span>
+      </div>
+    </div>
+    <!-- Botón de Envío -->
     <button type="submit">Subir Nómina</button>
   </form>
+
   <div class="historial-nominas">
     <h3>Historial de Nóminas Enviadas</h3>
     <div class="table-container"><table id="tablaNominasAdmin"><thead><tr><th>Empleado</th><th>Periodo</th><th>Nombre del Archivo</th><th>Fecha de Subida</th><th>Acciones</th></tr></thead><tbody></tbody></table></div>
@@ -1003,6 +1027,19 @@ async function ajustarDiasCompensatorios(userId, userName, currentDays) {
               });
           },
         });
+
+        const nominaArchivoInput = document.getElementById('nominaArchivo');
+      const fileNameDisplay = document.querySelector('.file-name-display');
+      if (nominaArchivoInput && fileNameDisplay) {
+          nominaArchivoInput.addEventListener('change', () => {
+              if (nominaArchivoInput.files.length > 0) {
+                  fileNameDisplay.textContent = nominaArchivoInput.files[0].name;
+              } else {
+                  fileNameDisplay.textContent = 'Ningún archivo seleccionado';
+              }
+          });
+      }
+      
         calendario.render();
       }
 
