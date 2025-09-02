@@ -1184,6 +1184,68 @@ async function ajustarDiasCompensatorios(userId, userName, currentDays) {
               return;
           }
 
+           // ===================================================
+      // === NUEVAS FUNCIONES PARA LA GESTIÓN DE NÓMINAS ===
+      // ===================================================
+      async function cargarNominasAdmin() {
+          const tbody = document.querySelector("#tablaNominasAdmin tbody");
+          tbody.innerHTML = '<tr><td colspan="5">Cargando...</td></tr>';
+          try {
+              const res = await fetch('/api/nominas/admin', { headers: { Authorization: `Bearer ${token}` } });
+              const nominas = await res.json();
+              if (!res.ok) throw new Error(nominas.message);
+              
+              tbody.innerHTML = '';
+              if (nominas.length === 0) {
+                  tbody.innerHTML = '<tr><td colspan="5">No se han subido nóminas.</td></tr>';
+                  return;
+              }
+              
+              const meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+              nominas.forEach(n => {
+                  const tr = document.createElement('tr');
+                  tr.innerHTML = `
+                      <td>${n.nombre_empleado}</td>
+                      <td>${meses[n.mes - 1]} ${n.anio}</td>
+                      <td>${n.nombre_archivo}</td>
+                      <td>${new Date(n.fecha_subida).toLocaleString('es-ES')}</td>
+                      <td><button class="action-btn btn-delete" onclick="eliminarNomina(${n.id}, '${n.nombre_empleado}', '${meses[n.mes - 1]} ${n.anio}')">Eliminar</button></td>
+                  `;
+                  tbody.appendChild(tr);
+              });
+          } catch (error) {
+              tbody.innerHTML = `<tr><td colspan="5">Error al cargar: ${error.message}</td></tr>`;
+          }
+      }
+
+      async function eliminarNomina(id, nombre, periodo) {
+          const result = await Swal.fire({
+              title: '¿Estás seguro?',
+              html: `Se eliminará la nómina de <strong>${nombre}</strong> del periodo <strong>${periodo}</strong>. Esta acción no se puede deshacer.`,
+              icon: 'warning',
+              showCancelButton: true,
+              confirmButtonColor: '#d33',
+              cancelButtonColor: '#3085d6',
+              confirmButtonText: 'Sí, ¡eliminar!',
+              cancelButtonText: 'Cancelar'
+          });
+
+          if (result.isConfirmed) {
+              try {
+                  const res = await fetch(`/api/nominas/${id}`, {
+                      method: 'DELETE',
+                      headers: { Authorization: `Bearer ${token}` }
+                  });
+                  const data = await res.json();
+                  if (!res.ok) throw new Error(data.message);
+                  Swal.fire('¡Eliminada!', 'La nómina ha sido eliminada.', 'success');
+                  cargarNominasAdmin();
+              } catch (error) {
+                  Swal.fire('Error', `No se pudo eliminar: ${error.message}`, 'error');
+              }
+          }
+      }
+
           // Para Admin/Gestor, no hay restricción de min/max días, pero se puede añadir una advertencia.
           const diasLaborablesAsignados = calcularDiasLaborables(fechaInicio, fechaFin);
           if (window.vacationData && diasLaborablesAsignados > window.vacationData.diasRestantes) {
@@ -1242,7 +1304,38 @@ async function ajustarDiasCompensatorios(userId, userName, currentDays) {
         cargarJustificantes();
         inicializarCalendario();
         poblarSelectorUsuarios("nominaUsuario");
-        cargarNominasAdmin();
+        cargarNominasAdmin(); 
+
+        document.getElementById('formSubirNomina').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const form = e.target;
+            const formData = new FormData();
+            formData.append('usuarioId', form.nominaUsuario.value);
+            formData.append('mesAnio', form.nominaMesAnio.value);
+            formData.append('nomina', form.nominaArchivo.files[0]);
+
+            const btn = form.querySelector('button');
+            btn.disabled = true;
+            btn.textContent = 'Subiendo...';
+
+            try {
+                const res = await fetch('/api/nominas', {
+                    method: 'POST',
+                    headers: { Authorization: `Bearer ${token}` },
+                    body: formData
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.message);
+                Swal.fire('¡Éxito!', data.message, 'success');
+                form.reset();
+                cargarNominasAdmin(); // Recargar la tabla
+            } catch (error) {
+                Swal.fire('Error', `No se pudo subir la nómina: ${error.message}`, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Subir Nómina';
+            }
+        });
 
         const fechaInicioInput = document.getElementById("fechaInicio"),
           fechaFinInput = document.getElementById("fechaFin");
@@ -1280,6 +1373,8 @@ async function ajustarDiasCompensatorios(userId, userName, currentDays) {
               });
           }
       });
+
+      
 
       inicializarPagina();
 
