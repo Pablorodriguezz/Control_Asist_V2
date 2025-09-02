@@ -146,39 +146,56 @@
 <section id="gestion-nominas">
   <h2><i class="bi bi-file-earmark-text-fill"></i> Gestión de Nóminas</h2>
 
-  <!-- Formulario para subir nueva nómina -->
+  <!-- Formulario para subir nueva nómina (Estructura mejorada) -->
   <form id="formSubirNomina" class="form-nominas">
     <h3>Subir Nueva Nómina</h3>
+    
     <!-- Campo Empleado -->
-    <div>
+    <div class="form-group">
       <label for="nominaUsuario">Selecciona Empleado</label>
       <select id="nominaUsuario" required>
         <option value="">-- Selecciona un trabajador --</option>
       </select>
     </div>
+
     <!-- Campo Mes y Año -->
-    <div>
+    <div class="form-group">
       <label for="nominaMesAnio">Selecciona Mes y Año</label>
       <input type="month" id="nominaMesAnio" required>
     </div>
-    <!-- NUEVO CAMPO DE ARCHIVO PERSONALIZADO -->
-    <div class="custom-file-input-wrapper">
-      <label for="nominaArchivo">Selecciona Archivo (PDF)</label>
-      <div class="custom-file-input">
-        <!-- El input real estará oculto -->
-        <input type="file" id="nominaArchivo" accept=".pdf" required>
-        <!-- Esto es lo que el usuario verá -->
-        <span class="file-label-button"><i class="bi bi-upload"></i> Seleccionar archivo</span>
-        <span class="file-name-display">Ningún archivo seleccionado</span>
+
+    <!-- NUEVO Y MEJORADO CAMPO DE ARCHIVO -->
+    <div class="form-group">
+      <label>Selecciona Archivo (PDF)</label>
+      <!-- El input real está totalmente oculto -->
+      <input type="file" id="nominaArchivo" accept=".pdf" required style="display: none;">
+      
+      <div class="file-upload-container">
+        <!-- La label es nuestro nuevo botón personalizado -->
+        <label for="nominaArchivo" class="custom-file-upload">
+          <i class="bi bi-upload"></i>
+          Seleccionar archivo
+        </label>
+        <!-- Este span mostrará el nombre del archivo -->
+        <span id="fileNameDisplay" class="file-name-display">Ningún archivo seleccionado</span>
       </div>
     </div>
+
     <!-- Botón de Envío -->
-    <button type="submit">Subir Nómina</button>
+    <div class="form-group submit-group">
+      <button type="submit">Subir Nómina</button>
+    </div>
   </form>
 
+  <!-- Historial de nóminas subidas (sin cambios aquí) -->
   <div class="historial-nominas">
     <h3>Historial de Nóminas Enviadas</h3>
-    <div class="table-container"><table id="tablaNominasAdmin"><thead><tr><th>Empleado</th><th>Periodo</th><th>Nombre del Archivo</th><th>Fecha de Subida</th><th>Acciones</th></tr></thead><tbody></tbody></table></div>
+    <div class="table-container">
+        <table id="tablaNominasAdmin">
+            <thead><tr><th>Empleado</th><th>Periodo</th><th>Nombre del Archivo</th><th>Fecha de Subida</th><th>Acciones</th></tr></thead>
+            <tbody></tbody>
+        </table>
+    </div>
   </div>
 </section>
       </main>
@@ -1028,8 +1045,12 @@ async function ajustarDiasCompensatorios(userId, userName, currentDays) {
           },
         });
 
-        const nominaArchivoInput = document.getElementById('nominaArchivo');
-      const fileNameDisplay = document.querySelector('.file-name-display');
+            // Pega este bloque DENTRO de la función inicializarPagina()
+
+      // Lógica para el botón de archivo personalizado
+      const nominaArchivoInput = document.getElementById('nominaArchivo');
+      const fileNameDisplay = document.getElementById('fileNameDisplay'); // Usamos el nuevo ID
+      
       if (nominaArchivoInput && fileNameDisplay) {
           nominaArchivoInput.addEventListener('change', () => {
               if (nominaArchivoInput.files.length > 0) {
@@ -1039,7 +1060,7 @@ async function ajustarDiasCompensatorios(userId, userName, currentDays) {
               }
           });
       }
-      
+
         calendario.render();
       }
 
