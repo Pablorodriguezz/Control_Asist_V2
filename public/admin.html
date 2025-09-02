@@ -46,6 +46,7 @@
             <li><a href="#crear-usuario"><i class="bi bi-person-plus"></i> Crear Usuario</a></li>
             <li><a href="#fichaje-manual"><i class="bi bi-pencil-square"></i> Fichaje Manual</a></li>
             <li><a href="#gestion-vacaciones"><i class="bi bi-airplane"></i> Gestión Vacaciones</a></li>
+            <li><a href="#gestion-nominas"><i class="bi bi-file-earmark-text"></i> Gestión Nóminas</a></li>
           </ul>
         </nav>
         <div class="sidebar-footer">
@@ -140,6 +141,22 @@
           <hr style="margin: 20px 0" />
           <div id="calendarioVacaciones"></div>
         </section>
+
+        <hr />
+<section id="gestion-nominas">
+  <h2>Gestión de Nóminas</h2>
+  <form id="formSubirNomina" class="form-nominas">
+    <h3>Subir Nueva Nómina</h3>
+    <div><label for="nominaUsuario">Selecciona Empleado:</label><select id="nominaUsuario" required><option value="">-- Selecciona un trabajador --</option></select></div>
+    <div><label for="nominaMesAnio">Selecciona Mes y Año:</label><input type="month" id="nominaMesAnio" required></div>
+    <div><label for="nominaArchivo">Selecciona Archivo (PDF):</label><input type="file" id="nominaArchivo" accept=".pdf" required></div>
+    <button type="submit">Subir Nómina</button>
+  </form>
+  <div class="historial-nominas">
+    <h3>Historial de Nóminas Enviadas</h3>
+    <div class="table-container"><table id="tablaNominasAdmin"><thead><tr><th>Empleado</th><th>Periodo</th><th>Nombre del Archivo</th><th>Fecha de Subida</th><th>Acciones</th></tr></thead><tbody></tbody></table></div>
+  </div>
+</section>
       </main>
     </div>
 
@@ -1224,6 +1241,8 @@ async function ajustarDiasCompensatorios(userId, userName, currentDays) {
         cargarSolicitudesPendientes();
         cargarJustificantes();
         inicializarCalendario();
+        poblarSelectorUsuarios("nominaUsuario");
+        cargarNominasAdmin();
 
         const fechaInicioInput = document.getElementById("fechaInicio"),
           fechaFinInput = document.getElementById("fechaFin");

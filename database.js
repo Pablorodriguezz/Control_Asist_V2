@@ -103,6 +103,22 @@ const init = async () => {
             );
         `);
         console.log('Tabla "justificantes" asegurada.');
+
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS nominas (
+                id SERIAL PRIMARY KEY,
+                usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+                mes INTEGER NOT NULL CHECK (mes >= 1 AND mes <= 12),
+                anio INTEGER NOT NULL,
+                nombre_archivo VARCHAR(255) NOT NULL,
+                archivo_path VARCHAR(512) NOT NULL,
+                fecha_subida TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(usuario_id, mes, anio) -- Un empleado solo puede tener una nómina por mes/año
+            );
+        `);
+        console.log("Tabla 'nominas' asegurada y lista.");
+
+        
         
         // --- CREACIÓN DEL USUARIO ADMIN POR DEFECTO ---
         const adminUser = 'admin';

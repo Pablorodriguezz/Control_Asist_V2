@@ -757,6 +757,91 @@ app.get('/api/estado-rapido', async (req, res) => {
     }
 });
 
+// (ADMIN) Subir una nueva nómina para un usuario
+app.post('/api/nominas', authenticateToken, upload.single('nomina'), async (req, res) => {
+    if (req.user.rol !== 'admin') {
+        return res.status(403).json({ message: 'Acceso denegado.' });
+    }
+    const { usuarioId, mesAnio } = req.body;
+    if (!req.file || !usuarioId || !mesAnio) {
+        return res.status(400).json({ message: 'Faltan datos (empleado, mes/año o archivo).' });
+    }
+    const [anio, mes] = mesAnio.split('-');
+    try {
+        const fileExtension = path.extname(req.file.originalname);
+        const randomName = crypto.randomBytes(16).toString('hex');
+        const fileName = `${randomName}${fileExtension}`;
+        const putCommand = new PutObjectCommand({
+            Bucket: process.env.R2_BUCKET_NAME,
+            Key: `nominas/${fileName}`,
+            Body: req.file.buffer,
+            ContentType: req.file.mimetype
+        });
+        await s3Client.send(putCommand);
+        const archivo_path = `${process.env.R2_PUBLIC_URL}/nominas/${fileName}`;
+        const sql = `
+            INSERT INTO nominas (usuario_id, mes, anio, nombre_archivo, archivo_path) 
+            VALUES ($1, $2, $3, $4, $5)
+            ON CONFLICT (usuario_id, mes, anio) DO UPDATE SET
+            nombre_archivo = EXCLUDED.nombre_archivo,
+            archivo_path = EXCLUDED.archivo_path,
+            fecha_subida = CURRENT_TIMESTAMP;
+        `;
+        await db.query(sql, [usuarioId, parseInt(mes), parseInt(anio), req.file.originalname, archivo_path]);
+        res.status(201).json({ message: 'Nómina subida y asignada correctamente.' });
+    } catch (err) {
+        console.error("Error al subir la nómina:", err);
+        res.status(500).json({ message: 'Error del servidor al procesar la nómina.' });
+    }
+});
+
+// (ADMIN) Ver todas las nóminas subidas
+app.get('/api/nominas/admin', authenticateToken, async (req, res) => {
+    if (req.user.rol !== 'admin') {
+        return res.status(403).json({ message: 'Acceso denegado.' });
+    }
+    try {
+        const sql = `
+            SELECT n.id, u.nombre AS nombre_empleado, n.mes, n.anio, n.nombre_archivo, n.fecha_subida
+            FROM nominas n JOIN usuarios u ON n.usuario_id = u.id
+            ORDER BY n.anio DESC, n.mes DESC, u.nombre ASC
+        `;
+        const { rows } = await db.query(sql);
+        res.json(rows);
+    } catch (err) { res.status(500).json({ message: 'Error del servidor.' }); }
+});
+
+// (ADMIN) Eliminar una nómina
+app.delete('/api/nominas/:id', authenticateToken, async (req, res) => {
+    if (req.user.rol !== 'admin') return res.status(403).json({ message: 'Acceso denegado.' });
+    const { id } = req.params;
+    try {
+        const selectRes = await db.query('SELECT archivo_path FROM nominas WHERE id = $1', [id]);
+        if (selectRes.rowCount === 0) return res.status(404).json({ message: 'Nómina no encontrada.' });
+        const filePath = selectRes.rows[0].archivo_path;
+        if (filePath) {
+            const fileName = filePath.substring(filePath.lastIndexOf('/') + 1);
+            const deleteCommand = new DeleteObjectCommand({ Bucket: process.env.R2_BUCKET_NAME, Key: `nominas/${fileName}` });
+            await s3Client.send(deleteCommand);
+        }
+        await db.query('DELETE FROM nominas WHERE id = $1', [id]);
+        res.json({ message: 'Nómina eliminada correctamente.' });
+    } catch (err) { res.status(500).json({ message: 'Error del servidor.' }); }
+});
+
+// (EMPLEADO) Ver SUS PROPIAS nóminas
+app.get('/api/mis-nominas', authenticateToken, async (req, res) => {
+    const usuarioId = req.user.id;
+    try {
+        const sql = `
+            SELECT id, mes, anio, nombre_archivo, archivo_path, fecha_subida
+            FROM nominas WHERE usuario_id = $1 ORDER BY anio DESC, mes DESC
+        `;
+        const { rows } = await db.query(sql, [usuarioId]);
+        res.json(rows);
+    } catch (err) { res.status(500).json({ message: 'Error del servidor.' }); }
+});
+
 
 // En server.js
 // --- LÓGICA RESTAURADA A LA VERSIÓN CORRECTA ---

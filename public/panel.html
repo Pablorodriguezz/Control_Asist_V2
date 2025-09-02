@@ -1,492 +1,753 @@
 <!DOCTYPE html>
 <html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, user-scalable=no"
+    />
     <title>Panel de Empleado</title>
-    <link rel="stylesheet" href="style.css">
-    <link href='https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css' rel='stylesheet'>
+    <link rel="stylesheet" href="style.css" />
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css"
+      rel="stylesheet"
+    />
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js'></script>
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/luxon@3.4.4/build/global/luxon.min.js"></script>
-    
-</head>
-<body>
+  </head>
+  <body>
     <!-- ===== HEADER ===== -->
     <header class="main-header">
-        <div class="logo-container">
-            <img src="/images/logo2.png" alt="Logo" class="header-logo">
-            <span class="header-title">Mi Portal</span>
-        </div>
-        <div class="profile-container">
-            <button class="profile-btn" onclick="confirmarLogout()" title="Cerrar Sesión"><i class="bi bi-person-circle"></i></button>
-        </div>
+      <div class="logo-container">
+        <img src="/images/logo2.png" alt="Logo" class="header-logo" />
+        <span class="header-title">Mi Portal</span>
+      </div>
+      <div class="profile-container">
+        <button
+          class="profile-btn"
+          onclick="confirmarLogout()"
+          title="Cerrar Sesión"
+        >
+          <i class="bi bi-person-circle"></i>
+        </button>
+      </div>
     </header>
 
     <!-- ===== CONTENEDOR PRINCIPAL DE PESTAÑAS ===== -->
     <main class="main-content">
-        <!-- PESTAÑA 1: INICIO (activa por defecto) -->
-        <div id="inicio-content" class="tab-content active">
-            <section class="highlight-section">
-                <h2>Destacados</h2>
-                <div class="widget-grid">
-                    <div class="widget-card">
-                        <span id="dias-vacaciones" class="widget-value">--</span>
-                        <span class="widget-label">Días vacaciones</span>
-                    </div>
-                    <div class="widget-card">
-                        <span id="fichajes-mes" class="widget-value">--</span>
-                        <span class="widget-label">Fichajes este mes</span>
-                    </div>
-                </div>
-            </section>
+      <!-- PESTAÑA 1: INICIO (activa por defecto) -->
+      <div id="inicio-content" class="tab-content active">
+        <section class="highlight-section">
+          <h2>Destacados</h2>
+          <div class="widget-grid">
+            <div class="widget-card">
+              <span id="dias-vacaciones" class="widget-value">--</span>
+              <span class="widget-label">Días vacaciones</span>
+            </div>
+            <div class="widget-card">
+              <span id="fichajes-mes" class="widget-value">--</span>
+              <span class="widget-label">Fichajes este mes</span>
+            </div>
+          </div>
+        </section>
 
-            <section id="seniority-container" class="highlight-section" style="display: none;">
-                <h2>Mi Antigüedad</h2>
-                <div class="seniority-card">
-                    <div class="seniority-item">
-                        <span id="seniority-years" class="seniority-value">--</span>
-                        <span class="seniority-label">Años</span>
-                    </div>
-                    <div class="seniority-item">
-                        <span id="seniority-months" class="seniority-value">--</span>
-                        <span class="seniority-label">Meses</span>
-                    </div>
-                    <div class="seniority-item">
-                        <span id="seniority-days" class="seniority-value">--</span>
-                        <span class="seniority-label">Días</span>
-                    </div>
-                </div>
-            </section>
+        <section
+          id="seniority-container"
+          class="highlight-section"
+          style="display: none"
+        >
+          <h2>Mi Antigüedad</h2>
+          <div class="seniority-card">
+            <div class="seniority-item">
+              <span id="seniority-years" class="seniority-value">--</span>
+              <span class="seniority-label">Años</span>
+            </div>
+            <div class="seniority-item">
+              <span id="seniority-months" class="seniority-value">--</span>
+              <span class="seniority-label">Meses</span>
+            </div>
+            <div class="seniority-item">
+              <span id="seniority-days" class="seniority-value">--</span>
+              <span class="seniority-label">Días</span>
+            </div>
+          </div>
+        </section>
 
-            <section class="fichaje-section">
-                <h2>Fichaje</h2>
-                <div class="fichaje-actions">
-                    <div class="action-button-wrapper">
-                        <button id="btnEntrada" class="action-button primary entrada" onclick="iniciarFichaje('entrada')"><i class="bi bi-plus-lg"></i></button>
-                        <span class="action-label">Entrada</span>
-                    </div>
-                    <div class="action-button-wrapper">
-                        <button id="btnSalida" class="action-button primary salida" onclick="iniciarFichaje('salida')"><i class="bi bi-dash-lg"></i></button>
-                        <span class="action-label">Salida</span>
-                    </div>
-                </div>
-            </section>
-            <section class="historial-section">
-                <h2>Último Fichaje</h2>
-                <div id="ultimoFichaje" class="ultimo-fichaje-card"><p>Cargando...</p></div>
-            </section>
-        </div>
+        <section class="fichaje-section">
+          <h2>Fichaje</h2>
+          <div class="fichaje-actions">
+            <div class="action-button-wrapper">
+              <button
+                id="btnEntrada"
+                class="action-button primary entrada"
+                onclick="iniciarFichaje('entrada')"
+              >
+                <i class="bi bi-plus-lg"></i>
+              </button>
+              <span class="action-label">Entrada</span>
+            </div>
+            <div class="action-button-wrapper">
+              <button
+                id="btnSalida"
+                class="action-button primary salida"
+                onclick="iniciarFichaje('salida')"
+              >
+                <i class="bi bi-dash-lg"></i>
+              </button>
+              <span class="action-label">Salida</span>
+            </div>
+          </div>
+        </section>
+        <section class="historial-section">
+          <h2>Último Fichaje</h2>
+          <div id="ultimoFichaje" class="ultimo-fichaje-card">
+            <p>Cargando...</p>
+          </div>
+        </section>
+      </div>
 
-        <!-- PESTAÑA 2: HISTORIAL -->
-        <div id="historial-content" class="tab-content">
-            <section class="historial-completo-section">
-                <h2>Mi Historial de Fichajes</h2>
-                <div>
-                    <label for="selectMesHistorial">Selecciona el mes:</label>
-                    <input type="month" id="selectMesHistorial" onchange="cargarHistorialCompleto()">
-                </div>
-                <div class="table-container">
-                    <table id="historialTable">
-                        <thead><tr><th>Fecha y Hora</th><th>Tipo</th><th>Observaciones</th></tr></thead>
-                        <tbody></tbody>
-                    </table>
-                </div>
-                <button class="btn-logout-bottom" onclick="confirmarLogout()">Cerrar Sesión</button>
-            </section>
-        </div>
+      <!-- PESTAÑA 2: HISTORIAL -->
+      <div id="historial-content" class="tab-content">
+        <section class="historial-completo-section">
+          <h2>Mi Historial de Fichajes</h2>
+          <div>
+            <label for="selectMesHistorial">Selecciona el mes:</label>
+            <input
+              type="month"
+              id="selectMesHistorial"
+              onchange="cargarHistorialCompleto()"
+            />
+          </div>
+          <div class="table-container">
+            <table id="historialTable">
+              <thead>
+                <tr>
+                  <th>Fecha y Hora</th>
+                  <th>Tipo</th>
+                  <th>Observaciones</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <button class="btn-logout-bottom" onclick="confirmarLogout()">
+            Cerrar Sesión
+          </button>
+        </section>
+      </div>
 
-        <!-- PESTAÑA 3: CALENDARIO -->
-        <div id="calendario-content" class="tab-content">
-            <section class="calendario-section">
-                <h2>Mi Calendario de Vacaciones</h2>
-                <p id="info-dias-calendario" class="vacation-counter">Cargando días...</p>
-                <div id="miCalendario"></div>
-            </section>
-        </div>
+      <!-- PESTAÑA 3: CALENDARIO -->
+      <div id="calendario-content" class="tab-content">
+        <section class="calendario-section">
+          <h2>Mi Calendario de Vacaciones</h2>
+          <p id="info-dias-calendario" class="vacation-counter">
+            Cargando días...
+          </p>
+          <div id="miCalendario"></div>
+        </section>
+      </div>
 
-        <!-- PESTAÑA 4: SOLICITUDES -->
-        <div id="solicitudes-content" class="tab-content">
-            <section class="solicitudes-section">
-                <h2>Solicitar Vacaciones</h2>
-                <p id="info-dias-solicitud" class="vacation-counter">Cargando días...</p>
-                <form id="solicitarVacacionesForm">
-                    <label for="fechaInicioSolicitud">Fecha de Inicio:</label>
-                    <input type="date" id="fechaInicioSolicitud" required>
-                    <label for="fechaFinSolicitud">Fecha de Fin:</label>
-                    <input type="date" id="fechaFinSolicitud" required>
-                    <button type="submit">Enviar Solicitud</button>
-                </form>
-            </section>
-            <hr>
-            <section>
-                <h2>Estado de mis Solicitudes</h2>
-                <div class="table-container">
-                    <table id="misSolicitudesTable">
-                        <thead><tr><th>Periodo</th><th>Estado</th></tr></thead>
-                        <tbody></tbody>
-                    </table>
-                </div>
-            </section>
-            
-            <!-- --- NUEVO: SECCIÓN PARA SUBIR JUSTIFICANTE --- -->
-            <hr>
-            <section id="subir-justificante" class="solicitudes-section">
-                <h2><i class="bi bi-file-earmark-medical"></i> Enviar Justificante Médico</h2>
-                <form id="formJustificante">
-                    <label for="fechaInicioJustificante">Fecha de Inicio de la Ausencia:</label>
-                    <input type="date" id="fechaInicioJustificante" required>
+      <!-- PESTAÑA 4: SOLICITUDES -->
+      <div id="solicitudes-content" class="tab-content">
+        <section class="solicitudes-section">
+          <h2>Solicitar Vacaciones</h2>
+          <p id="info-dias-solicitud" class="vacation-counter">
+            Cargando días...
+          </p>
+          <form id="solicitarVacacionesForm">
+            <label for="fechaInicioSolicitud">Fecha de Inicio:</label>
+            <input type="date" id="fechaInicioSolicitud" required />
+            <label for="fechaFinSolicitud">Fecha de Fin:</label>
+            <input type="date" id="fechaFinSolicitud" required />
+            <button type="submit">Enviar Solicitud</button>
+          </form>
+        </section>
+        <hr />
+        <section>
+          <h2>Estado de mis Solicitudes</h2>
+          <div class="table-container">
+            <table id="misSolicitudesTable">
+              <thead>
+                <tr>
+                  <th>Periodo</th>
+                  <th>Estado</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </section>
 
-                    <label for="fechaFinJustificante">Fecha de Fin de la Ausencia:</label>
-                    <input type="date" id="fechaFinJustificante" required>
+        <!-- --- NUEVO: SECCIÓN PARA SUBIR JUSTIFICANTE --- -->
+        <hr />
+        <section id="subir-justificante" class="solicitudes-section">
+          <h2>
+            <i class="bi bi-file-earmark-medical"></i> Enviar Justificante
+            Médico
+          </h2>
+          <form id="formJustificante">
+            <label for="fechaInicioJustificante"
+              >Fecha de Inicio de la Ausencia:</label
+            >
+            <input type="date" id="fechaInicioJustificante" required />
 
-                    <label for="motivoJustificante">Motivo (opcional):</label>
-                    <textarea id="motivoJustificante" placeholder="Ej: Visita médica, baja por enfermedad..."></textarea>
+            <label for="fechaFinJustificante"
+              >Fecha de Fin de la Ausencia:</label
+            >
+            <input type="date" id="fechaFinJustificante" required />
 
-                    <label for="archivoJustificante">Seleccionar Archivo (PDF, JPG, PNG):</label>
-                    <input type="file" id="archivoJustificante" accept=".pdf,.jpg,.jpeg,.png" required>
+            <label for="motivoJustificante">Motivo (opcional):</label>
+            <textarea
+              id="motivoJustificante"
+              placeholder="Ej: Visita médica, baja por enfermedad..."
+            ></textarea>
 
-                    <button type="submit">Enviar Justificante</button>
-                </form>
-            </section>
-        </div>
+            <label for="archivoJustificante"
+              >Seleccionar Archivo (PDF, JPG, PNG):</label
+            >
+            <input
+              type="file"
+              id="archivoJustificante"
+              accept=".pdf,.jpg,.jpeg,.png"
+              required
+            />
+
+            <button type="submit">Enviar Justificante</button>
+          </form>
+        </section>
+      </div>
+
+      <div id="nominas-content" class="tab-content">
+        <section class="nominas-section">
+          <h2>Mis Nóminas</h2>
+          <div class="table-container">
+            <table id="misNominasTable">
+              <thead>
+                <tr>
+                  <th>Periodo</th>
+                  <th>Descargar</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
     </main>
-    
+
     <!-- ===== BARRA DE NAVEGACIÓN INFERIOR ===== -->
     <nav class="bottom-nav">
-        <a href="#" class="nav-item active" data-target="inicio-content"><i class="bi bi-house-door-fill"></i><span>Inicio</span></a>
-        <a href="#" class="nav-item" data-target="historial-content"><i class="bi bi-calendar-week-fill"></i><span>Historial</span></a>
-        <a href="#" class="nav-item" data-target="calendario-content"><i class="bi bi-calendar-heart-fill"></i><span>Vacaciones</span></a>
-        <a href="#" class="nav-item" data-target="solicitudes-content"><i class="bi bi-send-fill"></i><span>Solicitudes</span></a>
+      <a href="#" class="nav-item active" data-target="inicio-content"
+        ><i class="bi bi-house-door-fill"></i><span>Inicio</span></a
+      >
+      <a href="#" class="nav-item" data-target="historial-content"
+        ><i class="bi bi-calendar-week-fill"></i><span>Historial</span></a
+      >
+      <a href="#" class="nav-item" data-target="nominas-content"
+        ><i class="bi bi-file-earmark-text-fill"></i><span>Nóminas</span></a
+      >
+      <a href="#" class="nav-item" data-target="calendario-content"
+        ><i class="bi bi-calendar-heart-fill"></i><span>Vacaciones</span></a
+      >
+      <a href="#" class="nav-item" data-target="solicitudes-content"
+        ><i class="bi bi-send-fill"></i><span>Solicitudes</span></a
+      >
     </nav>
-    
-    <div id="cameraModal" class="modal"><div class="modal-content"><h2>Sonríe para la foto</h2><video id="video" autoplay playsinline></video><p>Tomando foto en 3 segundos...</p></div></div>
-    <canvas id="canvas" style="display:none;"></canvas>
+
+    <div id="cameraModal" class="modal">
+      <div class="modal-content">
+        <h2>Sonríe para la foto</h2>
+        <video id="video" autoplay playsinline></video>
+        <p>Tomando foto en 3 segundos...</p>
+      </div>
+    </div>
+    <canvas id="canvas" style="display: none"></canvas>
 
     <script>
-        const token = localStorage.getItem('token');
-        if (!token) window.location.href = '/index.html';
+      const token = localStorage.getItem("token");
+      if (!token) window.location.href = "/index.html";
 
-        const [btnEntrada, btnSalida] = [document.getElementById('btnEntrada'), document.getElementById('btnSalida')];
-        const [cameraModal, video, canvas] = [document.getElementById('cameraModal'), document.getElementById('video'), document.getElementById('canvas')];
-        let stream;
-        let miCalendario;
+      const [btnEntrada, btnSalida] = [
+        document.getElementById("btnEntrada"),
+        document.getElementById("btnSalida"),
+      ];
+      const [cameraModal, video, canvas] = [
+        document.getElementById("cameraModal"),
+        document.getElementById("video"),
+        document.getElementById("canvas"),
+      ];
+      let stream;
+      let miCalendario;
 
-        function calcularDiasLaborables(fechaInicio, fechaFin) {
-            const inicio = new Date(fechaInicio);
-            const fin = new Date(fechaFin);
-            let count = 0;
-            const curDate = new Date(inicio.getTime());
-            while (curDate <= fin) {
-                const dayOfWeek = curDate.getDay();
-                if (dayOfWeek !== 0 && dayOfWeek !== 6) {
-                    count++;
-                }
-                curDate.setDate(curDate.getDate() + 1);
-            }
-            return count;
+      function calcularDiasLaborables(fechaInicio, fechaFin) {
+        const inicio = new Date(fechaInicio);
+        const fin = new Date(fechaFin);
+        let count = 0;
+        const curDate = new Date(inicio.getTime());
+        while (curDate <= fin) {
+          const dayOfWeek = curDate.getDay();
+          if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+            count++;
+          }
+          curDate.setDate(curDate.getDate() + 1);
         }
+        return count;
+      }
 
-        function confirmarLogout() {
-            Swal.fire({
-                title: '¿Cerrar sesión?', text: "¿Estás seguro?", icon: 'question',
-                showCancelButton: true, confirmButtonText: 'Sí, cerrar sesión', cancelButtonText: 'Cancelar'
-            }).then((result) => { if (result.isConfirmed) logout(); });
-        }
-        function logout() { localStorage.removeItem('token'); window.location.href = '/index.html'; }
-        
-        async function cargarHistorialCompleto() {
-            const mesValue = document.getElementById('selectMesHistorial').value;
-            if (!mesValue) return;
-            const [anio, mes] = mesValue.split('-');
-            const tbody = document.querySelector("#historialTable tbody");
-            tbody.innerHTML = '<tr><td colspan="3">Cargando...</td></tr>';
-            try {
-                const res = await fetch(`/api/mis-registros?anio=${anio}&mes=${mes}`, { headers: { 'Authorization': `Bearer ${token}` } });
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.message);
-                tbody.innerHTML = "";
-                if (data.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="3">No tienes registros para este mes.</td></tr>';
-                } else {
-                    data.forEach(registro => {
-                        const tr = document.createElement("tr");
-                        const fechaHora = new Date(registro.fecha_hora).toLocaleString("es-ES", { dateStyle: "long", timeStyle: "medium" });
-                        let observaciones = 'Correcto';
-                        if (registro.es_modificado) {
-                            const title = `Editado por Admin. Motivo: ${registro.motivo_modificacion || 'No especificado'}`;
-                            observaciones = `<span title="${title}" style="cursor: help; color: #f39c12; font-weight: bold;">Modificado ✏️</span>`;
-                        }
-                        tr.innerHTML = `<td>${fechaHora}</td><td>${registro.tipo}</td><td>${observaciones}</td>`;
-                        tbody.appendChild(tr);
-                    });
-                }
-            } catch (error) { tbody.innerHTML = `<tr><td colspan="3" class="error">${error.message}</td></tr>`; }
-        }
-        
-        async function cargarContadorVacaciones() {
-            const infoP = document.getElementById('info-dias-calendario');
-            infoP.textContent = 'Cargando días...';
-            try {
-                const res = await fetch('/api/mis-vacaciones-restantes', { headers: { 'Authorization': `Bearer ${token}` } });
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.message);
-                infoP.innerHTML = `Disponibles (laborables): <span class="dias-restantes">${data.diasRestantes}</span> / ${data.diasTotales} (Gastados: ${data.diasGastados})`;
-            } catch (error) {
-                console.error('Error al cargar el contador de vacaciones:', error);
-                infoP.textContent = 'No se pudo cargar el balance de días.';
-                infoP.style.color = 'red';
-            }
-        }
-
-        function inicializarMiCalendario() {
-            const calendarioEl = document.getElementById('miCalendario');
-            miCalendario = new FullCalendar.Calendar(calendarioEl, {
-                initialView: 'dayGridMonth', locale: 'es',
-                headerToolbar: { left: 'prev,next', center: 'title', right: 'today' },
-                events: function(fetchInfo, successCallback, failureCallback) {
-                    fetch('/api/mis-vacaciones', {
-                        method: 'GET',
-                        headers: { 'Authorization': `Bearer ${token}` }
-                    })
-                    .then(res => res.ok ? res.json() : Promise.reject('Error en respuesta'))
-                    .then(data => {
-                        const eventosProcesados = data.map(evento => ({
-                            ...evento,
-                            end: new Date(new Date(evento.end).getTime() + 86400000).toISOString().split('T')[0]
-                        }));
-                        successCallback(eventosProcesados);
-                    })
-                    .catch(error => { failureCallback(error); });
-                }
-            });
-            miCalendario.render();
-        }
-        
-        async function cargarDatosSolicitudes() {
-            const infoP = document.getElementById('info-dias-solicitud');
-            const tbody = document.querySelector("#misSolicitudesTable tbody");
-            infoP.textContent = 'Cargando...';
-            tbody.innerHTML = '<tr><td colspan="2">Cargando...</td></tr>';
-            try {
-                const [resDias, resSol] = await Promise.all([
-                    fetch('/api/mis-vacaciones-restantes', { headers: { Authorization: `Bearer ${token}` } }),
-                    fetch('/api/mis-solicitudes', { headers: { Authorization: `Bearer ${token}` } })
-                ]);
-
-                const dataDias = await resDias.json();
-                infoP.innerHTML = `Disponibles (laborables): <span class="dias-restantes">${dataDias.diasRestantes.toFixed(1)}</span> / ${dataDias.diasTotales.toFixed(1)}`;
-                const dataSol = await resSol.json();
-                tbody.innerHTML = "";
-                if (dataSol.length > 0) {
-                    dataSol.forEach(sol => {
-                        const tr = document.createElement('tr');
-                        const fInicio = new Date(sol.fecha_inicio).toLocaleDateString('es-ES');
-                        const fFin = new Date(sol.fecha_fin).toLocaleDateString('es-ES');
-                        tr.innerHTML = `<td>Del ${fInicio} al ${fFin}</td><td><span class="status-${sol.estado}">${sol.estado}</span></td>`;
-                        tbody.appendChild(tr);
-                    });
-                } else { tbody.innerHTML = '<tr><td colspan="2">No tienes solicitudes.</td></tr>'; }
-            } catch (error) { console.error('Error cargando solicitudes:', error); }
-        }
-
-        async function inicializarPanel() {
-             try {
-                const res = await fetch('/api/estado', { headers: { 'Authorization': `Bearer ${token}` } });
-                if (!res.ok) { if (res.status === 401 || res.status === 403) logout(); return; }
-                const data = await res.json();
-                actualizarBotones(data.estado);
-            } catch (error) { console.error("Error al inicializar panel:", error); }
-        }
-        async function iniciarFichaje(tipo) {
-            cameraModal.style.display = 'flex';
-            try { stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } }); video.srcObject = stream; setTimeout(() => tomarFotoYFichar(tipo), 3000); }
-            catch (err) { alert('No se pudo acceder a la cámara.'); cameraModal.style.display = 'none'; }
-        }
-        function tomarFotoYFichar(tipo) {
-            const context = canvas.getContext('2d');
-            canvas.width = video.videoWidth; canvas.height = video.videoHeight;
-            context.drawImage(video, 0, 0, canvas.width, canvas.height);
-            stream.getTracks().forEach(track => track.stop()); cameraModal.style.display = 'none';
-            canvas.toBlob(blob => { const formData = new FormData(); formData.append('tipo', tipo); formData.append('foto', blob, 'fichaje.jpeg'); enviarFichaje(formData); }, 'image/jpeg');
-        }
-        async function cargarDatosInicio() {
-            const mesValue = document.getElementById('selectMesHistorial').value;
-            if (!mesValue) return;
-            const [anio, mes] = mesValue.split('-');
-            try {
-                const [resVac, resReg] = await Promise.all([
-                    fetch('/api/mis-vacaciones-restantes', { headers: { 'Authorization': `Bearer ${token}` } }),
-                    fetch(`/api/mis-registros?anio=${anio}&mes=${mes}`, { headers: { 'Authorization': `Bearer ${token}` } })
-                ]);
-                if (!resVac.ok || !resReg.ok) throw new Error("Error al cargar los datos iniciales.");
-                const dataVac = await resVac.json();
-                const dataReg = await resReg.json();
-
-                document.getElementById('dias-vacaciones').textContent = dataVac.diasRestantes.toFixed(1) ?? '--';
-                
-                if (dataVac.fechaContratacion) {
-                    const container = document.getElementById('seniority-container');
-                    const start = luxon.DateTime.fromISO(dataVac.fechaContratacion);
-                    const now = luxon.DateTime.now();
-                    const diff = now.diff(start, ['years', 'months', 'days']).toObject();
-                    
-                    document.getElementById('seniority-years').textContent = Math.floor(diff.years) || 0;
-                    document.getElementById('seniority-months').textContent = Math.floor(diff.months) || 0;
-                    document.getElementById('seniority-days').textContent = Math.floor(diff.days) || 0;
-                    
-                    container.style.display = 'block';
-                }
-                
-                document.getElementById('fichajes-mes').textContent = dataReg.length;
-                const ultimoFichajeDiv = document.getElementById('ultimoFichaje');
-                if (dataReg.length > 0) {
-                    const ultimo = dataReg[dataReg.length - 1];
-                    const fechaUltimo = new Date(ultimo.fecha_hora).toLocaleString("es-ES", { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
-                    const tipoUltimo = ultimo.tipo.charAt(0).toUpperCase() + ultimo.tipo.slice(1);
-                    const icono = tipoUltimo === 'Entrada' ? '<i class="bi bi-box-arrow-in-right" style="color: #2ecc71;"></i>' : '<i class="bi bi-box-arrow-right" style="color: #e74c3c;"></i>';
-                    ultimoFichajeDiv.innerHTML = `<p>${icono} <strong>${tipoUltimo}</strong> - ${fechaUltimo}</p>`;
-                } else {
-                    ultimoFichajeDiv.innerHTML = '<p>No hay información disponible</p>';
-                }
-            } catch (error) { console.error('Error cargando datos de inicio:', error); }
-        }       
-        async function enviarFichaje(formData) {
-            const tipo = formData.get('tipo'); const button = tipo === 'entrada' ? btnEntrada : btnSalida;
-            button.innerHTML = '<div class="loader"></div>'; button.disabled = true;
-            try {
-                const res = await fetch('/api/fichar', { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: formData });
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.message);
-                Swal.fire({ icon: 'success', title: '¡Registrado!', text: data.message, timer: 2000, showConfirmButton: false });
-                inicializarPanel(); cargarDatosInicio();
-            } catch (error) { Swal.fire({ icon: 'error', title: 'Error', text: error.message || 'Error de conexión.' }); } 
-            finally { const iconClass = tipo === 'entrada' ? 'bi-plus-lg' : 'bi-dash-lg'; button.innerHTML = `<i class="bi ${iconClass}"></i>`; }
-        }
-        function actualizarBotones(estado) { btnEntrada.disabled = (estado === 'entrada'); btnSalida.disabled = (estado !== 'entrada'); }
-
-        document.addEventListener('DOMContentLoaded', () => {
-            const navItems = document.querySelectorAll('.nav-item');
-            const tabContents = document.querySelectorAll('.tab-content');
-
-            navItems.forEach(item => {
-                item.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    const targetId = item.getAttribute('data-target');
-                    tabContents.forEach(content => content.classList.remove('active'));
-                    document.getElementById(targetId).classList.add('active');
-                    navItems.forEach(i => i.classList.remove('active'));
-                    item.classList.add('active');
-                    if (targetId === 'historial-content') {
-                        cargarHistorialCompleto();
-                    } else if (targetId === 'calendario-content') {
-                        cargarContadorVacaciones();
-                        if (!miCalendario) {
-                            inicializarMiCalendario();
-                        }
-                    } else if (targetId === 'solicitudes-content') {
-                        cargarDatosSolicitudes();
-                    }
-                });
-            });
-
-            document.getElementById('solicitarVacacionesForm').addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const fechaInicio = document.getElementById('fechaInicioSolicitud').value;
-                const fechaFin = document.getElementById('fechaFinSolicitud').value;
-                
-                if (!fechaInicio || !fechaFin) {
-                    Swal.fire('Atención', 'Por favor, selecciona una fecha de inicio y de fin.', 'warning');
-                    return;
-                }
-
-                const diasLaborablesSeleccionados = calcularDiasLaborables(fechaInicio, fechaFin);
-                if (diasLaborablesSeleccionados < 5) {
-                    Swal.fire({
-                        icon: 'error', title: 'Solicitud no válida',
-                        text: `Debes solicitar un mínimo de 5 días laborables. Has seleccionado ${diasLaborablesSeleccionados}.`
-                    });
-                    return; 
-                }
-                if (diasLaborablesSeleccionados > 10) {
-                    Swal.fire({
-                        icon: 'error', title: 'Solicitud no válida',
-                        text: `Puedes solicitar un máximo de 10 días laborables. Has seleccionado ${diasLaborablesSeleccionados}.`
-                    });
-                    return;
-                }
-
-                const btn = e.target.querySelector('button');
-                btn.disabled = true; 
-                btn.textContent = 'Enviando...';
-                
-                try {
-                    const res = await fetch('/api/solicitar-vacaciones', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                        body: JSON.stringify({ fechaInicio, fechaFin })
-                    });
-                    const data = await res.json();
-                    if (!res.ok) throw new Error(data.message);
-                    
-                    Swal.fire('¡Éxito!', data.message, 'success');
-                    e.target.reset();
-                    cargarDatosSolicitudes(); 
-                } catch (error) {
-                    Swal.fire('Error', error.message, 'error');
-                } finally {
-                    btn.disabled = false;
-                    btn.textContent = 'Enviar Solicitud';
-                }
-            });
-
-            // --- NUEVO: EVENT LISTENER PARA EL FORMULARIO DE JUSTIFICANTE ---
-            document.getElementById('formJustificante').addEventListener('submit', async (e) => {
-                e.preventDefault();
-
-                const form = e.target;
-                const formData = new FormData();
-
-                formData.append('fechaInicio', form.fechaInicioJustificante.value);
-                formData.append('fechaFin', form.fechaFinJustificante.value);
-                formData.append('motivo', form.motivoJustificante.value);
-                formData.append('justificante', form.archivoJustificante.files[0]);
-
-                Swal.fire({
-                    title: 'Subiendo justificante...',
-                    text: 'Por favor, espera.',
-                    allowOutsideClick: false,
-                    didOpen: () => {
-                        Swal.showLoading();
-                    }
-                });
-
-                try {
-                    const res = await fetch('/api/justificantes', {
-                        method: 'POST',
-                        headers: { 'Authorization': `Bearer ${token}` },
-                        body: formData
-                    });
-
-                    const data = await res.json();
-                    if (!res.ok) throw new Error(data.message);
-
-                    Swal.fire('¡Éxito!', 'Tu justificante ha sido enviado correctamente.', 'success');
-                    form.reset();
-                } catch (error) {
-                    Swal.fire('Error', `No se pudo enviar el justificante: ${error.message}`, 'error');
-                }
-            });
-
-            function inicializarPaginaEmpleado() {
-                const hoy = new Date();
-                document.getElementById('selectMesHistorial').value = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`;
-                inicializarPanel();
-                cargarDatosInicio();
-            }
-
-            inicializarPaginaEmpleado();
+      function confirmarLogout() {
+        Swal.fire({
+          title: "¿Cerrar sesión?",
+          text: "¿Estás seguro?",
+          icon: "question",
+          showCancelButton: true,
+          confirmButtonText: "Sí, cerrar sesión",
+          cancelButtonText: "Cancelar",
+        }).then((result) => {
+          if (result.isConfirmed) logout();
         });
+      }
+      function logout() {
+        localStorage.removeItem("token");
+        window.location.href = "/index.html";
+      }
+
+      async function cargarHistorialCompleto() {
+        const mesValue = document.getElementById("selectMesHistorial").value;
+        if (!mesValue) return;
+        const [anio, mes] = mesValue.split("-");
+        const tbody = document.querySelector("#historialTable tbody");
+        tbody.innerHTML = '<tr><td colspan="3">Cargando...</td></tr>';
+        try {
+          const res = await fetch(
+            `/api/mis-registros?anio=${anio}&mes=${mes}`,
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.message);
+          tbody.innerHTML = "";
+          if (data.length === 0) {
+            tbody.innerHTML =
+              '<tr><td colspan="3">No tienes registros para este mes.</td></tr>';
+          } else {
+            data.forEach((registro) => {
+              const tr = document.createElement("tr");
+              const fechaHora = new Date(registro.fecha_hora).toLocaleString(
+                "es-ES",
+                { dateStyle: "long", timeStyle: "medium" }
+              );
+              let observaciones = "Correcto";
+              if (registro.es_modificado) {
+                const title = `Editado por Admin. Motivo: ${
+                  registro.motivo_modificacion || "No especificado"
+                }`;
+                observaciones = `<span title="${title}" style="cursor: help; color: #f39c12; font-weight: bold;">Modificado ✏️</span>`;
+              }
+              tr.innerHTML = `<td>${fechaHora}</td><td>${registro.tipo}</td><td>${observaciones}</td>`;
+              tbody.appendChild(tr);
+            });
+          }
+        } catch (error) {
+          tbody.innerHTML = `<tr><td colspan="3" class="error">${error.message}</td></tr>`;
+        }
+      }
+
+      async function cargarContadorVacaciones() {
+        const infoP = document.getElementById("info-dias-calendario");
+        infoP.textContent = "Cargando días...";
+        try {
+          const res = await fetch("/api/mis-vacaciones-restantes", {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.message);
+          infoP.innerHTML = `Disponibles (laborables): <span class="dias-restantes">${data.diasRestantes}</span> / ${data.diasTotales} (Gastados: ${data.diasGastados})`;
+        } catch (error) {
+          console.error("Error al cargar el contador de vacaciones:", error);
+          infoP.textContent = "No se pudo cargar el balance de días.";
+          infoP.style.color = "red";
+        }
+      }
+
+      function inicializarMiCalendario() {
+        const calendarioEl = document.getElementById("miCalendario");
+        miCalendario = new FullCalendar.Calendar(calendarioEl, {
+          initialView: "dayGridMonth",
+          locale: "es",
+          headerToolbar: { left: "prev,next", center: "title", right: "today" },
+          events: function (fetchInfo, successCallback, failureCallback) {
+            fetch("/api/mis-vacaciones", {
+              method: "GET",
+              headers: { Authorization: `Bearer ${token}` },
+            })
+              .then((res) =>
+                res.ok ? res.json() : Promise.reject("Error en respuesta")
+              )
+              .then((data) => {
+                const eventosProcesados = data.map((evento) => ({
+                  ...evento,
+                  end: new Date(new Date(evento.end).getTime() + 86400000)
+                    .toISOString()
+                    .split("T")[0],
+                }));
+                successCallback(eventosProcesados);
+              })
+              .catch((error) => {
+                failureCallback(error);
+              });
+          },
+        });
+        miCalendario.render();
+      }
+
+      async function cargarDatosSolicitudes() {
+        const infoP = document.getElementById("info-dias-solicitud");
+        const tbody = document.querySelector("#misSolicitudesTable tbody");
+        infoP.textContent = "Cargando...";
+        tbody.innerHTML = '<tr><td colspan="2">Cargando...</td></tr>';
+        try {
+          const [resDias, resSol] = await Promise.all([
+            fetch("/api/mis-vacaciones-restantes", {
+              headers: { Authorization: `Bearer ${token}` },
+            }),
+            fetch("/api/mis-solicitudes", {
+              headers: { Authorization: `Bearer ${token}` },
+            }),
+          ]);
+
+          const dataDias = await resDias.json();
+          infoP.innerHTML = `Disponibles (laborables): <span class="dias-restantes">${dataDias.diasRestantes.toFixed(
+            1
+          )}</span> / ${dataDias.diasTotales.toFixed(1)}`;
+          const dataSol = await resSol.json();
+          tbody.innerHTML = "";
+          if (dataSol.length > 0) {
+            dataSol.forEach((sol) => {
+              const tr = document.createElement("tr");
+              const fInicio = new Date(sol.fecha_inicio).toLocaleDateString(
+                "es-ES"
+              );
+              const fFin = new Date(sol.fecha_fin).toLocaleDateString("es-ES");
+              tr.innerHTML = `<td>Del ${fInicio} al ${fFin}</td><td><span class="status-${sol.estado}">${sol.estado}</span></td>`;
+              tbody.appendChild(tr);
+            });
+          } else {
+            tbody.innerHTML =
+              '<tr><td colspan="2">No tienes solicitudes.</td></tr>';
+          }
+        } catch (error) {
+          console.error("Error cargando solicitudes:", error);
+        }
+      }
+
+      async function inicializarPanel() {
+        try {
+          const res = await fetch("/api/estado", {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (!res.ok) {
+            if (res.status === 401 || res.status === 403) logout();
+            return;
+          }
+          const data = await res.json();
+          actualizarBotones(data.estado);
+        } catch (error) {
+          console.error("Error al inicializar panel:", error);
+        }
+      }
+      async function iniciarFichaje(tipo) {
+        cameraModal.style.display = "flex";
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: "user" },
+          });
+          video.srcObject = stream;
+          setTimeout(() => tomarFotoYFichar(tipo), 3000);
+        } catch (err) {
+          alert("No se pudo acceder a la cámara.");
+          cameraModal.style.display = "none";
+        }
+      }
+      function tomarFotoYFichar(tipo) {
+        const context = canvas.getContext("2d");
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        stream.getTracks().forEach((track) => track.stop());
+        cameraModal.style.display = "none";
+        canvas.toBlob((blob) => {
+          const formData = new FormData();
+          formData.append("tipo", tipo);
+          formData.append("foto", blob, "fichaje.jpeg");
+          enviarFichaje(formData);
+        }, "image/jpeg");
+      }
+      async function cargarDatosInicio() {
+        const mesValue = document.getElementById("selectMesHistorial").value;
+        if (!mesValue) return;
+        const [anio, mes] = mesValue.split("-");
+        try {
+          const [resVac, resReg] = await Promise.all([
+            fetch("/api/mis-vacaciones-restantes", {
+              headers: { Authorization: `Bearer ${token}` },
+            }),
+            fetch(`/api/mis-registros?anio=${anio}&mes=${mes}`, {
+              headers: { Authorization: `Bearer ${token}` },
+            }),
+          ]);
+          if (!resVac.ok || !resReg.ok)
+            throw new Error("Error al cargar los datos iniciales.");
+          const dataVac = await resVac.json();
+          const dataReg = await resReg.json();
+
+          document.getElementById("dias-vacaciones").textContent =
+            dataVac.diasRestantes.toFixed(1) ?? "--";
+
+          if (dataVac.fechaContratacion) {
+            const container = document.getElementById("seniority-container");
+            const start = luxon.DateTime.fromISO(dataVac.fechaContratacion);
+            const now = luxon.DateTime.now();
+            const diff = now
+              .diff(start, ["years", "months", "days"])
+              .toObject();
+
+            document.getElementById("seniority-years").textContent =
+              Math.floor(diff.years) || 0;
+            document.getElementById("seniority-months").textContent =
+              Math.floor(diff.months) || 0;
+            document.getElementById("seniority-days").textContent =
+              Math.floor(diff.days) || 0;
+
+            container.style.display = "block";
+          }
+
+          document.getElementById("fichajes-mes").textContent = dataReg.length;
+          const ultimoFichajeDiv = document.getElementById("ultimoFichaje");
+          if (dataReg.length > 0) {
+            const ultimo = dataReg[dataReg.length - 1];
+            const fechaUltimo = new Date(ultimo.fecha_hora).toLocaleString(
+              "es-ES",
+              {
+                day: "numeric",
+                month: "long",
+                hour: "2-digit",
+                minute: "2-digit",
+              }
+            );
+            const tipoUltimo =
+              ultimo.tipo.charAt(0).toUpperCase() + ultimo.tipo.slice(1);
+            const icono =
+              tipoUltimo === "Entrada"
+                ? '<i class="bi bi-box-arrow-in-right" style="color: #2ecc71;"></i>'
+                : '<i class="bi bi-box-arrow-right" style="color: #e74c3c;"></i>';
+            ultimoFichajeDiv.innerHTML = `<p>${icono} <strong>${tipoUltimo}</strong> - ${fechaUltimo}</p>`;
+          } else {
+            ultimoFichajeDiv.innerHTML = "<p>No hay información disponible</p>";
+          }
+        } catch (error) {
+          console.error("Error cargando datos de inicio:", error);
+        }
+      }
+      async function enviarFichaje(formData) {
+        const tipo = formData.get("tipo");
+        const button = tipo === "entrada" ? btnEntrada : btnSalida;
+        button.innerHTML = '<div class="loader"></div>';
+        button.disabled = true;
+        try {
+          const res = await fetch("/api/fichar", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}` },
+            body: formData,
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.message);
+          Swal.fire({
+            icon: "success",
+            title: "¡Registrado!",
+            text: data.message,
+            timer: 2000,
+            showConfirmButton: false,
+          });
+          inicializarPanel();
+          cargarDatosInicio();
+        } catch (error) {
+          Swal.fire({
+            icon: "error",
+            title: "Error",
+            text: error.message || "Error de conexión.",
+          });
+        } finally {
+          const iconClass = tipo === "entrada" ? "bi-plus-lg" : "bi-dash-lg";
+          button.innerHTML = `<i class="bi ${iconClass}"></i>`;
+        }
+      }
+      function actualizarBotones(estado) {
+        btnEntrada.disabled = estado === "entrada";
+        btnSalida.disabled = estado !== "entrada";
+      }
+
+      document.addEventListener("DOMContentLoaded", () => {
+        const navItems = document.querySelectorAll(".nav-item");
+        const tabContents = document.querySelectorAll(".tab-content");
+
+        navItems.forEach((item) => {
+          item.addEventListener("click", (e) => {
+            e.preventDefault();
+            const targetId = item.getAttribute("data-target");
+            tabContents.forEach((content) =>
+              content.classList.remove("active")
+            );
+            document.getElementById(targetId).classList.add("active");
+            navItems.forEach((i) => i.classList.remove("active"));
+            item.classList.add("active");
+            if (targetId === "historial-content") {
+              cargarHistorialCompleto();
+            } else if (targetId === "calendario-content") {
+              cargarContadorVacaciones();
+              if (!miCalendario) {
+                inicializarMiCalendario();
+              }
+            } else if (targetId === "solicitudes-content") {
+              cargarDatosSolicitudes();
+            }
+          });
+        });
+
+        document
+          .getElementById("solicitarVacacionesForm")
+          .addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const fechaInicio = document.getElementById(
+              "fechaInicioSolicitud"
+            ).value;
+            const fechaFin = document.getElementById("fechaFinSolicitud").value;
+
+            if (!fechaInicio || !fechaFin) {
+              Swal.fire(
+                "Atención",
+                "Por favor, selecciona una fecha de inicio y de fin.",
+                "warning"
+              );
+              return;
+            }
+
+            const diasLaborablesSeleccionados = calcularDiasLaborables(
+              fechaInicio,
+              fechaFin
+            );
+            if (diasLaborablesSeleccionados < 5) {
+              Swal.fire({
+                icon: "error",
+                title: "Solicitud no válida",
+                text: `Debes solicitar un mínimo de 5 días laborables. Has seleccionado ${diasLaborablesSeleccionados}.`,
+              });
+              return;
+            }
+            if (diasLaborablesSeleccionados > 10) {
+              Swal.fire({
+                icon: "error",
+                title: "Solicitud no válida",
+                text: `Puedes solicitar un máximo de 10 días laborables. Has seleccionado ${diasLaborablesSeleccionados}.`,
+              });
+              return;
+            }
+
+            const btn = e.target.querySelector("button");
+            btn.disabled = true;
+            btn.textContent = "Enviando...";
+
+            try {
+              const res = await fetch("/api/solicitar-vacaciones", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({ fechaInicio, fechaFin }),
+              });
+              const data = await res.json();
+              if (!res.ok) throw new Error(data.message);
+
+              Swal.fire("¡Éxito!", data.message, "success");
+              e.target.reset();
+              cargarDatosSolicitudes();
+            } catch (error) {
+              Swal.fire("Error", error.message, "error");
+            } finally {
+              btn.disabled = false;
+              btn.textContent = "Enviar Solicitud";
+            }
+          });
+
+        // --- NUEVO: EVENT LISTENER PARA EL FORMULARIO DE JUSTIFICANTE ---
+        document
+          .getElementById("formJustificante")
+          .addEventListener("submit", async (e) => {
+            e.preventDefault();
+
+            const form = e.target;
+            const formData = new FormData();
+
+            formData.append("fechaInicio", form.fechaInicioJustificante.value);
+            formData.append("fechaFin", form.fechaFinJustificante.value);
+            formData.append("motivo", form.motivoJustificante.value);
+            formData.append("justificante", form.archivoJustificante.files[0]);
+
+            Swal.fire({
+              title: "Subiendo justificante...",
+              text: "Por favor, espera.",
+              allowOutsideClick: false,
+              didOpen: () => {
+                Swal.showLoading();
+              },
+            });
+
+            try {
+              const res = await fetch("/api/justificantes", {
+                method: "POST",
+                headers: { Authorization: `Bearer ${token}` },
+                body: formData,
+              });
+
+              const data = await res.json();
+              if (!res.ok) throw new Error(data.message);
+
+              Swal.fire(
+                "¡Éxito!",
+                "Tu justificante ha sido enviado correctamente.",
+                "success"
+              );
+              form.reset();
+            } catch (error) {
+              Swal.fire(
+                "Error",
+                `No se pudo enviar el justificante: ${error.message}`,
+                "error"
+              );
+            }
+          });
+
+        // JavaScript para panel.html (pegar dentro del script)
+        async function cargarNominas() {
+          /* ... (código de la respuesta anterior) ... */
+        }
+        // Y modifica el event listener de las pestañas para incluir:
+        // else if (targetId === 'nominas-content') { cargarNominas(); }
+
+        function inicializarPaginaEmpleado() {
+          const hoy = new Date();
+          document.getElementById(
+            "selectMesHistorial"
+          ).value = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(
+            2,
+            "0"
+          )}`;
+          inicializarPanel();
+          cargarDatosInicio();
+        }
+
+        inicializarPaginaEmpleado();
+      });
     </script>
-</body>
+  </body>
 </html>
