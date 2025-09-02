@@ -13,6 +13,17 @@
     />
   </head>
   <body>
+    <header class="mobile-header">
+        <button id="hamburger-btn" aria-label="Abrir menú">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <span class="mobile-header-title">Panel de Admin</span>
+    </header>
+
+    <div class="overlay"></div>
+
     <!-- Contenedor principal que crea el layout de dos columnas -->
     <div class="admin-container">
       
@@ -386,6 +397,34 @@
             '<tr><td colspan="5">Error al cargar datos.</td></tr>';
         }
       }
+
+       document.addEventListener('DOMContentLoaded', () => {
+          const hamburgerBtn = document.getElementById('hamburger-btn');
+          const sidebar = document.querySelector('.sidebar');
+          const overlay = document.querySelector('.overlay');
+
+          function closeMenu() {
+              sidebar.classList.remove('sidebar-visible');
+              overlay.classList.remove('visible');
+          }
+
+          if (hamburgerBtn && sidebar && overlay) {
+              hamburgerBtn.addEventListener('click', () => {
+                  sidebar.classList.toggle('sidebar-visible');
+                  overlay.classList.toggle('visible');
+              });
+
+              overlay.addEventListener('click', closeMenu);
+
+              // Cierra el menú si se hace clic en un enlace
+              const navLinks = sidebar.querySelectorAll('a');
+              navLinks.forEach(link => {
+                  link.addEventListener('click', closeMenu);
+              });
+          }
+      });
+
+      
 
                   async function abrirModalEdicion(
         registroId,
