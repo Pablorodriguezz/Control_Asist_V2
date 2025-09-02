@@ -13,259 +13,238 @@
     />
   </head>
   <body>
-    <header class="mobile-header">
-        <button id="hamburger-btn" aria-label="Abrir menú">
-            <span></span>
-            <span></span>
-            <span></span>
-        </button>
-        <span class="mobile-header-title">Panel de Admin</span>
-    </header>
+    <div class="container">
+      <button class="logout-btn" onclick="logout()">Cerrar Sesión</button>
+      <h1>Panel de Administración</h1>
 
-    <div class="overlay"></div>
+      <nav class="admin-nav">
+        <ul>
+          <li><a href="#dashboard">Panel de Control</a></li>
+          <li><a href="#informe-diario">Informe Diario</a></li>
+          <li><a href="#informe-mensual">Informe Mensual</a></li>
+          <li><a href="#gestion-usuarios">Gestión Usuarios</a></li>
+          <li><a href="#crear-usuario">Crear Usuario</a></li>
+          <li><a href="#fichaje-manual">Fichaje Manual</a></li>
+          <li><a href="#gestion-vacaciones">Gestión Vacaciones</a></li>
+          <li><a href="#solicitudes-pendientes">Solicitudes Pendientes</a></li>
+          <li><a href="#gestion-justificantes">Justificantes</a></li>
+        </ul>
+      </nav>
 
-    <!-- Contenedor principal que crea el layout de dos columnas -->
-    <div class="admin-container">
-      
-      <!-- ======================= -->
-      <!-- BARRA LATERAL (ASIDE) -->
-      <!-- ======================= -->
-      <aside class="sidebar">
-        <div class="sidebar-header">
-          <h1>Panel Admin</h1>
+      <!-- ===================================== -->
+      <!-- DASHBOARD DE ESTADO EN TIEMPO REAL -->
+      <!-- ===================================== -->
+      <section id="dashboard">
+        <h2>Panel de Control en Tiempo Real</h2>
+        <div class="dashboard-grid">
+          <!-- Widget: Quién está dentro -->
+          <div class="widget">
+            <h3><i class="bi bi-person-check-fill"></i> Empleados Fichados</h3>
+            <ul id="empleados-dentro" class="employee-list">
+              <li>Cargando...</li>
+            </ul>
+          </div>
+
+          <!-- Widget: Quién está fuera -->
+          <div class="widget">
+            <h3><i class="bi bi-person-x-fill"></i> Empleados Fuera</h3>
+            <ul id="empleados-fuera" class="employee-list">
+              <li>Cargando...</li>
+            </ul>
+          </div>
+
+          <!-- Widget: Ausencias del día -->
+          <div class="widget">
+            <h3><i class="bi bi-calendar-x"></i> Ausencias Hoy</h3>
+            <ul id="ausencias-hoy" class="employee-list">
+              <li>Cargando...</li>
+            </ul>
+          </div>
+
+          <!-- Widget: Resumen de Fichajes -->
+          <div class="widget">
+            <h3><i class="bi bi-card-list"></i> Resumen del Día</h3>
+            <p id="total-fichajes">
+              <strong>Total de fichajes hoy:</strong> <span>Cargando...</span>
+            </p>
+            <p id="fichajes-manuales">
+              <strong>Fichajes manuales/editados:</strong>
+              <span>Cargando...</span>
+            </p>
+          </div>
         </div>
-        <!-- La navegación original se mueve aquí dentro -->
-        <nav class="admin-nav">
-          <ul>
-            <li><a href="#dashboard"><i class="bi bi-grid-1x2"></i> Panel de Control</a></li>
-            <li><a href="#solicitudes-pendientes"><i class="bi bi-envelope-paper"></i> Solicitudes</a></li>
-            <li><a href="#gestion-justificantes"><i class="bi bi-file-earmark-medical"></i> Justificantes</a></li>
-            <li><a href="#informe-diario"><i class="bi bi-calendar-day"></i> Informe Diario</a></li>
-            <li><a href="#informe-mensual"><i class="bi bi-calendar-month"></i> Informe Mensual</a></li>
-            <li><a href="#gestion-usuarios"><i class="bi bi-people"></i> Gestión Usuarios</a></li>
-            <li><a href="#crear-usuario"><i class="bi bi-person-plus"></i> Crear Usuario</a></li>
-            <li><a href="#fichaje-manual"><i class="bi bi-pencil-square"></i> Fichaje Manual</a></li>
-            <li><a href="#gestion-vacaciones"><i class="bi bi-airplane"></i> Gestión Vacaciones</a></li>
-          </ul>
-        </nav>
-        <div class="sidebar-footer">
-          <button class="logout-btn" onclick="logout()">Cerrar Sesión</button>
+      </section>
+      <hr />
+
+      <section id="solicitudes-pendientes">
+        <h2>Solicitudes de Vacaciones Pendientes</h2>
+        <div class="table-container">
+          <table id="tablaSolicitudes">
+            <thead>
+              <tr>
+                <th>Empleado</th>
+                <th>Periodo Solicitado</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
         </div>
-      </aside>
+      </section>
+      <hr />
 
-      <!-- ========================= -->
-      <!-- CONTENIDO PRINCIPAL (MAIN)-->
-      <!-- ========================= -->
-      <main class="main-content-area">
-        <!-- El contenido original va aquí, pero sin el h1, nav y botón de logout iniciales -->
-
-        <!-- ===================================== -->
-        <!-- DASHBOARD DE ESTADO EN TIEMPO REAL -->
-        <!-- ===================================== -->
-        <section id="dashboard">
-          <h2>Panel de Control en Tiempo Real</h2>
-          <div class="dashboard-grid">
-            <!-- Widget: Quién está dentro -->
-            <div class="widget">
-              <h3><i class="bi bi-person-check-fill"></i> Empleados Fichados</h3>
-              <ul id="empleados-dentro" class="employee-list">
-                <li>Cargando...</li>
-              </ul>
-            </div>
-
-            <!-- Widget: Quién está fuera -->
-            <div class="widget">
-              <h3><i class="bi bi-person-x-fill"></i> Empleados Fuera</h3>
-              <ul id="empleados-fuera" class="employee-list">
-                <li>Cargando...</li>
-              </ul>
-            </div>
-
-            <!-- Widget: Ausencias del día -->
-            <div class="widget">
-              <h3><i class="bi bi-calendar-x"></i> Ausencias Hoy</h3>
-              <ul id="ausencias-hoy" class="employee-list">
-                <li>Cargando...</li>
-              </ul>
-            </div>
-
-            <!-- Widget: Resumen de Fichajes -->
-            <div class="widget">
-              <h3><i class="bi bi-card-list"></i> Resumen del Día</h3>
-              <p id="total-fichajes">
-                <strong>Total de fichajes hoy:</strong> <span>Cargando...</span>
-              </p>
-              <p id="fichajes-manuales">
-                <strong>Fichajes manuales/editados:</strong>
-                <span>Cargando...</span>
-              </p>
-            </div>
-          </div>
-        </section>
-        <hr />
-
-        <section id="solicitudes-pendientes">
-          <h2>Solicitudes de Vacaciones Pendientes</h2>
-          <div class="table-container">
-            <table id="tablaSolicitudes">
-              <thead>
-                <tr>
-                  <th>Empleado</th>
-                  <th>Periodo Solicitado</th>
-                  <th>Acciones</th>
-                </tr>
-              </thead>
-              <tbody></tbody>
+       <section id="gestion-justificantes">
+        <h2>Justificantes Recibidos</h2>
+        <div class="table-container">
+            <table id="tablaJustificantes">
+                <thead>
+                    <tr>
+                        <th>Empleado</th>
+                        <th>Periodo Ausencia</th>
+                        <th>Motivo</th>
+                        <th>Fecha de Envío</th>
+                        <th>Archivo</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Los datos se cargarán aquí con JavaScript -->
+                </tbody>
             </table>
-          </div>
-        </section>
-        <hr />
+        </div>
+      </section>
+      <hr />
 
-        <section id="gestion-justificantes">
-          <h2>Justificantes Recibidos</h2>
-          <div class="table-container">
-              <table id="tablaJustificantes">
-                  <thead>
-                      <tr>
-                          <th>Empleado</th>
-                          <th>Periodo Ausencia</th>
-                          <th>Motivo</th>
-                          <th>Fecha de Envío</th>
-                          <th>Archivo</th>
-                          <th>Acciones</th>
-                      </tr>
-                  </thead>
-                  <tbody>
-                      <!-- Los datos se cargarán aquí con JavaScript -->
-                  </tbody>
-              </table>
-          </div>
-        </section>
-        <hr />
+      <section id="informe-diario">
+        <h2>Informe de Asistencia Diario</h2>
+        <input type="date" id="fecha" onchange="getReport()" />
+        <div class="table-container">
+          <table id="reportTable">
+            <thead>
+              <tr>
+                <th>Nombre</th>
+                <th>Fecha y Hora</th>
+                <th>Tipo</th>
+                <th>Foto</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+      <hr />
 
-        <section id="informe-diario">
-          <h2>Informe de Asistencia Diario</h2>
-          <input type="date" id="fecha" onchange="getReport()" />
-          <div class="table-container">
-            <table id="reportTable">
-              <thead>
-                <tr>
-                  <th>Nombre</th>
-                  <th>Fecha y Hora</th>
-                  <th>Tipo</th>
-                  <th>Foto</th>
-                  <th>Acciones</th>
-                </tr>
-              </thead>
-              <tbody></tbody>
-            </table>
-          </div>
-        </section>
-        <hr />
+      <section id="informe-mensual">
+        <h2>Informe Mensual por Trabajador</h2>
+        <div>
+          <select id="selectUsuario" required>
+            <option value="">-- Selecciona un trabajador --</option>
+          </select>
+          <input type="month" id="selectMes" required />
+          <button onclick="generarInformeMensual()">Generar Informe</button>
+          <button
+            id="btnExportar"
+            style="display: none"
+            onclick="exportarCSV()"
+          >
+            Exportar a CSV
+          </button>
+        </div>
+        <div id="informeMensualContainer" style="margin-top: 20px"></div>
+      </section>
+      <hr />
 
-        <section id="informe-mensual">
-          <h2>Informe Mensual por Trabajador</h2>
-          <div>
-            <select id="selectUsuario" required>
-              <option value="">-- Selecciona un trabajador --</option>
-            </select>
-            <input type="month" id="selectMes" required />
-            <button onclick="generarInformeMensual()">Generar Informe</button>
-            <button
-              id="btnExportar"
-              style="display: none"
-              onclick="exportarCSV()"
-            >
-              Exportar a CSV
-            </button>
-          </div>
-          <div id="informeMensualContainer" style="margin-top: 20px"></div>
-        </section>
-        <hr />
+      <section id="gestion-usuarios">
+        <h2>Gestión de Usuarios</h2>
+        <div class="table-container">
+          <table id="usersTable">
+            <thead>
+              <tr>
+                <th>Nombre</th>
+                <th>Usuario</th>
+                <th>Rol</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+      <hr />
 
-        <section id="gestion-usuarios">
-          <h2>Gestión de Usuarios</h2>
-          <div class="table-container">
-            <table id="usersTable">
-              <thead>
-                <tr>
-                  <th>Nombre</th>
-                  <th>Usuario</th>
-                  <th>Rol</th>
-                  <th>Acciones</th>
-                </tr>
-              </thead>
-              <tbody></tbody>
-            </table>
-          </div>
-        </section>
-        <hr />
-        
-        <section id="crear-usuario">
-            <h2>Crear Nuevo Usuario</h2>
-            <form id="createUserForm">
-              <input type="text" id="nombre" placeholder="Nombre completo" required />
-              <input type="text" id="usuario" placeholder="Nombre de usuario (login)" required />
-              <input type="password" id="password" placeholder="Contraseña" required />
-              <label for="fechaContratacion" style="text-align: left; margin-top: 10px;">Fecha de Contratación:</label>
-              <input type="date" id="fechaContratacion" required />
-              <select id="rol" required>
-                <option value="empleado" selected>Empleado</option>
-                <option value="admin">Administrador</option>
-                <option value="gestor_vacaciones">Gestor de Vacaciones</option>
-              </select>
-              <button type="submit" class="btn-create">Crear Usuario</button>
-            </form>
-        </section>
-        <hr />
+      <!-- En admin.html, dentro del <form id="createUserForm"> -->
+<section id="crear-usuario">
+    <h2>Crear Nuevo Usuario</h2>
+    <form id="createUserForm">
+      <input type="text" id="nombre" placeholder="Nombre completo" required />
+      <input type="text" id="usuario" placeholder="Nombre de usuario (login)" required />
+      <input type="password" id="password" placeholder="Contraseña" required />
+      <!-- --- NUEVO CAMPO --- -->
+      <label for="fechaContratacion" style="text-align: left; margin-top: 10px;">Fecha de Contratación:</label>
+      <input type="date" id="fechaContratacion" required />
 
-        <section id="fichaje-manual">
-          <h2>Crear Fichaje Manual</h2>
-          <form id="manualAttendanceForm">
-            <label for="manualUsuario">Trabajador:</label>
-            <select id="manualUsuario" required>
-              <option value="">-- Selecciona un trabajador --</option>
-            </select>
-            <label for="manualFechaHora">Fecha y Hora del Fichaje:</label>
-            <input type="datetime-local" id="manualFechaHora" required />
-            <label for="manualTipo">Tipo de Fichaje:</label>
-            <select id="manualTipo" required>
-              <option value="" disabled selected>-- Selecciona tipo --</option>
-              <option value="entrada">Entrada</option>
-              <option value="salida">Salida</option>
-            </select>
-            <label for="manualMotivo">Motivo (ej: olvido, error del sistema):</label>
-            <textarea
-              id="manualMotivo"
-              placeholder="Es obligatorio explicar por qué se crea este fichaje."
-              required
-            ></textarea>
-            <button type="submit">Crear Fichaje Manual</button>
-          </form>
-        </section>
-        <hr />
+      <select id="rol" required>
+        <option value="empleado" selected>Empleado</option>
+        <option value="admin">Administrador</option>
+        <option value="gestor_vacaciones">Gestor de Vacaciones</option>
+      </select>
+      <button type="submit" class="btn-create">Crear Usuario</button>
+    </form>
+</section>
+      <hr />
 
-        <section id="gestion-vacaciones">
-          <h2>Gestión de Vacaciones</h2>
-          <form id="formVacaciones">
-            <label for="vacacionesUsuario">Trabajador:</label>
-            <select id="vacacionesUsuario" required>
-              <option value="">-- Selecciona un trabajador --</option>
-            </select>
-            <span
-              id="infoDiasRestantes"
-              style="display: block; margin-bottom: 15px; font-weight: bold"
-            ></span>
-            <label for="fechaInicio">Fecha de Inicio:</label>
-            <input type="date" id="fechaInicio" required />
-            <label for="fechaFin">Fecha de Fin:</label>
-            <input type="date" id="fechaFin" required />
-            <button type="submit">Asignar Vacaciones</button>
-          </form>
-          <hr style="margin: 20px 0" />
-          <div id="calendarioVacaciones"></div>
-        </section>
-      </main>
+      <section id="fichaje-manual">
+        <h2>Crear Fichaje Manual</h2>
+        <form id="manualAttendanceForm">
+          <label for="manualUsuario">Trabajador:</label>
+          <select id="manualUsuario" required>
+            <option value="">-- Selecciona un trabajador --</option>
+          </select>
+          <label for="manualFechaHora">Fecha y Hora del Fichaje:</label>
+          <input type="datetime-local" id="manualFechaHora" required />
+          <label for="manualTipo">Tipo de Fichaje:</label>
+          <select id="manualTipo" required>
+            <option value="" disabled selected>-- Selecciona tipo --</option>
+            <option value="entrada">Entrada</option>
+            <option value="salida">Salida</option>
+          </select>
+          <label for="manualMotivo"
+            >Motivo (ej: olvido, error del sistema):</label
+          >
+          <textarea
+            id="manualMotivo"
+            placeholder="Es obligatorio explicar por qué se crea este fichaje."
+            required
+          ></textarea>
+          <button type="submit">Crear Fichaje Manual</button>
+        </form>
+      </section>
+      <hr />
+
+      <section id="gestion-vacaciones">
+        <h2>Gestión de Vacaciones</h2>
+        <form id="formVacaciones">
+          <label for="vacacionesUsuario">Trabajador:</label>
+          <select id="vacacionesUsuario" required>
+            <option value="">-- Selecciona un trabajador --</option>
+          </select>
+          <span
+            id="infoDiasRestantes"
+            style="display: block; margin-bottom: 15px; font-weight: bold"
+          ></span>
+
+          <label for="fechaInicio">Fecha de Inicio:</label>
+          <input type="date" id="fechaInicio" required />
+
+          <label for="fechaFin">Fecha de Fin:</label>
+          <input type="date" id="fechaFin" required />
+
+          <button type="submit">Asignar Vacaciones</button>
+        </form>
+        <hr style="margin: 20px 0" />
+        <div id="calendarioVacaciones"></div>
+      </section>
     </div>
 
     <button id="scrollTopBtn" title="Volver arriba">⇧</button>
@@ -397,34 +376,6 @@
             '<tr><td colspan="5">Error al cargar datos.</td></tr>';
         }
       }
-
-       document.addEventListener('DOMContentLoaded', () => {
-          const hamburgerBtn = document.getElementById('hamburger-btn');
-          const sidebar = document.querySelector('.sidebar');
-          const overlay = document.querySelector('.overlay');
-
-          function closeMenu() {
-              sidebar.classList.remove('sidebar-visible');
-              overlay.classList.remove('visible');
-          }
-
-          if (hamburgerBtn && sidebar && overlay) {
-              hamburgerBtn.addEventListener('click', () => {
-                  sidebar.classList.toggle('sidebar-visible');
-                  overlay.classList.toggle('visible');
-              });
-
-              overlay.addEventListener('click', closeMenu);
-
-              // Cierra el menú si se hace clic en un enlace
-              const navLinks = sidebar.querySelectorAll('a');
-              navLinks.forEach(link => {
-                  link.addEventListener('click', closeMenu);
-              });
-          }
-      });
-
-      
 
                   async function abrirModalEdicion(
         registroId,
