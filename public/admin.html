@@ -1185,7 +1185,45 @@ async function ajustarDiasCompensatorios(userId, userName, currentDays) {
           }
 
            // ===================================================
-      // === NUEVAS FUNCIONES PARA LA GESTIÓN DE NÓMINAS ===
+      
+
+          // Para Admin/Gestor, no hay restricción de min/max días, pero se puede añadir una advertencia.
+          const diasLaborablesAsignados = calcularDiasLaborables(fechaInicio, fechaFin);
+          if (window.vacationData && diasLaborablesAsignados > window.vacationData.diasRestantes) {
+              const confirmation = await Swal.fire({
+                  icon: 'warning',
+                  title: 'Saldo insuficiente',
+                  html: `Estás asignando <strong>${diasLaborablesAsignados}</strong> días laborables, pero al trabajador solo le quedan <strong>${window.vacationData.diasRestantes}</strong> disponibles.<br><br>¿Deseas continuar de todos modos?`,
+                  showCancelButton: true,
+                  confirmButtonText: 'Sí, asignar',
+                  cancelButtonText: 'Cancelar'
+              });
+              if (!confirmation.isConfirmed) {
+                  return;
+              }
+          }
+
+          try {
+            const res = await fetch("/api/vacaciones", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify({ usuarioId, fechaInicio, fechaFin }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message);
+            Swal.fire("¡Éxito!", "Vacaciones asignadas.", "success");
+            e.target.reset();
+            calendario.refetchEvents();
+            mostrarDiasRestantes(); // Actualizamos el contador
+          } catch (error) {
+            Swal.fire("Error", `No se pudo asignar: ${error.message}`, "error");
+          }
+        });
+
+        // === NUEVAS FUNCIONES PARA LA GESTIÓN DE NÓMINAS ===
       // ===================================================
       async function cargarNominasAdmin() {
           const tbody = document.querySelector("#tablaNominasAdmin tbody");
@@ -1245,42 +1283,6 @@ async function ajustarDiasCompensatorios(userId, userName, currentDays) {
               }
           }
       }
-
-          // Para Admin/Gestor, no hay restricción de min/max días, pero se puede añadir una advertencia.
-          const diasLaborablesAsignados = calcularDiasLaborables(fechaInicio, fechaFin);
-          if (window.vacationData && diasLaborablesAsignados > window.vacationData.diasRestantes) {
-              const confirmation = await Swal.fire({
-                  icon: 'warning',
-                  title: 'Saldo insuficiente',
-                  html: `Estás asignando <strong>${diasLaborablesAsignados}</strong> días laborables, pero al trabajador solo le quedan <strong>${window.vacationData.diasRestantes}</strong> disponibles.<br><br>¿Deseas continuar de todos modos?`,
-                  showCancelButton: true,
-                  confirmButtonText: 'Sí, asignar',
-                  cancelButtonText: 'Cancelar'
-              });
-              if (!confirmation.isConfirmed) {
-                  return;
-              }
-          }
-
-          try {
-            const res = await fetch("/api/vacaciones", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`,
-              },
-              body: JSON.stringify({ usuarioId, fechaInicio, fechaFin }),
-            });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.message);
-            Swal.fire("¡Éxito!", "Vacaciones asignadas.", "success");
-            e.target.reset();
-            calendario.refetchEvents();
-            mostrarDiasRestantes(); // Actualizamos el contador
-          } catch (error) {
-            Swal.fire("Error", `No se pudo asignar: ${error.message}`, "error");
-          }
-        });
 
       function inicializarPagina() {
         document.getElementById("fecha").valueAsDate = new Date();
