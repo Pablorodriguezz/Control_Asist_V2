@@ -342,6 +342,39 @@ body.login-page .logo-img {
   font-size: 1.8rem;
 }
 
+/* =================================================================== */
+/* === ESTILOS PARA EL CONTADOR DE ACTUALIZACIÓN AUTOMÁTICA === */
+/* =================================================================== */
+
+#autoRefreshCounter {
+  position: sticky; /* Se pega a la parte de arriba al hacer scroll */
+  top: 15px;
+  right: 30px; /* Lo alineamos a la derecha del área de contenido */
+  float: right; /* Hace que el texto del dashboard fluya a su izquierda */
+  clear: both; /* Evita que se solape con otros elementos flotantes */
+  background-color: #ffffff;
+  padding: 8px 15px;
+  border-radius: 20px;
+  border: 1px solid #e0e0e0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  font-size: 0.9rem;
+  color: #555;
+  z-index: 950;
+  margin-bottom: 10px; /* Espacio para que no se pegue al título "Panel de Control" */
+}
+
+#autoRefreshCounter #countdown {
+  font-weight: bold;
+  color: var(--primary-color);
+}
+
+/* Ocultar el contador en pantallas de móvil para no ocupar espacio */
+@media (max-width: 900px) {
+  #autoRefreshCounter {
+    display: none;
+  }
+}
+
 /* 6. Diseño Responsivo para móviles */
 @media (max-width: 800px) {
   body.login-page .container {
