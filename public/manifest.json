@@ -1,6 +1,6 @@
 {
-  "name": "Control de Asistencia HC",
-  "short_name": "AsistenciaHC",
+  "name": "Hostel Cleaning",
+  "short_name": "HC",
   "description": "Aplicación para el control de asistencia y fichaje de empleados.",
   "start_url": "/index.html",
   "display": "standalone",
