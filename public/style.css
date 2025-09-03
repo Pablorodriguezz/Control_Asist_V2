@@ -261,4 +261,188 @@ hr { border: none; border-top: 1px solid #eee; margin: 25px 0; }
         transform: translateX(-100%); transition: transform 0.3s ease-in-out;
     }
     .admin-page .sidebar.sidebar-visible { transform: translateX(0); }
+
+    /* =================================================================== */
+/* === ESTILOS MEJORADOS PARA EL LOGIN (index.html) === */
+/* =================================================================== */
+
+/* Estilo base para la página de login */
+.login-page {
+  /* Imagen de fondo - ¡Puedes cambiarla por una tuya! */
+  background-image: url("https://images.unsplash.com/photo-1582719478212-c857e5405b62?q=80&w=2070&auto=format&fit=crop");
+  background-size: cover;
+  background-position: center center;
+  background-attachment: fixed;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+.login-page-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(100vh - 40px);
+  width: 100%;
+}
+
+/* Contenedor principal del login */
+.login-container {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr; /* Dos columnas */
+  width: 100%;
+  max-width: 950px;
+  min-height: 600px;
+  background: rgba(255, 255, 255, 0.15); /* Efecto cristal */
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2);
+  overflow: hidden; /* Para que los bordes redondeados afecten a los hijos */
+}
+
+/* Columna izquierda con mensaje de bienvenida (Showcase) */
+.login-showcase {
+  background-color: rgba(0, 0, 0, 0.2);
+  padding: 40px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  color: white;
+}
+
+.login-showcase h2 {
+  font-size: 2.5rem;
+  line-height: 1.2;
+  border: none;
+  padding: 0;
+  margin-bottom: 20px;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.login-showcase p {
+  font-size: 1.1rem;
+  line-height: 1.6;
+}
+
+/* Columna derecha con el formulario */
+.login-form-area {
+  padding: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.form-content-wrapper {
+  width: 100%;
+  max-width: 380px;
+  text-align: center;
+}
+
+.logo-group {
+  margin-bottom: 25px;
+}
+.logo-group .logo-img {
+  max-height: 70px; /* Ajusta el tamaño del logo */
+  width: auto;
+}
+
+/* Estilos específicos para elementos dentro del login */
+.login-page h1 {
+  color: var(--text-color-primary);
+  font-size: 1.8rem;
+  margin-bottom: 25px;
+  padding-bottom: 0;
+  border-bottom: none;
+  text-align: center;
+}
+
+.login-page input[type="text"],
+.login-page input[type="password"] {
+  background-color: #f4f6f9;
+  border: 1px solid #ddd;
+}
+.login-page input[type="text"]:focus,
+.login-page input[type="password"]:focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(233, 30, 99, 0.2);
+  outline: none;
+}
+
+.login-page .btn-principal {
+  width: 100%;
+  margin-top: 10px;
+  box-shadow: 0 4px 15px rgba(233, 30, 99, 0.3);
+}
+
+.login-page .btn-secundario {
+  width: 100%;
+  background-color: transparent;
+  border: 1px solid #ccc;
+  color: #555;
+}
+.login-page .btn-secundario:hover {
+  background-color: #f0f0f0;
+  border-color: #bbb;
+}
+
+.separator {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  color: #aaa;
+  margin: 25px 0;
+}
+.separator::before,
+.separator::after {
+  content: "";
+  flex: 1;
+  border-bottom: 1px solid #ddd;
+}
+.separator:not(:empty)::before {
+  margin-right: 0.5em;
+}
+.separator:not(:empty)::after {
+  margin-left: 0.5em;
+}
+
+/* === RESPONSIVE DESIGN: Vista para Móviles y Tablets === */
+@media (max-width: 950px) {
+  .login-container {
+    /* Se convierte en una sola columna */
+    grid-template-columns: 1fr;
+    min-height: auto;
+    max-width: 500px;
+  }
+
+  /* Ocultamos la columna de bienvenida en pantallas pequeñas */
+  .login-showcase {
+    display: none;
+  }
+
+  .login-form-area {
+    padding: 30px;
+  }
+}
+
+@media (max-width: 500px) {
+    .login-page {
+        padding: 10px;
+    }
+    .login-page-wrapper {
+        min-height: calc(100vh - 20px);
+    }
+    .login-container {
+        /* Para que no haya efecto cristal en móviles pequeños y se lea mejor */
+        background: #ffffff;
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+    }
+    .login-form-area {
+        padding: 25px;
+    }
+    .login-page h1 {
+        font-size: 1.5rem;
+    }
+}
 }
