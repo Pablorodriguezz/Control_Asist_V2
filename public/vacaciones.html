@@ -8,6 +8,9 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js'></script>
     <link href='https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css' rel='stylesheet'>
+    <link rel="manifest" href="/manifest.json">
+<!-- Color de la barra de estado en móviles -->
+<meta name="theme-color" content="#e91e63">
 </head>
 <body>
     <div class="container">
@@ -293,5 +296,18 @@ document.getElementById('formVacaciones').addEventListener('submit', async (e) =
         
         inicializarPagina();
     </script>
+    <script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js')
+        .then(registration => {
+          console.log('ServiceWorker registrado con éxito:', registration.scope);
+        })
+        .catch(err => {
+          console.log('El registro del ServiceWorker falló:', err);
+        });
+    });
+  }
+</script>
 </body>
 </html>
