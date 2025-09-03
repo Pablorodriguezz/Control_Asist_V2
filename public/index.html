@@ -10,10 +10,9 @@
       rel="stylesheet"
     />
   </head>
-  <!-- 1. Añadimos la clase 'login-page' al body -->
   <body class="login-page">
     <div class="container">
-      <!-- 2. Creamos la columna izquierda para el logo -->
+      <!-- Columna izquierda para el logo -->
       <div class="login-column logo-column">
         <img
           src="/images/dad1.png"
@@ -22,9 +21,9 @@
         />
       </div>
 
-      <!-- 3. Creamos la columna derecha para el formulario -->
+      <!-- Columna derecha para el formulario -->
       <div class="login-column form-column">
-        <!-- Contenedor para el Login Normal (sin cambios internos) -->
+        <!-- Contenedor para el Login Normal -->
         <div id="loginNormalContainer">
           <h1>Iniciar Sesión</h1>
           <form id="loginForm">
@@ -54,7 +53,7 @@
           <p id="error" class="status-message error" style="display: none"></p>
         </div>
 
-        <!-- Contenedor para Fichaje Rápido (sin cambios internos) -->
+        <!-- Contenedor para Fichaje Rápido -->
         <div id="fichajeRapidoContainer" style="display: none">
           <h1>¿Quién va a fichar?</h1>
           <div id="listaEmpleados" class="employee-grid">
@@ -90,7 +89,6 @@
             if (!res.ok) throw new Error(data.message);
             localStorage.setItem("token", data.token);
 
-            // --- LÓGICA DE REDIRECCIÓN MEJORADA ---
             if (data.rol === "admin") {
               window.location.href = "/admin.html";
             } else if (data.rol === "gestor_vacaciones") {
@@ -113,7 +111,6 @@
       const btnFichajeRapido = document.getElementById("btnFichajeRapido");
       const btnVolverLogin = document.getElementById("btnVolverLogin");
       const listaEmpleadosDiv = document.getElementById("listaEmpleados");
-
       const togglePassword = document.querySelector("#togglePassword");
       const passwordInput = document.querySelector("#password");
 
@@ -124,7 +121,6 @@
               ? "text"
               : "password";
           passwordInput.setAttribute("type", type);
-
           this.classList.toggle("bi-eye-slash-fill");
           this.classList.toggle("bi-eye-fill");
         });
