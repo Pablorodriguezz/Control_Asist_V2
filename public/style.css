@@ -265,8 +265,9 @@ hr { border: none; border-top: 1px solid #eee; margin: 25px 0; }
         transform: translateX(-100%); transition: transform 0.3s ease-in-out;
     }
     .admin-page .sidebar.sidebar-visible { transform: translateX(0); }
+}
 
-    /* =================================================================== */
+/* =================================================================== */
 /* === ESTILOS ESPECÍFICOS PARA EL NUEVO LOGIN DE 2 COLUMNAS === */
 /* =================================================================== */
 
@@ -342,5 +343,4 @@ body.login-page .logo-img {
   body.login-page .logo-img {
     max-width: 150px; /* Hacemos el logo un poco más pequeño */
   }
-}
 }
