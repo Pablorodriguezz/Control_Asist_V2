@@ -272,6 +272,11 @@ hr { border: none; border-top: 1px solid #eee; margin: 25px 0; }
 /* =================================================================== */
 
 /* 1. Body Styling for Login Page */
+/* =================================================================== */
+/* === ESTILOS ESPECÍFICOS PARA EL NUEVO LOGIN DE 2 COLUMNAS === */
+/* =================================================================== */
+
+/* 1. Body Styling for Login Page */
 body.login-page {
   display: flex;
   justify-content: center;
@@ -302,6 +307,18 @@ body.login-page .container {
   flex-direction: column;
   justify-content: center;
 }
+
+/* --- ESTAS SON LAS REGLAS IMPORTANTES --- */
+/* Centra todo el contenido de la columna del formulario (botones incluidos) */
+.form-column {
+  text-align: center;
+}
+/* Asegura que el texto dentro de los inputs siga alineado a la izquierda */
+.form-column input {
+  text-align: left;
+}
+/* --- FIN DE LAS REGLAS IMPORTANTES --- */
+
 
 /* 4. Columna del logo (izquierda) */
 .logo-column {
@@ -344,17 +361,5 @@ body.login-page .logo-img {
     max-width: 150px; /* Hacemos el logo un poco más pequeño */
   }
 
-  /* --- AÑADE ESTAS LÍNEAS AQUÍ DENTRO --- */
-  
-  /* 1. Centra todo el contenido de la columna del formulario */
-  body.login-page .form-column {
-    text-align: center;
-  }
-
-  /* 2. PERO, vuelve a alinear a la izquierda el texto de los inputs para que se vea bien */
-  body.login-page .form-column #loginForm input {
-    text-align: left;
-  }
-  
-  /* --- FIN DEL CÓDIGO A AÑADIR --- */
+  /* Ya no necesitamos las reglas de alineación aquí porque las hemos puesto arriba */
 }
