@@ -343,4 +343,18 @@ body.login-page .logo-img {
   body.login-page .logo-img {
     max-width: 150px; /* Hacemos el logo un poco más pequeño */
   }
+
+  /* --- AÑADE ESTAS LÍNEAS AQUÍ DENTRO --- */
+  
+  /* 1. Centra todo el contenido de la columna del formulario */
+  body.login-page .form-column {
+    text-align: center;
+  }
+
+  /* 2. PERO, vuelve a alinear a la izquierda el texto de los inputs para que se vea bien */
+  body.login-page .form-column #loginForm input {
+    text-align: left;
+  }
+  
+  /* --- FIN DEL CÓDIGO A AÑADIR --- */
 }
