@@ -1763,6 +1763,16 @@
             }
           }
         });
+        // Establecemos un intervalo que se ejecutará cada 30 segundos
+        setInterval(() => {
+          console.log("Actualizando datos del panel en tiempo real...");
+          
+          // Volvemos a llamar a las funciones que cargan los datos dinámicos
+          cargarDashboard();
+          cargarSolicitudesPendientes();
+          cargarJustificantes();
+
+        }, 30000); // 30000 milisegundos = 30 segundos
       }
       document.addEventListener("DOMContentLoaded", () => {
         const hamburgerBtn = document.getElementById("hamburger-btn");
