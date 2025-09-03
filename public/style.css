@@ -32,9 +32,13 @@ body {
     border: 1px solid rgba(255, 255, 255, 0.2);
     box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.1);
     width: 90%;
-    max-width: 900px;
+    max-width: 400px; /* Ancho original para el login de una columna */
     text-align: center;
     margin: 20px auto;
+}
+.logo-img {
+    max-width: 150px;
+    margin-bottom: 20px;
 }
 .main-content {
     width: 100%; max-width: 500px; padding-top: 70px; margin: 0 auto;
@@ -126,7 +130,7 @@ hr { border: none; border-top: 1px solid #eee; margin: 25px 0; }
 .swal2-cancel, .swal2-deny { background-color: #aaa !important; }
 
 /* =================================================================== */
-/* === ESTILOS ESPECÍFICOS PARA EL LOGIN === */
+/* === ESTILOS ESPECÍFICOS PARA EL LOGIN ANTIGUO === */
 /* =================================================================== */
 .password-wrapper {
     position: relative;
@@ -267,7 +271,6 @@ hr { border: none; border-top: 1px solid #eee; margin: 25px 0; }
 /* =================================================================== */
 
 /* 1. Body Styling for Login Page */
-/* Centra la tarjeta de login en medio de la pantalla */
 body.login-page {
   display: flex;
   justify-content: center;
@@ -277,7 +280,7 @@ body.login-page {
   box-sizing: border-box;
 }
 
-/* 2. Modificamos el .container para que sea el contenedor de las columnas */
+/* 2. Modificamos el .container SOLO en la página de login */
 body.login-page .container {
   display: flex;
   flex-direction: row; /* Columnas una al lado de la otra */
@@ -302,16 +305,15 @@ body.login-page .container {
 /* 4. Columna del logo (izquierda) */
 .logo-column {
   align-items: center; /* Centra el logo horizontalmente */
-  background-color: var(
-    --secondary-color
-  ); /* Un fondo suave para diferenciar */
+  background-color: var(--secondary-color); /* Un fondo suave para diferenciar */
 }
 
-.logo-column .logo-img {
-  max-width: 250px; /* Ajusta el tamaño del logo */
-  width: 100%;
-  height: auto;
+/* Anulamos el margen del logo solo en la página de login */
+body.login-page .logo-img {
+  max-width: 250px;
+  margin-bottom: 0;
 }
+
 
 /* 5. Columna del formulario (derecha) */
 .form-column h1 {
@@ -337,7 +339,7 @@ body.login-page .container {
     padding: 30px 20px; /* Menos padding en móvil */
   }
 
-  .logo-column .logo-img {
+  body.login-page .logo-img {
     max-width: 150px; /* Hacemos el logo un poco más pequeño */
   }
 }
