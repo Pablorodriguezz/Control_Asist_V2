@@ -1693,32 +1693,30 @@
       }
 
       function inicializarPagina() {
-        document.getElementById("fecha").valueAsDate = new Date();
-        const hoy = new Date(),
-          offset = hoy.getTimezoneOffset(),
-          hoyLocal = new Date(hoy.getTime() - offset * 60 * 1000);
-        document.getElementById("manualFechaHora").value = hoyLocal
-          .toISOString()
-          .slice(0, 16);
-        selectMes.value = `${hoy.getFullYear()}-${String(
-          hoy.getMonth() + 1
-        ).padStart(2, "0")}`;
+    document.getElementById("fecha").valueAsDate = new Date();
+    const hoy = new Date(),
+        offset = hoy.getTimezoneOffset(),
+        hoyLocal = new Date(hoy.getTime() - offset * 60 * 1000);
+    document.getElementById("manualFechaHora").value = hoyLocal
+        .toISOString()
+        .slice(0, 16);
+    selectMes.value = `${hoy.getFullYear()}-${String(
+        hoy.getMonth() + 1
+    ).padStart(2, "0")}`;
 
-        cargarDashboard();
-        getReport();
-        loadUsers();
-        poblarSelectorUsuarios("selectUsuario");
-        poblarSelectorUsuarios("manualUsuario");
-        poblarSelectorUsuarios("vacacionesUsuario");
-        cargarSolicitudesPendientes();
-        cargarJustificantes();
-        inicializarCalendario();
-        poblarSelectorUsuarios("nominaUsuario");
-        cargarNominasAdmin();
+    // Carga inicial de datos estáticos
+    getReport();
+    loadUsers();
+    poblarSelectorUsuarios("selectUsuario");
+    poblarSelectorUsuarios("manualUsuario");
+    poblarSelectorUsuarios("vacacionesUsuario");
+    inicializarCalendario();
+    poblarSelectorUsuarios("nominaUsuario");
+    cargarNominasAdmin();
 
-        document
-          .getElementById("formSubirNomina")
-          .addEventListener("submit", async (e) => {
+    document
+        .getElementById("formSubirNomina")
+        .addEventListener("submit", async (e) => {
             e.preventDefault();
             const form = e.target;
             const formData = new FormData();
@@ -1731,52 +1729,76 @@
             btn.textContent = "Subiendo...";
 
             try {
-              const res = await fetch("/api/nominas", {
-                method: "POST",
-                headers: { Authorization: `Bearer ${token}` },
-                body: formData,
-              });
-              const data = await res.json();
-              if (!res.ok) throw new Error(data.message);
-              Swal.fire("¡Éxito!", data.message, "success");
-              form.reset();
-              cargarNominasAdmin(); // Recargar la tabla
+                const res = await fetch("/api/nominas", {
+                    method: "POST",
+                    headers: { Authorization: `Bearer ${token}` },
+                    body: formData,
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.message);
+                Swal.fire("¡Éxito!", data.message, "success");
+                form.reset();
+                cargarNominasAdmin(); // Recargar la tabla
             } catch (error) {
-              Swal.fire(
-                "Error",
-                `No se pudo subir la nómina: ${error.message}`,
-                "error"
-              );
+                Swal.fire(
+                    "Error",
+                    `No se pudo subir la nómina: ${error.message}`,
+                    "error"
+                );
             } finally {
-              btn.disabled = false;
-              btn.textContent = "Subir Nómina";
+                btn.disabled = false;
+                btn.textContent = "Subir Nómina";
             }
-          });
+        });
 
-        const fechaInicioInput = document.getElementById("fechaInicio"),
-          fechaFinInput = document.getElementById("fechaFin");
-        fechaInicioInput.addEventListener("change", () => {
-          const fechaInicioSeleccionada = fechaInicioInput.value;
-          if (fechaInicioSeleccionada) {
+    const fechaInicioInput = document.getElementById("fechaInicio"),
+        fechaFinInput = document.getElementById("fechaFin");
+    fechaInicioInput.addEventListener("change", () => {
+        const fechaInicioSeleccionada = fechaInicioInput.value;
+        if (fechaInicioSeleccionada) {
             fechaFinInput.min = fechaInicioSeleccionada;
             if (
-              new Date(fechaFinInput.value) < new Date(fechaInicioSeleccionada)
+                new Date(fechaFinInput.value) < new Date(fechaInicioSeleccionada)
             ) {
-              fechaFinInput.value = fechaInicioSeleccionada;
+                fechaFinInput.value = fechaInicioSeleccionada;
             }
-          }
-        });
-        // Establecemos un intervalo que se ejecutará cada 30 segundos
-        setInterval(() => {
-          console.log("Actualizando datos del panel en tiempo real...");
-          
-          // Volvemos a llamar a las funciones que cargan los datos dinámicos
-          cargarDashboard();
-          cargarSolicitudesPendientes();
-          cargarJustificantes();
+        }
+    });
 
-        }, 30000); // 30000 milisegundos = 30 segundos
-      }
+    // ==========================================================
+    // === NUEVA LÓGICA DE ACTUALIZACIÓN AUTOMÁTICA CON CONTADOR ===
+    // ==========================================================
+    const REFRESH_INTERVAL_SECONDS = 30;
+    let countdown = REFRESH_INTERVAL_SECONDS;
+    const countdownElement = document.getElementById("countdown");
+
+    // Función que se encarga de recargar los datos dinámicos
+    const refreshDynamicData = () => {
+        console.log("Actualizando datos del panel...");
+        cargarDashboard();
+        cargarSolicitudesPendientes();
+        cargarJustificantes();
+    };
+
+    // 1. Carga inicial de los datos dinámicos
+    refreshDynamicData();
+
+    // 2. Inicia el ciclo de actualización
+    setInterval(() => {
+        countdown--;
+        if (countdownElement) {
+            countdownElement.textContent = countdown;
+        }
+
+        if (countdown <= 0) {
+            refreshDynamicData(); // Llama a la recarga de datos
+            countdown = REFRESH_INTERVAL_SECONDS; // Reinicia el contador
+            if (countdownElement) {
+                countdownElement.textContent = countdown;
+            }
+        }
+    }, 1000); // Este intervalo se ejecuta cada segundo para la cuenta atrás
+}
       document.addEventListener("DOMContentLoaded", () => {
         const hamburgerBtn = document.getElementById("hamburger-btn");
         const sidebar = document.querySelector(".sidebar");
