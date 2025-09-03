@@ -10,59 +10,87 @@
       rel="stylesheet"
     />
   </head>
-  <body>
-    <div class="container">
-      <img src="/images/logo1.jpg" alt="Logo de la Empresa" class="logo-img" />
-
-      <!-- Contenedor para el Login Normal -->
-      <div id="loginNormalContainer">
-        <h1>Iniciar Sesión</h1>
-        <form id="loginForm">
-          <input
-            type="text"
-            id="usuario"
-            placeholder="Usuario"
-            required
-            autocomplete="username"
-          />
-          <div class="password-wrapper">
-            <input
-              type="password"
-              id="password"
-              placeholder="Contraseña"
-              required
-              autocomplete="current-password"
+  <!-- Añadimos una clase 'login-page-dark' para aplicar el nuevo tema oscuro -->
+  <body class="login-page-dark">
+    <div class="login-wrapper">
+      <!-- Este es el contenedor principal que tendrá el efecto de cristal -->
+      <div class="glass-container">
+        <!-- Contenido del formulario -->
+        <div class="form-content">
+          <div class="logo-group">
+            <img
+              src="/images/logo1.jpg"
+              alt="Logo HC Maxclean"
+              class="logo-img"
             />
-            <!-- Mueve el icono aquí dentro -->
-            <i class="bi bi-eye-slash-fill" id="togglePassword"></i>
           </div>
-          <button type="submit" class="btn-principal">Entrar</button>
-        </form>
-        <hr style="margin: 20px 0" />
-        <!-- NUEVO BOTÓN -->
-        <button type="button" id="btnFichajeRapido" class="btn-secundario">
-          Fichaje Rápido
-        </button>
-        <p id="error" class="status-message error" style="display: none"></p>
-      </div>
 
-      <!-- NUEVO CONTENEDOR PARA EL FICHAJE RÁPIDO (inicialmente oculto) -->
-      <div id="fichajeRapidoContainer" style="display: none">
-        <h1>¿Quién va a fichar?</h1>
-        <div id="listaEmpleados" class="employee-grid">
-          <!-- La lista de empleados se generará aquí -->
+          <!-- Contenedor para el Login Normal -->
+          <div id="loginNormalContainer">
+            <h1>Bienvenido</h1>
+            <p class="login-subtitle">Inicia sesión para acceder al panel.</p>
+
+            <form id="loginForm">
+              <div class="input-group">
+                <label for="usuario">Usuario</label>
+                <input
+                  type="text"
+                  id="usuario"
+                  placeholder="Introduce tu usuario"
+                  required
+                  autocomplete="username"
+                />
+              </div>
+
+              <div class="input-group">
+                <label for="password">Contraseña</label>
+                <div class="password-wrapper">
+                  <input
+                    type="password"
+                    id="password"
+                    placeholder="Introduce tu contraseña"
+                    required
+                    autocomplete="current-password"
+                  />
+                  <i class="bi bi-eye-slash-fill" id="togglePassword"></i>
+                </div>
+              </div>
+
+              <button type="submit" class="btn-principal">Entrar</button>
+            </form>
+
+            <div class="separator">O</div>
+
+            <button type="button" id="btnFichajeRapido" class="btn-secundario">
+              Fichaje Rápido
+            </button>
+            <p
+              id="error"
+              class="status-message error"
+              style="display: none"
+            ></p>
+          </div>
+
+          <!-- Contenedor para el Fichaje Rápido (sin cambios estructurales) -->
+          <div id="fichajeRapidoContainer" style="display: none">
+            <h1>¿Quién va a fichar?</h1>
+            <div id="listaEmpleados" class="employee-grid">
+              <!-- La lista de empleados se generará aquí -->
+            </div>
+            <button
+              type="button"
+              id="btnVolverLogin"
+              class="btn-secundario"
+              style="margin-top: 20px"
+            >
+              Volver al Login
+            </button>
+          </div>
         </div>
-        <button
-          type="button"
-          id="btnVolverLogin"
-          class="btn-secundario"
-          style="margin-top: 20px"
-        >
-          Volver al Login
-        </button>
       </div>
     </div>
 
+    <!-- Tu script original no necesita ningún cambio -->
     <script>
       document
         .getElementById("loginForm")
@@ -81,7 +109,6 @@
             if (!res.ok) throw new Error(data.message);
             localStorage.setItem("token", data.token);
 
-            // --- LÓGICA DE REDIRECCIÓN MEJORADA ---
             if (data.rol === "admin") {
               window.location.href = "/admin.html";
             } else if (data.rol === "gestor_vacaciones") {
@@ -95,8 +122,6 @@
           }
         });
 
-      // En el <script> de index.html, añade este código nuevo
-
       const loginNormalContainer = document.getElementById(
         "loginNormalContainer"
       );
@@ -107,28 +132,21 @@
       const btnVolverLogin = document.getElementById("btnVolverLogin");
       const listaEmpleadosDiv = document.getElementById("listaEmpleados");
 
-      // =======================================================
-      // === NUEVA LÓGICA PARA MOSTRAR/OCULTAR CONTRASEÑA ===
-      // =======================================================
       const togglePassword = document.querySelector("#togglePassword");
       const passwordInput = document.querySelector("#password");
 
       if (togglePassword && passwordInput) {
         togglePassword.addEventListener("click", function () {
-          // Cambia el tipo del input (de password a text o viceversa)
           const type =
             passwordInput.getAttribute("type") === "password"
               ? "text"
               : "password";
           passwordInput.setAttribute("type", type);
-
-          // Cambia el icono del ojo
           this.classList.toggle("bi-eye-slash-fill");
           this.classList.toggle("bi-eye-fill");
         });
       }
 
-      // Evento para mostrar la pantalla de fichaje rápido
       btnFichajeRapido.addEventListener("click", async () => {
         loginNormalContainer.style.display = "none";
         fichajeRapidoContainer.style.display = "block";
@@ -139,7 +157,7 @@
           if (!res.ok) throw new Error("No se pudo cargar la lista.");
           const empleados = await res.json();
 
-          listaEmpleadosDiv.innerHTML = ""; // Limpiar
+          listaEmpleadosDiv.innerHTML = "";
           if (empleados.length === 0) {
             listaEmpleadosDiv.innerHTML =
               "<p>No hay empleados configurados para fichar.</p>";
@@ -151,7 +169,6 @@
             btnEmpleado.className = "btn-empleado";
             btnEmpleado.textContent = emp.nombre;
             btnEmpleado.onclick = () => {
-              // Navegamos a la nueva página pasando el ID y el nombre como parámetros
               window.location.href = `/fichaje-rapido.html?id=${
                 emp.id
               }&nombre=${encodeURIComponent(emp.nombre)}`;
@@ -163,7 +180,6 @@
         }
       });
 
-      // Evento para volver a la pantalla de login normal
       btnVolverLogin.addEventListener("click", () => {
         loginNormalContainer.style.display = "block";
         fichajeRapidoContainer.style.display = "none";
