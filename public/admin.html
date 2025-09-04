@@ -13,11 +13,9 @@
     />
 
     <link rel="manifest" href="/manifest.json">
-<!-- Color de la barra de estado en móviles -->
-<meta name="theme-color" content="#e91e63">
+    <meta name="theme-color" content="#e91e63">
   </head>
   <body class="admin-page">
-    <!-- HEADER PARA MÓVIL (SOLO VISIBLE EN PANTALLAS PEQUEÑAS) -->
     <header class="mobile-header">
       <button id="hamburger-btn" aria-label="Abrir menú">
         <span></span>
@@ -27,12 +25,9 @@
       <span class="mobile-header-title">Panel de Admin</span>
     </header>
 
-    <!-- FONDO OSCURO PARA EL MENÚ MÓVIL -->
     <div class="overlay"></div>
 
-    <!-- CONTENEDOR PRINCIPAL DEL LAYOUT -->
     <div class="admin-container">
-      <!-- BARRA LATERAL DE NAVEGACIÓN -->
       <aside class="sidebar">
         <div class="sidebar-header">
           <h1>Panel Admin</h1>
@@ -97,14 +92,10 @@
         </div>
       </aside>
 
-      <!-- ÁREA DE CONTENIDO PRINCIPAL -->
       <main class="main-content-area">
          <div id="autoRefreshCounter">
-    Próxima actualización en: <span id="countdown">30</span>s
-  </div>
-        <!-- ===================================== -->
-        <!-- DASHBOARD DE ESTADO EN TIEMPO REAL -->
-        <!-- ===================================== -->
+            Próxima actualización en: <span id="countdown">30</span>s
+         </div>
         <section id="dashboard">
           <h2>Panel de Control en Tiempo Real</h2>
           <div class="dashboard-grid">
@@ -328,11 +319,9 @@
             <i class="bi bi-file-earmark-text-fill"></i> Gestión de Nóminas
           </h2>
 
-          <!-- Formulario para subir nueva nómina (Estructura mejorada) -->
           <form id="formSubirNomina" class="form-nominas">
             <h3>Subir Nueva Nómina</h3>
 
-            <!-- Campo Empleado -->
             <div class="form-group">
               <label for="nominaUsuario">Selecciona Empleado</label>
               <select id="nominaUsuario" required>
@@ -340,16 +329,13 @@
               </select>
             </div>
 
-            <!-- Campo Mes y Año -->
             <div class="form-group">
               <label for="nominaMesAnio">Selecciona Mes y Año</label>
               <input type="month" id="nominaMesAnio" required />
             </div>
 
-            <!-- NUEVO Y MEJORADO CAMPO DE ARCHIVO -->
             <div class="form-group">
               <label>Selecciona Archivo (PDF)</label>
-              <!-- El input real está totalmente oculto -->
               <input
                 type="file"
                 id="nominaArchivo"
@@ -357,27 +343,22 @@
                 required
                 style="display: none"
               />
-
               <div class="file-upload-container">
-                <!-- La label es nuestro nuevo botón personalizado -->
                 <label for="nominaArchivo" class="custom-file-upload">
                   <i class="bi bi-upload"></i>
                   Seleccionar archivo
                 </label>
-                <!-- Este span mostrará el nombre del archivo -->
                 <span id="fileNameDisplay" class="file-name-display"
                   >Ningún archivo seleccionado</span
                 >
               </div>
             </div>
 
-            <!-- Botón de Envío -->
             <div class="form-group submit-group">
               <button type="submit">Subir Nómina</button>
             </div>
           </form>
 
-          <!-- Historial de nóminas subidas (sin cambios aquí) -->
           <div class="historial-nominas">
             <h3>Historial de Nóminas Enviadas</h3>
             <div class="table-container">
@@ -408,15 +389,12 @@
       const selectMes = document.getElementById("selectMes");
       const btnExportar = document.getElementById("btnExportar");
       let calendario;
-      let vacationData; // Variable global para guardar datos de vacaciones del usuario seleccionado
+      let vacationData;
 
-      // --- NUEVA FUNCIÓN ---
-      // Calcula días laborables (Lunes a Viernes)
       function calcularDiasLaborables(fechaInicio, fechaFin) {
         const inicio = new Date(fechaInicio);
         const fin = new Date(fechaFin);
         let count = 0;
-        // Usamos UTC para evitar problemas con zonas horarias que pueden desfasar el día
         const curDate = new Date(
           Date.UTC(
             inicio.getUTCFullYear(),
@@ -427,9 +405,8 @@
         const finalDate = new Date(
           Date.UTC(fin.getUTCFullYear(), fin.getUTCMonth(), fin.getUTCDate())
         );
-
         while (curDate <= finalDate) {
-          const dayOfWeek = curDate.getUTCDay(); // 0 = Domingo, 6 = Sábado
+          const dayOfWeek = curDate.getUTCDay();
           if (dayOfWeek !== 0 && dayOfWeek !== 6) {
             count++;
           }
@@ -443,9 +420,6 @@
         window.location.href = "/index.html";
       }
 
-      // ===================================================
-      // LÓGICA PARA CARGAR EL DASHBOARD
-      // ===================================================
       async function cargarDashboard() {
         const ids = {
           dentro: document.getElementById("empleados-dentro"),
@@ -454,14 +428,12 @@
           total: document.querySelector("#total-fichajes span"),
           manuales: document.querySelector("#fichajes-manuales span"),
         };
-
         try {
           const res = await fetch("/api/dashboard", {
             headers: { Authorization: `Bearer ${token}` },
           });
           if (!res.ok) throw new Error("No se pudo cargar el dashboard.");
           const data = await res.json();
-
           const rellenarLista = (ulElement, items) => {
             ulElement.innerHTML = "";
             if (items.length === 0) {
@@ -474,11 +446,9 @@
               });
             }
           };
-
           rellenarLista(ids.dentro, data.empleadosDentro);
           rellenarLista(ids.fuera, data.empleadosFuera);
           rellenarLista(ids.ausencias, data.ausenciasHoy);
-
           ids.total.textContent = data.resumen.totalFichajes;
           ids.manuales.textContent = data.resumen.fichajesManuales;
         } catch (error) {
@@ -542,25 +512,13 @@
         fechaHoraActual,
         nombreUsuario
       ) {
-        // --- INICIO DE LA NUEVA CORRECCIÓN (MÉTODO MÁS FIABLE) ---
-
-        // 1. Creamos el objeto Date. Javascript lo interpretará correctamente
-        //    y sus métodos devolverán los valores en la zona horaria local del navegador.
         const fechaActualDate = new Date(fechaHoraActual);
-
-        // 2. Obtenemos cada componente de la fecha en la hora LOCAL.
         const year = fechaActualDate.getFullYear();
-        // getMonth() es 0-indexado (0 = Enero), por eso sumamos 1.
         const month = String(fechaActualDate.getMonth() + 1).padStart(2, "0");
         const day = String(fechaActualDate.getDate()).padStart(2, "0");
         const hours = String(fechaActualDate.getHours()).padStart(2, "0");
         const minutes = String(fechaActualDate.getMinutes()).padStart(2, "0");
-
-        // 3. Construimos la cadena en el formato exacto que necesita 'datetime-local'.
         const fechaParaInput = `${year}-${month}-${day}T${hours}:${minutes}`;
-
-        // --- FIN DE LA CORRECCIÓN ---
-
         const { value: formValues } = await Swal.fire({
           title: `Editar fichaje de ${nombreUsuario}`,
           html: `<p style="margin-bottom: 1rem;">Fecha y Hora Actual: ${fechaActualDate.toLocaleString()}</p>
@@ -613,56 +571,6 @@
           }
         }
       }
-      // --- ESTA FUNCIÓN FALTABA ---
-      async function handleEventClick(event) {
-        const { value: action } = await Swal.fire({
-          title: `Gestionar vacaciones de ${event.title}`,
-          text: `Del ${new Date(
-            event.start
-          ).toLocaleDateString()} al ${new Date(
-            new Date(event.end).getTime() - 86400000
-          ).toLocaleDateString()}`,
-          showDenyButton: true,
-          showCancelButton: true,
-          confirmButtonText: "✏️ Editar",
-          denyButtonText: "🗑️ Eliminar",
-          cancelButtonText: "Cancelar",
-        });
-
-        if (action === true) {
-          // Botón "Editar"
-          handleEditVacation(event);
-        } else if (action === false) {
-          // Botón "Eliminar"
-          handleDeleteVacation(event);
-        }
-      }
-
-      // --- ESTA FUNCIÓN FALTABA ---
-      async function handleEditVacation(event) {
-        const fechaInicioActual = new Date(event.start)
-          .toISOString()
-          .split("T")[0];
-        const fechaFinActual = new Date(
-          new Date(event.end).getTime() - 86400000
-        )
-          .toISOString()
-          .split("T")[0];
-        const { value: formValues } = await Swal.fire({
-          title: `Editar vacaciones de ${event.title}`,
-          // ... (código del modal)
-        });
-        if (formValues) {
-          try {
-            const res = await fetch(`/api/vacaciones/${event.id}`, {
-              /* ...petición PUT... */
-            });
-            // ... (lógica de éxito/error)
-          } catch (error) {
-            // ...
-          }
-        }
-      }
 
       async function cargarJustificantes() {
         const tbody = document.querySelector("#tablaJustificantes tbody");
@@ -688,12 +596,9 @@
             );
             const fFin = new Date(j.fecha_fin).toLocaleDateString("es-ES");
             const fSubida = new Date(j.fecha_subida).toLocaleString("es-ES");
-
-            // Escapar comillas en el motivo para evitar problemas en el HTML
             const motivoEscapado = j.motivo
               ? j.motivo.replace(/'/g, "\\'").replace(/"/g, "&quot;")
               : "";
-
             tr.innerHTML = `
                     <td>${j.nombre_empleado}</td>
                     <td>Del ${fInicio} al ${fFin}</td>
@@ -727,12 +632,10 @@
         motivo,
         nombreEmpleado
       ) {
-        // Formatear las fechas para los inputs de tipo 'date' (YYYY-MM-DD)
         const fechaInicioInput = new Date(fechaInicio)
           .toISOString()
           .split("T")[0];
         const fechaFinInput = new Date(fechaFin).toISOString().split("T")[0];
-
         const { value: formValues } = await Swal.fire({
           title: `Editar justificante de ${nombreEmpleado}`,
           html: `
@@ -756,7 +659,6 @@
             };
           },
         });
-
         if (formValues) {
           try {
             const res = await fetch(`/api/justificantes/${id}`, {
@@ -774,7 +676,7 @@
               "El justificante ha sido modificado.",
               "success"
             );
-            cargarJustificantes(); // Recargar la tabla
+            cargarJustificantes();
           } catch (error) {
             Swal.fire(
               "Error",
@@ -785,7 +687,6 @@
         }
       }
 
-      // --- NUEVO: FUNCIÓN PARA ELIMINAR UN JUSTIFICANTE ---
       async function eliminarJustificante(id, nombreEmpleado) {
         const result = await Swal.fire({
           title: "¿Estás seguro?",
@@ -797,7 +698,6 @@
           confirmButtonText: "Sí, ¡eliminar!",
           cancelButtonText: "Cancelar",
         });
-
         if (result.isConfirmed) {
           try {
             const res = await fetch(`/api/justificantes/${id}`, {
@@ -811,40 +711,7 @@
               "El justificante ha sido eliminado.",
               "success"
             );
-            cargarJustificantes(); // Recargar la tabla
-          } catch (error) {
-            Swal.fire(
-              "Error",
-              `No se pudo eliminar: ${error.message}`,
-              "error"
-            );
-          }
-        }
-      }
-
-      // --- ESTA FUNCIÓN FALTABA ---
-      async function handleDeleteVacation(event) {
-        const result = await Swal.fire({
-          title: "¿Estás seguro?",
-          // ... (código del modal de confirmación)
-        });
-        if (result.isConfirmed) {
-          try {
-            // La petición correcta al backend
-            const res = await fetch(`/api/vacaciones/${event.id}`, {
-              method: "DELETE",
-              headers: { Authorization: `Bearer ${token}` },
-            });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.message);
-            Swal.fire(
-              "¡Eliminado!",
-              "El periodo de vacaciones ha sido eliminado.",
-              "success"
-            );
-            calendario.refetchEvents();
-            if (document.getElementById("vacacionesUsuario").value)
-              mostrarDiasRestantes();
+            cargarJustificantes();
           } catch (error) {
             Swal.fire(
               "Error",
@@ -895,8 +762,6 @@
         });
       }
 
-      // En el <script> de admin.html, dentro de la función loadUsers
-
       async function loadUsers() {
         try {
           const res = await fetch("/api/usuarios", {
@@ -910,7 +775,6 @@
           users.forEach((user) => {
             const tr = document.createElement("tr");
             const diasCompensatorios = user.dias_compensatorios || 0;
-            // --- CAMBIO AQUÍ: Se añade el nuevo botón "Ajustar Días" ---
             tr.innerHTML = `
                 <td>${user.nombre}</td>
                 <td>${user.usuario}</td>
@@ -1054,7 +918,6 @@
             return { dias, motivo };
           },
         });
-
         if (formValues) {
           try {
             const res = await fetch(
@@ -1071,7 +934,7 @@
             const data = await res.json();
             if (!res.ok) throw new Error(data.message);
             Swal.fire("¡Actualizado!", data.message, "success");
-            loadUsers(); // Recargamos la lista para ver los cambios
+            loadUsers();
           } catch (error) {
             Swal.fire(
               "Error",
@@ -1273,9 +1136,6 @@
           }
         });
 
-      // ==================================================
-      // LÓGICA PARA GESTIÓN DE VACACIONES (MODIFICADA)
-      // ==================================================
       function inicializarCalendario() {
         const calendarioEl = document.getElementById("calendarioVacaciones");
         calendario = new FullCalendar.Calendar(calendarioEl, {
@@ -1343,13 +1203,8 @@
               });
           },
         });
-
-        // Pega este bloque DENTRO de la función inicializarPagina()
-
-        // Lógica para el botón de archivo personalizado
         const nominaArchivoInput = document.getElementById("nominaArchivo");
-        const fileNameDisplay = document.getElementById("fileNameDisplay"); // Usamos el nuevo ID
-
+        const fileNameDisplay = document.getElementById("fileNameDisplay");
         if (nominaArchivoInput && fileNameDisplay) {
           nominaArchivoInput.addEventListener("change", () => {
             if (nominaArchivoInput.files.length > 0) {
@@ -1359,7 +1214,6 @@
             }
           });
         }
-
         calendario.render();
       }
 
@@ -1377,7 +1231,6 @@
           denyButtonText: `🗑️ Eliminar`,
           cancelButtonText: "Cancelar",
         });
-
         if (action === true) {
           handleEditVacation(event);
         } else if (action === false) {
@@ -1409,7 +1262,6 @@
             fechaFin: document.getElementById("swal-fecha-fin").value,
           }),
         });
-
         if (formValues) {
           try {
             const res = await fetch(`/api/vacaciones/${event.id}`, {
@@ -1446,7 +1298,6 @@
           confirmButtonText: "Sí, ¡eliminar!",
           cancelButtonText: "Cancelar",
         });
-
         if (result.isConfirmed) {
           try {
             const res = await fetch(`/api/vacaciones/${event.id}`, {
@@ -1473,7 +1324,7 @@
         const infoSpan = document.getElementById("infoDiasRestantes");
         if (!usuarioId) {
           infoSpan.textContent = "";
-          window.vacationData = null; // Limpiar datos si se deselecciona
+          window.vacationData = null;
           return;
         }
         try {
@@ -1483,7 +1334,7 @@
           );
           const data = await res.json();
           if (!res.ok) throw new Error(data.message);
-          window.vacationData = data; // Guardamos los datos para usarlos en el submit
+          window.vacationData = data;
           infoSpan.innerHTML = `Disponibles (laborables): <span style="color: green;">${data.diasRestantes}</span> / ${data.diasTotales} (Gastados: ${data.diasGastados})`;
         } catch (error) {
           infoSpan.textContent = "Error al calcular días.";
@@ -1551,7 +1402,6 @@
           const usuarioId = document.getElementById("vacacionesUsuario").value;
           const fechaInicio = document.getElementById("fechaInicio").value;
           const fechaFin = document.getElementById("fechaFin").value;
-
           if (!usuarioId || !fechaInicio || !fechaFin) {
             Swal.fire(
               "Atención",
@@ -1560,10 +1410,6 @@
             );
             return;
           }
-
-          // ===================================================
-
-          // Para Admin/Gestor, no hay restricción de min/max días, pero se puede añadir una advertencia.
           const diasLaborablesAsignados = calcularDiasLaborables(
             fechaInicio,
             fechaFin
@@ -1584,7 +1430,6 @@
               return;
             }
           }
-
           try {
             const res = await fetch("/api/vacaciones", {
               method: "POST",
@@ -1599,14 +1444,12 @@
             Swal.fire("¡Éxito!", "Vacaciones asignadas.", "success");
             e.target.reset();
             calendario.refetchEvents();
-            mostrarDiasRestantes(); // Actualizamos el contador
+            mostrarDiasRestantes();
           } catch (error) {
             Swal.fire("Error", `No se pudo asignar: ${error.message}`, "error");
           }
         });
 
-      // === NUEVAS FUNCIONES PARA LA GESTIÓN DE NÓMINAS ===
-      // ===================================================
       async function cargarNominasAdmin() {
         const tbody = document.querySelector("#tablaNominasAdmin tbody");
         tbody.innerHTML = '<tr><td colspan="5">Cargando...</td></tr>';
@@ -1616,27 +1459,15 @@
           });
           const nominas = await res.json();
           if (!res.ok) throw new Error(nominas.message);
-
           tbody.innerHTML = "";
           if (nominas.length === 0) {
             tbody.innerHTML =
               '<tr><td colspan="5">No se han subido nóminas.</td></tr>';
             return;
           }
-
           const meses = [
-            "Enero",
-            "Febrero",
-            "Marzo",
-            "Abril",
-            "Mayo",
-            "Junio",
-            "Julio",
-            "Agosto",
-            "Septiembre",
-            "Octubre",
-            "Noviembre",
-            "Diciembre",
+            "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+            "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
           ];
           nominas.forEach((n) => {
             const tr = document.createElement("tr");
@@ -1644,9 +1475,7 @@
                       <td>${n.nombre_empleado}</td>
                       <td>${meses[n.mes - 1]} ${n.anio}</td>
                       <td>${n.nombre_archivo}</td>
-                      <td>${new Date(n.fecha_subida).toLocaleString(
-                        "es-ES"
-                      )}</td>
+                      <td>${new Date(n.fecha_subida).toLocaleString("es-ES")}</td>
                       <td><button class="action-btn btn-delete" onclick="eliminarNomina(${
                         n.id
                       }, '${n.nombre_empleado}', '${meses[n.mes - 1]} ${
@@ -1671,7 +1500,6 @@
           confirmButtonText: "Sí, ¡eliminar!",
           cancelButtonText: "Cancelar",
         });
-
         if (result.isConfirmed) {
           try {
             const res = await fetch(`/api/nominas/${id}`, {
@@ -1693,130 +1521,118 @@
       }
 
       function inicializarPagina() {
-    document.getElementById("fecha").valueAsDate = new Date();
-    const hoy = new Date(),
-        offset = hoy.getTimezoneOffset(),
-        hoyLocal = new Date(hoy.getTime() - offset * 60 * 1000);
-    document.getElementById("manualFechaHora").value = hoyLocal
-        .toISOString()
-        .slice(0, 16);
-    selectMes.value = `${hoy.getFullYear()}-${String(
-        hoy.getMonth() + 1
-    ).padStart(2, "0")}`;
+        document.getElementById("fecha").valueAsDate = new Date();
+        const hoy = new Date(),
+          offset = hoy.getTimezoneOffset(),
+          hoyLocal = new Date(hoy.getTime() - offset * 60 * 1000);
+        document.getElementById("manualFechaHora").value = hoyLocal
+          .toISOString()
+          .slice(0, 16);
+        selectMes.value = `${hoy.getFullYear()}-${String(
+          hoy.getMonth() + 1
+        ).padStart(2, "0")}`;
 
-    // Carga inicial de datos estáticos
-    getReport();
-    loadUsers();
-    poblarSelectorUsuarios("selectUsuario");
-    poblarSelectorUsuarios("manualUsuario");
-    poblarSelectorUsuarios("vacacionesUsuario");
-    inicializarCalendario();
-    poblarSelectorUsuarios("nominaUsuario");
-    cargarNominasAdmin();
+        getReport();
+        loadUsers();
+        poblarSelectorUsuarios("selectUsuario");
+        poblarSelectorUsuarios("manualUsuario");
+        poblarSelectorUsuarios("vacacionesUsuario");
+        inicializarCalendario();
+        poblarSelectorUsuarios("nominaUsuario");
+        cargarNominasAdmin();
 
-    document
-        .getElementById("formSubirNomina")
-        .addEventListener("submit", async (e) => {
+        document
+          .getElementById("formSubirNomina")
+          .addEventListener("submit", async (e) => {
             e.preventDefault();
             const form = e.target;
             const formData = new FormData();
             formData.append("usuarioId", form.nominaUsuario.value);
             formData.append("mesAnio", form.nominaMesAnio.value);
             formData.append("nomina", form.nominaArchivo.files[0]);
-
             const btn = form.querySelector("button");
             btn.disabled = true;
             btn.textContent = "Subiendo...";
-
             try {
-                const res = await fetch("/api/nominas", {
-                    method: "POST",
-                    headers: { Authorization: `Bearer ${token}` },
-                    body: formData,
-                });
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.message);
-                Swal.fire("¡Éxito!", data.message, "success");
-                form.reset();
-                cargarNominasAdmin(); // Recargar la tabla
+              const res = await fetch("/api/nominas", {
+                method: "POST",
+                headers: { Authorization: `Bearer ${token}` },
+                body: formData,
+              });
+              const data = await res.json();
+              if (!res.ok) throw new Error(data.message);
+              Swal.fire("¡Éxito!", data.message, "success");
+              form.reset();
+              cargarNominasAdmin();
             } catch (error) {
-                Swal.fire(
-                    "Error",
-                    `No se pudo subir la nómina: ${error.message}`,
-                    "error"
-                );
+              Swal.fire(
+                "Error",
+                `No se pudo subir la nómina: ${error.message}`,
+                "error"
+              );
             } finally {
-                btn.disabled = false;
-                btn.textContent = "Subir Nómina";
+              btn.disabled = false;
+              btn.textContent = "Subir Nómina";
             }
-        });
+          });
 
-    const fechaInicioInput = document.getElementById("fechaInicio"),
-        fechaFinInput = document.getElementById("fechaFin");
-    fechaInicioInput.addEventListener("change", () => {
-        const fechaInicioSeleccionada = fechaInicioInput.value;
-        if (fechaInicioSeleccionada) {
+        const fechaInicioInput = document.getElementById("fechaInicio"),
+          fechaFinInput = document.getElementById("fechaFin");
+        fechaInicioInput.addEventListener("change", () => {
+          const fechaInicioSeleccionada = fechaInicioInput.value;
+          if (fechaInicioSeleccionada) {
             fechaFinInput.min = fechaInicioSeleccionada;
             if (
-                new Date(fechaFinInput.value) < new Date(fechaInicioSeleccionada)
+              new Date(fechaFinInput.value) < new Date(fechaInicioSeleccionada)
             ) {
-                fechaFinInput.value = fechaInicioSeleccionada;
+              fechaFinInput.value = fechaInicioSeleccionada;
             }
-        }
-    });
+          }
+        });
 
-    // ==========================================================
-    // === NUEVA LÓGICA DE ACTUALIZACIÓN AUTOMÁTICA CON CONTADOR ===
-    // ==========================================================
-    const REFRESH_INTERVAL_SECONDS = 30;
-    let countdown = REFRESH_INTERVAL_SECONDS;
-    const countdownElement = document.getElementById("countdown");
+        // LÓGICA DE ACTUALIZACIÓN AUTOMÁTICA
+        const REFRESH_INTERVAL_SECONDS = 30;
+        let countdown = REFRESH_INTERVAL_SECONDS;
+        const countdownElement = document.getElementById("countdown");
 
-    // Función que se encarga de recargar los datos dinámicos
-    const refreshDynamicData = () => {
-        console.log("Actualizando datos del panel...");
-        cargarDashboard();
-        cargarSolicitudesPendientes();
-        cargarJustificantes();
-    };
+        const refreshDynamicData = () => {
+          console.log("Actualizando datos del panel...");
+          cargarDashboard();
+          cargarSolicitudesPendientes();
+          cargarJustificantes();
+        };
 
-    // 1. Carga inicial de los datos dinámicos
-    refreshDynamicData();
+        refreshDynamicData();
 
-    // 2. Inicia el ciclo de actualización
-    setInterval(() => {
-        countdown--;
-        if (countdownElement) {
+        setInterval(() => {
+          countdown--;
+          if (countdownElement) {
             countdownElement.textContent = countdown;
-        }
-
-        if (countdown <= 0) {
-            refreshDynamicData(); // Llama a la recarga de datos
-            countdown = REFRESH_INTERVAL_SECONDS; // Reinicia el contador
+          }
+          if (countdown <= 0) {
+            refreshDynamicData();
+            countdown = REFRESH_INTERVAL_SECONDS;
             if (countdownElement) {
-                countdownElement.textContent = countdown;
+              countdownElement.textContent = countdown;
             }
-        }
-    }, 1000); // Este intervalo se ejecuta cada segundo para la cuenta atrás
-}
+          }
+        }, 1000);
+      }
+      
       document.addEventListener("DOMContentLoaded", () => {
         const hamburgerBtn = document.getElementById("hamburger-btn");
         const sidebar = document.querySelector(".sidebar");
         const overlay = document.querySelector(".overlay");
-
         function closeMenu() {
           sidebar.classList.remove("sidebar-visible");
           overlay.classList.remove("visible");
         }
-
         if (hamburgerBtn && sidebar && overlay) {
           hamburgerBtn.addEventListener("click", () => {
             sidebar.classList.toggle("sidebar-visible");
             overlay.classList.toggle("visible");
           });
-
           overlay.addEventListener("click", closeMenu);
-
           const navLinks = sidebar.querySelectorAll(".admin-nav a");
           navLinks.forEach((link) => {
             link.addEventListener("click", closeMenu);
@@ -1826,7 +1642,6 @@
 
       inicializarPagina();
 
-      // Lógica para el botón "Volver arriba"
       const scrollTopBtn = document.getElementById("scrollTopBtn");
       window.onscroll = function () {
         if (
@@ -1843,17 +1658,17 @@
       });
     </script>
     <script>
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('/sw.js')
-        .then(registration => {
-          console.log('ServiceWorker registrado con éxito:', registration.scope);
-        })
-        .catch(err => {
-          console.log('El registro del ServiceWorker falló:', err);
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then(registration => {
+              console.log('ServiceWorker registrado con éxito:', registration.scope);
+            })
+            .catch(err => {
+              console.log('El registro del ServiceWorker falló:', err);
+            });
         });
-    });
-  }
-</script>
+      }
+    </script>
   </body>
 </html>

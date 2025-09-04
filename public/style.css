@@ -347,11 +347,9 @@ body.login-page .logo-img {
 /* =================================================================== */
 
 #autoRefreshCounter {
-  position: sticky; /* Se pega a la parte de arriba al hacer scroll */
-  top: 15px;
-  right: 30px; /* Lo alineamos a la derecha del área de contenido */
-  float: right; /* Hace que el texto del dashboard fluya a su izquierda */
-  clear: both; /* Evita que se solape con otros elementos flotantes */
+  position: absolute;
+  top: 30px; /* Distancia desde arriba */
+  right: 30px; /* Distancia desde la derecha */
   background-color: #ffffff;
   padding: 8px 15px;
   border-radius: 20px;
@@ -360,7 +358,6 @@ body.login-page .logo-img {
   font-size: 0.9rem;
   color: #555;
   z-index: 950;
-  margin-bottom: 10px; /* Espacio para que no se pegue al título "Panel de Control" */
 }
 
 #autoRefreshCounter #countdown {
