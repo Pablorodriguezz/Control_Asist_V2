@@ -343,21 +343,31 @@ body.login-page .logo-img {
 }
 
 /* =================================================================== */
-/* === ESTILOS PARA EL CONTADOR DE ACTUALIZACIÓN AUTOMÁTICA === */
+/* === ESTILOS PARA EL CONTADOR DE ACTUALIZACIÓN AUTOMÁTICA (v2) === */
 /* =================================================================== */
 
+.section-header {
+  display: flex; /* Activa Flexbox */
+  justify-content: space-between; /* Pone un elemento a cada extremo */
+  align-items: center; /* Los alinea verticalmente */
+  margin-bottom: 20px; /* Espacio antes de las tarjetas del dashboard */
+}
+
+/* Le quitamos el borde y margen al título que está dentro del header */
+.section-header h2 {
+  border-bottom: none;
+  padding-bottom: 0;
+  margin-bottom: 0;
+}
+
 #autoRefreshCounter {
-  position: absolute;
-  top: 30px; /* Distancia desde arriba */
-  right: 30px; /* Distancia desde la derecha */
-  background-color: #ffffff;
+  background-color: #f0f0f0; /* Un color más sutil */
   padding: 8px 15px;
   border-radius: 20px;
   border: 1px solid #e0e0e0;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   font-size: 0.9rem;
   color: #555;
-  z-index: 950;
+  white-space: nowrap; /* Evita que el texto se parta en dos líneas */
 }
 
 #autoRefreshCounter #countdown {
