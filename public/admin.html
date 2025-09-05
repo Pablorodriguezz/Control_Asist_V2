@@ -94,17 +94,17 @@
 
             <main class="main-content-area">
         <section id="dashboard">
-          <!-- INICIO DE LA ESTRUCTURA CORREGIDA -->
-          <div class="section-header">
-            <h2>Panel de Control en Tiempo Real</h2>
-            <div id="autoRefreshCounter">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-clockwise" viewBox="0 0 16 16">
-                <path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2z"/>
-                <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466"/>
-              </svg>
-              <span>Próxima actualización en <strong id="countdown">30</strong>s</span>
-            </div>
-          </div>
+          <!-- INICIO DE LA ESTRUCTURA CON ACTUALIZACIÓN MANUAL -->
+<div class="section-header">
+  <h2>Panel de Control</h2>
+  <div class="dashboard-header-controls">
+    <span id="lastUpdatedTimestamp"></span>
+    <button id="manualRefreshBtn" title="Actualizar datos">
+      <i class="bi bi-arrow-clockwise"></i>
+    </button>
+  </div>
+</div>
+<!-- FIN DE LA ESTRUCTURA CON ACTUALIZACIÓN MANUAL -->
           <!-- FIN DE LA ESTRUCTURA CORREGIDA -->
 
           <div class="dashboard-grid">
@@ -1628,37 +1628,45 @@ async function generarInformeMensual() {
           }
         });
 
-        // LÓGICA DE ACTUALIZACIÓN AUTOMÁTICA
-        const REFRESH_INTERVAL_SECONDS = 30;
-        let countdown = REFRESH_INTERVAL_SECONDS;
-        const countdownElement = document.getElementById("countdown");
-        
-        // Inicializa el contador visual
-        if (countdownElement) {
-            countdownElement.textContent = countdown;
-        }
+        // LÓGICA DE ACTUALIZACIÓN MANUAL
+const manualRefreshBtn = document.getElementById("manualRefreshBtn");
+const refreshIcon = manualRefreshBtn.querySelector("i");
+const timestampElement = document.getElementById("lastUpdatedTimestamp");
 
-        const refreshDynamicData = () => {
-          console.log("Actualizando datos del panel...");
-          cargarDashboard();
-          cargarSolicitudesPendientes();
-          cargarJustificantes();
-        };
-        refreshDynamicData();
-        setInterval(() => {
-          countdown--;
-          if (countdownElement) {
-            countdownElement.textContent = countdown;
-          }
-          if (countdown <= 0) {
-            refreshDynamicData();
-            countdown = REFRESH_INTERVAL_SECONDS;
-            if (countdownElement) {
-              countdownElement.textContent = countdown;
-            }
-          }
-        }, 1000);
-      }
+const refreshDynamicData = async () => {
+  console.log("Actualizando datos del panel...");
+  
+  // 1. Mostrar estado de carga
+  manualRefreshBtn.disabled = true;
+  refreshIcon.classList.add("is-loading");
+  
+  try {
+    // 2. Ejecutar todas las actualizaciones en paralelo para mayor rapidez
+    await Promise.all([
+      cargarDashboard(),
+      cargarSolicitudesPendientes(),
+      cargarJustificantes(),
+    ]);
+    
+    // 3. Actualizar la hora de la última actualización
+    const now = new Date();
+    timestampElement.textContent = `Última act: ${now.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}`;
+
+  } catch (error) {
+    console.error("Error al refrescar los datos:", error);
+    timestampElement.textContent = "Error al actualizar";
+  } finally {
+    // 4. Quitar estado de carga (incluso si hay un error)
+    manualRefreshBtn.disabled = false;
+    refreshIcon.classList.remove("is-loading");
+  }
+};
+
+// Carga inicial de los datos al entrar en la página
+refreshDynamicData();
+
+// Asignar el evento de clic al botón
+manualRefreshBtn.addEventListener("click", refreshDynamicData);
 
       document.addEventListener("DOMContentLoaded", () => {
         const hamburgerBtn = document.getElementById("hamburger-btn");

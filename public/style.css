@@ -423,3 +423,55 @@ body.login-page .logo-img {
 
   /* Ya no necesitamos las reglas de alineación aquí porque las hemos puesto arriba */
 }
+
+/* =============================================================== */
+/* === ESTILOS PARA EL BOTÓN DE ACTUALIZACIÓN MANUAL (ADMIN) === */
+/* =============================================================== */
+
+.dashboard-header-controls {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+#lastUpdatedTimestamp {
+  font-size: 13px;
+  color: #7f8c8d; /* Un gris suave */
+}
+
+#manualRefreshBtn {
+  background: none;
+  border: 1px solid #ccc;
+  color: var(--text-color-primary);
+  width: 36px;
+  height: 36px;
+  border-radius: 50%; /* Botón circular */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 0;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+#manualRefreshBtn:hover {
+  background-color: #f0f0f0;
+  border-color: #aaa;
+}
+
+#manualRefreshBtn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* Clase para la animación de carga */
+#manualRefreshBtn .is-loading {
+  animation: spin 1s linear infinite;
+}
+
+/* Si no tienes esta animación, añádela */
+@keyframes spin { 
+  100% { 
+    transform: rotate(360deg); 
+  } 
+}
