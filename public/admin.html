@@ -958,86 +958,82 @@
         }
       }
 
-      // Pega este código completo en admin.html, reemplazando la función generarInformeMensual existente.
-async function generarInformeMensual() {
-    const usuarioId = selectUsuario.value;
-    const mesValue = selectMes.value;
-    if (!usuarioId) {
-        Swal.fire("Atención", "Selecciona un trabajador.", "info");
-        return;
-    }
-    if (!mesValue) {
-        Swal.fire("Atención", "Selecciona un mes.", "info");
-        return;
-    }
-    const [anio, mes] = mesValue.split("-");
-    const container = document.getElementById("informeMensualContainer");
-    container.innerHTML = "Generando informe...";
-    btnExportar.style.display = "none";
+      async function generarInformeMensual() {
+          const usuarioId = selectUsuario.value;
+          const mesValue = selectMes.value;
+          if (!usuarioId) {
+              Swal.fire("Atención", "Selecciona un trabajador.", "info");
+              return;
+          }
+          if (!mesValue) {
+              Swal.fire("Atención", "Selecciona un mes.", "info");
+              return;
+          }
+          const [anio, mes] = mesValue.split("-");
+          const container = document.getElementById("informeMensualContainer");
+          container.innerHTML = "Generando informe...";
+          btnExportar.style.display = "none";
 
-    // --- FUNCIÓN CORREGIDA ---
-    // Esta función SÍ maneja duraciones de más de 24 horas.
-    const segundosAFormatoDuracion = (totalSegundos) => {
-        totalSegundos = Math.floor(totalSegundos || 0);
-        const horas = Math.floor(totalSegundos / 3600);
-        const minutos = Math.floor((totalSegundos % 3600) / 60);
-        const segundos = totalSegundos % 60;
-        
-        // Usamos padStart para asegurar que siempre tengan dos dígitos (ej: 09:05:01)
-        const pad = (num) => String(num).padStart(2, '0');
+          const segundosAFormatoDuracion = (totalSegundos) => {
+              totalSegundos = Math.floor(totalSegundos || 0);
+              const horas = Math.floor(totalSegundos / 3600);
+              const minutos = Math.floor((totalSegundos % 3600) / 60);
+              const segundos = totalSegundos % 60;
+              
+              const pad = (num) => String(num).padStart(2, '0');
 
-        return `${horas}:${pad(minutos)}:${pad(segundos)}`;
-    };
+              return `${horas}:${pad(minutos)}:${pad(segundos)}`;
+          };
 
-    try {
-        const url = `/api/informe-mensual?anio=${anio}&mes=${mes}&usuarioId=${usuarioId}`;
-        const res = await fetch(url, {
-            headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!res.ok) {
-            const errData = await res
-                .json()
-                .catch(() => ({ message: `Error: ${res.status}` }));
-            throw new Error(errData.message);
-        }
-        const informe = await res.json();
-        
-        let html = `<h3>Informe para ${
-            selectUsuario.options[selectUsuario.selectedIndex].text
-        }</h3>`;
-        if (Object.keys(informe.resumenSemanas).length === 0) {
-            html += "<p>No hay datos de trabajo para el mes seleccionado.</p>";
-            container.innerHTML = html;
-            return;
-        }
-        html += "<h4>Resumen Semanal:</h4><ul>";
-        for (const numSemana in informe.resumenSemanas) {
-            const semana = informe.resumenSemanas[numSemana];
-            html += `<li><strong>Semana ${numSemana}:</strong><ul><li>Horas Trabajadas: ${segundosAFormatoDuracion( // <-- USAMOS LA NUEVA FUNCIÓN
-                semana.totalSegundos
-            )}</li><li>Horas Extra (sobre 40h/sem): ${segundosAFormatoDuracion( // <-- USAMOS LA NUEVA FUNCIÓN
-                semana.horasExtraSegundos
-            )}</li></ul></li>`;
-        }
-        html += '</ul><hr style="margin: 20px 0;">';
-        html += `<p><strong>Total Horas en el Mes:</strong> ${segundosAFormatoDuracion( // <-- USAMOS LA NUEVA FUNCIÓN
-            informe.totalHorasMesSegundos
-        )}</p>`;
-        html += `<p><strong>Total Horas Extra en el Mes:</strong> ${segundosAFormatoDuracion( // <-- USAMOS LA NUEVA FUNCIÓN
-            informe.totalHorasExtraMesSegundos
-        )}</p>`;
-        container.innerHTML = html;
-        if (informe.totalHorasMesSegundos > 0)
-            btnExportar.style.display = "inline-block";
-    } catch (error) {
-        Swal.fire(
-            "Error",
-            `No se pudo generar el informe: ${error.message}`,
-            "error"
-        );
-        container.innerHTML = "";
-    }
-}
+          try {
+              const url = `/api/informe-mensual?anio=${anio}&mes=${mes}&usuarioId=${usuarioId}`;
+              const res = await fetch(url, {
+                  headers: { Authorization: `Bearer ${token}` },
+              });
+              if (!res.ok) {
+                  const errData = await res
+                      .json()
+                      .catch(() => ({ message: `Error: ${res.status}` }));
+                  throw new Error(errData.message);
+              }
+              const informe = await res.json();
+              
+              let html = `<h3>Informe para ${
+                  selectUsuario.options[selectUsuario.selectedIndex].text
+              }</h3>`;
+              if (Object.keys(informe.resumenSemanas).length === 0) {
+                  html += "<p>No hay datos de trabajo para el mes seleccionado.</p>";
+                  container.innerHTML = html;
+                  return;
+              }
+              html += "<h4>Resumen Semanal:</h4><ul>";
+              for (const numSemana in informe.resumenSemanas) {
+                  const semana = informe.resumenSemanas[numSemana];
+                  html += `<li><strong>Semana ${numSemana}:</strong><ul><li>Horas Trabajadas: ${segundosAFormatoDuracion(
+                      semana.totalSegundos
+                  )}</li><li>Horas Extra (sobre 40h/sem): ${segundosAFormatoDuracion(
+                      semana.horasExtraSegundos
+                  )}</li></ul></li>`;
+              }
+              html += '</ul><hr style="margin: 20px 0;">';
+              html += `<p><strong>Total Horas en el Mes:</strong> ${segundosAFormatoDuracion(
+                  informe.totalHorasMesSegundos
+              )}</p>`;
+              html += `<p><strong>Total Horas Extra en el Mes:</strong> ${segundosAFormatoDuracion(
+                  informe.totalHorasExtraMesSegundos
+              )}</p>`;
+              container.innerHTML = html;
+              if (informe.totalHorasMesSegundos > 0)
+                  btnExportar.style.display = "inline-block";
+          } catch (error) {
+              Swal.fire(
+                  "Error",
+                  `No se pudo generar el informe: ${error.message}`,
+                  "error"
+              );
+              container.innerHTML = "";
+          }
+      }
 
       async function exportarCSV() {
         const usuarioId = selectUsuario.value;
@@ -1629,44 +1625,39 @@ async function generarInformeMensual() {
         });
 
         // LÓGICA DE ACTUALIZACIÓN MANUAL
-const manualRefreshBtn = document.getElementById("manualRefreshBtn");
-const refreshIcon = manualRefreshBtn.querySelector("i");
-const timestampElement = document.getElementById("lastUpdatedTimestamp");
+        const manualRefreshBtn = document.getElementById("manualRefreshBtn");
+        const refreshIcon = manualRefreshBtn.querySelector("i");
+        const timestampElement = document.getElementById("lastUpdatedTimestamp");
 
-const refreshDynamicData = async () => {
-  console.log("Actualizando datos del panel...");
-  
-  // 1. Mostrar estado de carga
-  manualRefreshBtn.disabled = true;
-  refreshIcon.classList.add("is-loading");
-  
-  try {
-    // 2. Ejecutar todas las actualizaciones en paralelo para mayor rapidez
-    await Promise.all([
-      cargarDashboard(),
-      cargarSolicitudesPendientes(),
-      cargarJustificantes(),
-    ]);
-    
-    // 3. Actualizar la hora de la última actualización
-    const now = new Date();
-    timestampElement.textContent = `Última act: ${now.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}`;
+        const refreshDynamicData = async () => {
+          console.log("Actualizando datos del panel...");
+          
+          manualRefreshBtn.disabled = true;
+          refreshIcon.classList.add("is-loading");
+          
+          try {
+            await Promise.all([
+              cargarDashboard(),
+              cargarSolicitudesPendientes(),
+              cargarJustificantes(),
+            ]);
+            
+            const now = new Date();
+            timestampElement.textContent = `Última act: ${now.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}`;
 
-  } catch (error) {
-    console.error("Error al refrescar los datos:", error);
-    timestampElement.textContent = "Error al actualizar";
-  } finally {
-    // 4. Quitar estado de carga (incluso si hay un error)
-    manualRefreshBtn.disabled = false;
-    refreshIcon.classList.remove("is-loading");
-  }
-};
+          } catch (error) {
+            console.error("Error al refrescar los datos:", error);
+            timestampElement.textContent = "Error al actualizar";
+          } finally {
+            manualRefreshBtn.disabled = false;
+            refreshIcon.classList.remove("is-loading");
+          }
+        };
 
-// Carga inicial de los datos al entrar en la página
-refreshDynamicData();
+        refreshDynamicData();
 
-// Asignar el evento de clic al botón
-manualRefreshBtn.addEventListener("click", refreshDynamicData);
+        manualRefreshBtn.addEventListener("click", refreshDynamicData);
+      }; // <-- ¡ESTA ES LA LLAVE QUE FALTABA!
 
       document.addEventListener("DOMContentLoaded", () => {
         const hamburgerBtn = document.getElementById("hamburger-btn");
