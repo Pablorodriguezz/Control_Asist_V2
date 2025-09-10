@@ -87,6 +87,13 @@ function authenticateToken(req, res, next) {
     });
 }
 
+// --- RUTA PARA EL PING / HEALTH CHECK ---
+// Esta ruta es súper ligera y NO toca la base de datos.
+// Su único propósito es responder a Uptime Robot para mantener despierto el servidor de Render.
+app.get('/health', (req, res) => {
+    res.status(200).json({ status: 'ok', message: 'Server is awake' });
+});
+
 // =================================================================
 // RUTAS DE USUARIOS Y FICHAR (sin cambios)
 // =================================================================
