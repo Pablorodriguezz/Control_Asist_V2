@@ -341,67 +341,65 @@ app.get('/api/informe-mensual', authenticateToken, async (req, res) => {
     if (req.user.rol !== 'admin') return res.status(403).json({ message: 'Acceso denegado.' });
     const { anio, mes, usuarioId } = req.query;
 
-    // Usamos nuestra nueva función para obtener el rango de fechas correcto
     const { startDate, endDate } = getCustomPeriod(parseInt(anio), parseInt(mes));
 
-    // La consulta SQL ahora usa BETWEEN en lugar de date_trunc
+    // --- INICIO DE LA NUEVA LÓGICA OPTIMIZADA ---
     const sql = `
-        SELECT fecha_hora, tipo 
-        FROM registros 
-        WHERE usuario_id = $1 
-          AND fecha_hora BETWEEN $2 AND $3
-        ORDER BY fecha_hora ASC
+        WITH paired_logs AS (
+            SELECT
+                fecha_hora AS entrada_time,
+                LEAD(fecha_hora) OVER (PARTITION BY usuario_id, fecha_hora::date ORDER BY fecha_hora) as salida_time,
+                tipo,
+                LEAD(tipo) OVER (PARTITION BY usuario_id, fecha_hora::date ORDER BY fecha_hora) as next_tipo
+            FROM registros
+            WHERE usuario_id = $1 AND fecha_hora BETWEEN $2 AND $3
+        ),
+        daily_seconds AS (
+            SELECT
+                entrada_time::date as dia,
+                EXTRACT(EPOCH FROM (salida_time - entrada_time)) as segundos
+            FROM paired_logs
+            WHERE tipo = 'entrada' AND next_tipo = 'salida' AND salida_time > entrada_time
+        ),
+        aggregated_daily AS (
+            SELECT 
+                dia,
+                SUM(segundos) as total_segundos_dia
+            FROM daily_seconds
+            GROUP BY dia
+        )
+        SELECT 
+            EXTRACT(WEEK FROM dia) as num_semana,
+            SUM(total_segundos_dia) as total_segundos_semana
+        FROM aggregated_daily
+        GROUP BY num_semana
+        ORDER BY num_semana;
     `;
     
     try {
-        const { rows: registros } = await db.query(sql, [usuarioId, startDate, endDate]);
+        const { rows: semanas } = await db.query(sql, [usuarioId, startDate, endDate]);
 
-        // El resto de la lógica para calcular horas ya funciona perfectamente con los registros filtrados
-        const segundosPorDia = {};
-        let entradaActual = null;
-
-        for (const registro of registros) {
-            const fecha = DateTime.fromJSDate(registro.fecha_hora);
-            const diaISO = fecha.toISODate();
-            if (registro.tipo === 'entrada') {
-                entradaActual = fecha;
-            } else if (registro.tipo === 'salida' && entradaActual) {
-                if (entradaActual.hasSame(fecha, 'day')) {
-                    const duracion = fecha.diff(entradaActual, 'seconds').seconds;
-                    if (duracion > 0) {
-                        if (!segundosPorDia[diaISO]) segundosPorDia[diaISO] = 0;
-                        segundosPorDia[diaISO] += duracion;
-                    }
-                }
-                entradaActual = null;
-            }
-        }
-        
         const informe = { resumenSemanas: {}, totalHorasMesSegundos: 0, totalHorasExtraMesSegundos: 0 };
-        for (const dia in segundosPorDia) {
-            const segundosDelDia = segundosPorDia[dia];
-            informe.totalHorasMesSegundos += segundosDelDia;
-            const numSemana = DateTime.fromISO(dia).weekNumber;
-            if (!informe.resumenSemanas[numSemana]) {
-                informe.resumenSemanas[numSemana] = { totalSegundos: 0, horasExtraSegundos: 0 };
-            }
-            informe.resumenSemanas[numSemana].totalSegundos += segundosDelDia;
-        }
-
         const umbralSemanalSegundos = 40 * 3600;
-        for (const semana in informe.resumenSemanas) {
-            const totalSemana = informe.resumenSemanas[semana].totalSegundos;
-            if (totalSemana > umbralSemanalSegundos) {
-                const extra = totalSemana - umbralSemanalSegundos;
-                informe.resumenSemanas[semana].horasExtraSegundos = extra;
+
+        for (const semana of semanas) {
+            const numSemana = semana.num_semana;
+            const totalSegundos = parseFloat(semana.total_segundos_semana);
+            
+            informe.resumenSemanas[numSemana] = { totalSegundos: totalSegundos, horasExtraSegundos: 0 };
+            informe.totalHorasMesSegundos += totalSegundos;
+
+            if (totalSegundos > umbralSemanalSegundos) {
+                const extra = totalSegundos - umbralSemanalSegundos;
+                informe.resumenSemanas[numSemana].horasExtraSegundos = extra;
                 informe.totalHorasExtraMesSegundos += extra;
             }
         }
 
         res.json(informe);
     } catch (err) {
-        console.error("Error en informe por periodo:", err);
-        res.status(500).json({ message: 'Error en informe por periodo.' });
+        console.error("Error en informe mensual optimizado:", err);
+        res.status(500).json({ message: 'Error al generar el informe optimizado.' });
     }
 });
 
@@ -412,71 +410,67 @@ app.get('/api/exportar-csv', authenticateToken, async (req, res) => {
     const { anio, mes, usuarioId } = req.query;
     const timeZone = 'Europe/Madrid';
     
-    // Usamos la misma función para obtener el rango de fechas
     const { startDate, endDate } = getCustomPeriod(parseInt(anio), parseInt(mes));
 
-    // Actualizamos la consulta SQL
-    const sql = `
+    // --- LÓGICA OPTIMIZADA TAMBIÉN PARA EL CSV ---
+    const sqlRawData = `
         SELECT u.nombre, r.fecha_hora, r.tipo 
-        FROM registros r 
-        JOIN usuarios u ON r.usuario_id = u.id 
-        WHERE r.usuario_id = $1 
-          AND r.fecha_hora BETWEEN $2 AND $3
+        FROM registros r JOIN u ON r.usuario_id = u.id 
+        WHERE r.usuario_id = $1 AND r.fecha_hora BETWEEN $2 AND $3
         ORDER BY r.fecha_hora ASC
+    `;
+
+    const sqlTotals = `
+        WITH paired_logs AS (
+          SELECT
+            fecha_hora, tipo,
+            LEAD(fecha_hora) OVER (PARTITION BY usuario_id, fecha_hora::date ORDER BY fecha_hora) as next_fecha_hora,
+            LEAD(tipo) OVER (PARTITION BY usuario_id, fecha_hora::date ORDER BY fecha_hora) as next_tipo
+          FROM registros
+          WHERE usuario_id = $1 AND fecha_hora BETWEEN $2 AND $3
+        ), sessions AS (
+          SELECT EXTRACT(EPOCH FROM (next_fecha_hora - fecha_hora)) as segundos,
+                 EXTRACT(WEEK FROM fecha_hora) as num_semana
+          FROM paired_logs
+          WHERE tipo = 'entrada' AND next_tipo = 'salida' AND next_fecha_hora > fecha_hora
+        ), weekly_totals AS (
+          SELECT num_semana, SUM(segundos) as total_semanal
+          FROM sessions
+          GROUP BY num_semana
+        )
+        SELECT 
+            SUM(total_semanal) as total_periodo,
+            SUM(CASE WHEN total_semanal > (40*3600) THEN total_semanal - (40*3600) ELSE 0 END) as total_extra
+        FROM weekly_totals;
     `;
     
     try {
-        const { rows: data } = await db.query(sql, [usuarioId, startDate, endDate]);
+        // Ejecutamos ambas consultas en paralelo para máxima eficiencia
+        const [rawDataResult, totalsResult] = await Promise.all([
+            db.query(sqlRawData, [usuarioId, startDate, endDate]),
+            db.query(sqlTotals, [usuarioId, startDate, endDate])
+        ]);
 
-        // El resto del código que procesa los datos para el CSV no necesita cambios
-        const segundosPorDia = {};
-        let entradaActual = null;
-        for (const registro of data) {
-            const fecha = DateTime.fromJSDate(registro.fecha_hora);
-            const diaISO = fecha.toISODate();
-            if (registro.tipo === 'entrada') {
-                entradaActual = fecha;
-            } else if (registro.tipo === 'salida' && entradaActual) {
-                if (entradaActual.hasSame(fecha, 'day')) {
-                    const duracion = fecha.diff(entradaActual, 'seconds').seconds;
-                    if (duracion > 0) {
-                        if (!segundosPorDia[diaISO]) segundosPorDia[diaISO] = 0;
-                        segundosPorDia[diaISO] += duracion;
-                    }
-                }
-                entradaActual = null;
-            }
-        }
-
-        let totalHorasMesSegundos = 0;
-        let totalHorasExtraMesSegundos = 0;
-        const resumenSemanas = {};
-
-        for (const dia in segundosPorDia) {
-            totalHorasMesSegundos += segundosPorDia[dia];
-            const numSemana = DateTime.fromISO(dia).weekNumber;
-            if (!resumenSemanas[numSemana]) resumenSemanas[numSemana] = 0;
-            resumenSemanas[numSemana] += segundosPorDia[dia];
-        }
-
-        const umbralSemanalSegundos = 40 * 3600;
-        for (const semana in resumenSemanas) {
-            if (resumenSemanas[semana] > umbralSemanalSegundos) {
-                totalHorasExtraMesSegundos += resumenSemanas[semana] - umbralSemanalSegundos;
-            }
-        }
+        const data = rawDataResult.rows;
+        const totals = totalsResult.rows[0];
+        const totalHorasMesSegundos = totals.total_periodo || 0;
+        const totalHorasExtraMesSegundos = totals.total_extra || 0;
 
         const datosProcesados = data.map(registro => {
             const fechaLocal = DateTime.fromJSDate(registro.fecha_hora, { zone: 'utc' }).setZone(timeZone);
             return { "Nombre": registro.nombre, "Fecha y Hora (Local)": fechaLocal.toFormat('dd/MM/yyyy HH:mm:ss'), "Tipo": registro.tipo };
         });
-        const segundosAFormatoHora = (s) => DateTime.fromSeconds(s, { zone: 'utc' }).toFormat('HH:mm:ss');
-        datosProcesados.push({}, { "Nombre": "Total Horas Periodo", "Fecha y Hora (Local)": segundosAFormatoHora(totalHorasMesSegundos) }, { "Nombre": "Total Horas Extra", "Fecha y Hora (Local)": segundosAFormatoHora(totalHorasExtraMesSegundos) });
+        const segundosAFormatoHora = (s) => DateTime.fromSeconds(s || 0, { zone: 'utc' }).toFormat('HH:mm:ss');
+
+        datosProcesados.push({}, 
+            { "Nombre": "Total Horas Periodo", "Fecha y Hora (Local)": segundosAFormatoHora(totalHorasMesSegundos) }, 
+            { "Nombre": "Total Horas Extra", "Fecha y Hora (Local)": segundosAFormatoHora(totalHorasExtraMesSegundos) }
+        );
+
         const fields = ["Nombre", "Fecha y Hora (Local)", "Tipo"];
         const json2csvParser = new Parser({ fields });
         const csv = json2csvParser.parse(datosProcesados);
-
-        // Cambiamos el nombre del archivo para reflejar el periodo
+        
         const startDateFormatted = DateTime.fromISO(startDate).toFormat('yyyy-MM-dd');
         const endDateFormatted = DateTime.fromISO(endDate).toFormat('yyyy-MM-dd');
 
@@ -485,11 +479,10 @@ app.get('/api/exportar-csv', authenticateToken, async (req, res) => {
         res.send(csv);
 
     } catch (err) {
-        console.error("Error al exportar CSV:", err);
-        res.status(500).json({ message: 'Error al exportar.' });
+        console.error("Error al exportar CSV optimizado:", err);
+        res.status(500).json({ message: 'Error al exportar el informe.' });
     }
 });
-
 
 // --- RUTAS PARA GESTIÓN DE JUSTIFICANTES ---
 app.post('/api/justificantes', authenticateToken, upload.single('justificante'), async (req, res) => {
