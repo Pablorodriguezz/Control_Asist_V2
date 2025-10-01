@@ -114,9 +114,7 @@ app.post('/api/login', async (req, res) => {
     } catch (err) { res.status(500).json({ message: 'Error del servidor' }); }
 });
 
-// En server.js
 
-// ... (después de la ruta /api/login)
 
 // --- NUEVA RUTA PÚBLICA PARA OBTENER EMPLEADOS ---
 // No necesita autenticación porque es para la pantalla de inicio.
@@ -624,7 +622,6 @@ app.get('/api/vacaciones', authenticateToken, async (req, res) => {
 });
 
 // MODIFICADO: (ADMIN/GESTOR) Asigna vacaciones y valida saldo
-// MODIFICADO: (ADMIN/GESTOR) Asigna vacaciones y valida saldo
 app.post('/api/vacaciones', authenticateToken, async (req, res) => {
     // Solo admin y gestor pueden asignar vacaciones directamente
     if (req.user.rol !== 'admin' && req.user.rol !== 'gestor_vacaciones') {
@@ -950,5 +947,5 @@ const startServer = async () => {
         process.exit(1);
     }
 };
-
+//PRUENA
 startServer();
