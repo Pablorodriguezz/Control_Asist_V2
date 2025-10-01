@@ -200,38 +200,27 @@
         </section>
         <hr />
 
-        <!-- Busca esta sección en admin.html y reemplázala -->
-<section id="informe-mensual">
-  <h2>Informe por Periodo (21 al 20)</h2>
-  
-  <!-- Contenedor de controles con la explicación -->
-  <div class="informe-controls">
-    <select id="selectUsuario" required>
-      <option value="">-- Selecciona un trabajador --</option>
-    </select>
-    <input type="month" id="selectMes" required />
-    <button onclick="generarInformeMensual()">
-      Generar Informe
-    </button>
-    <button
-      id="btnExportar"
-      style="display: none"
-      onclick="exportarCSV()"
-    >
-      Exportar a CSV
-    </button>
-  </div>
-  
-  <!-- Párrafo explicativo -->
-  <p style="font-size: 0.9em; color: #555; margin-top: 10px;">
-    <strong>Nota:</strong> Selecciona el <strong>mes de fin</strong> del periodo. El informe se generará desde el día 21 del mes anterior hasta el día 20 del mes que elijas.
-    <br>
-    <em>Excepción: El informe de Septiembre abarca del 1 al 20 de Septiembre.</em>
-  </p>
-
-  <div id="informeMensualContainer" style="margin-top: 20px"></div>
-</section>
-<!-- Fin de la sección reemplazada -->
+        <section id="informe-mensual">
+          <h2>Informe Mensual por Trabajador</h2>
+          <div>
+            <select id="selectUsuario" required>
+              <option value="">-- Selecciona un trabajador --</option>
+            </select>
+            <input type="month" id="selectMes" required /><button
+              onclick="generarInformeMensual()"
+            >
+              Generar Informe
+            </button>
+            <button
+              id="btnExportar"
+              style="display: none"
+              onclick="exportarCSV()"
+            >
+              Exportar a CSV
+            </button>
+          </div>
+          <div id="informeMensualContainer" style="margin-top: 20px"></div>
+        </section>
         <hr />
 
         <section id="gestion-usuarios">
