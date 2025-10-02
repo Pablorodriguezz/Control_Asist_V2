@@ -92,19 +92,19 @@
         </div>
       </aside>
 
-            <main class="main-content-area">
+      <main class="main-content-area">
         <section id="dashboard">
           <!-- INICIO DE LA ESTRUCTURA CON ACTUALIZACIÓN MANUAL -->
-<div class="section-header">
-  <h2>Panel de Control</h2>
-  <div class="dashboard-header-controls">
-    <span id="lastUpdatedTimestamp"></span>
-    <button id="manualRefreshBtn" title="Actualizar datos">
-      <i class="bi bi-arrow-clockwise"></i>
-    </button>
-  </div>
-</div>
-<!-- FIN DE LA ESTRUCTURA CON ACTUALIZACIÓN MANUAL -->
+          <div class="section-header">
+            <h2>Panel de Control</h2>
+            <div class="dashboard-header-controls">
+              <span id="lastUpdatedTimestamp"></span>
+              <button id="manualRefreshBtn" title="Actualizar datos">
+                <i class="bi bi-arrow-clockwise"></i>
+              </button>
+            </div>
+          </div>
+          <!-- FIN DE LA ESTRUCTURA CON ACTUALIZACIÓN MANUAL -->
           <!-- FIN DE LA ESTRUCTURA CORREGIDA -->
 
           <div class="dashboard-grid">
@@ -201,26 +201,30 @@
         <hr />
 
         <section id="informe-mensual">
-          <h2>Informe Mensual por Trabajador</h2>
-          <div>
-            <select id="selectUsuario" required>
-              <option value="">-- Selecciona un trabajador --</option>
-            </select>
-            <input type="month" id="selectMes" required /><button
-              onclick="generarInformeMensual()"
-            >
-              Generar Informe
-            </button>
-            <button
-              id="btnExportar"
-              style="display: none"
-              onclick="exportarCSV()"
-            >
-              Exportar a CSV
-            </button>
-          </div>
-          <div id="informeMensualContainer" style="margin-top: 20px"></div>
-        </section>
+  <h2>Informe Mensual por Trabajador</h2>
+  <div>
+    <select id="selectUsuario" required>
+      <option value="">-- Selecciona un trabajador --</option>
+    </select>
+    <select id="selectPeriodo" required>
+      <option value="">-- Selecciona un periodo --</option>
+    </select>
+    
+    <!-- BOTÓN AÑADIDO -->
+    <button onclick="generarInformeMensual()">
+      Generar Informe
+    </button>
+    
+    <button
+      id="btnExportar"
+      style="display: none"
+      onclick="exportarCSV()"
+    >
+      Exportar a CSV
+    </button>
+  </div>
+  <div id="informeMensualContainer" style="margin-top: 20px"></div>
+</section>
         <hr />
 
         <section id="gestion-usuarios">
@@ -391,15 +395,11 @@
     </div>
 
     <button id="scrollTopBtn" title="Volver arriba">⇧</button>
-    
-    
-
 
     <script>
       const token = localStorage.getItem("token");
       if (!token) window.location.href = "/index.html";
       const selectUsuario = document.getElementById("selectUsuario");
-      const selectMes = document.getElementById("selectMes");
       const btnExportar = document.getElementById("btnExportar");
       let calendario;
       let vacationData;
@@ -958,121 +958,150 @@
         }
       }
 
+      async function poblarSelectorPeriodos() {
+    const selectPeriodo = document.getElementById("selectPeriodo");
+    selectPeriodo.innerHTML = '<option value="">-- Selecciona un periodo --</option>'; // Limpiar
+    
+    // Usaremos Luxon que ya tienes en panel.html y server.js
+    // Si no está globalmente, asegúrate de añadir <script src="...luxon.min.js"></script>
+    // Pero para este caso, podemos hacerlo con Date nativo para no añadir dependencias.
+
+    let hoy = new Date();
+    // Generamos los últimos 12 periodos
+    for (let i = 0; i < 12; i++) {
+        let fechaFin, fechaInicio;
+        
+        // Ajustamos la fecha para iterar hacia atrás
+        let fechaCursor = new Date(hoy.getFullYear(), hoy.getMonth() - i, 1);
+
+        let anioFin = fechaCursor.getFullYear();
+        let mesFin = fechaCursor.getMonth(); // 0 = Enero
+
+        fechaFin = new Date(Date.UTC(anioFin, mesFin, 20));
+
+        // Caso especial: El periodo que termina el 20 de Septiembre
+        if (fechaFin.getUTCMonth() === 8 && fechaFin.getUTCDate() === 20) { // 8 = Septiembre
+             fechaInicio = new Date(Date.UTC(fechaFin.getUTCFullYear(), 8, 1)); // 1 de Septiembre
+        } else {
+             fechaInicio = new Date(Date.UTC(anioFin, mesFin - 1, 21));
+        }
+
+        const formatoFecha = (fecha) => fecha.toISOString().split('T')[0];
+        const formatoBonito = (fecha) => fecha.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' });
+
+        const option = document.createElement('option');
+        // El valor contendrá ambas fechas separadas por un guion bajo
+        option.value = `${formatoFecha(fechaInicio)}_${formatoFecha(fechaFin)}`;
+        option.textContent = `Periodo: ${formatoBonito(fechaInicio)} - ${formatoBonito(fechaFin)}`;
+        selectPeriodo.appendChild(option);
+    }
+}
+
       async function generarInformeMensual() {
-          const usuarioId = selectUsuario.value;
-          const mesValue = selectMes.value;
-          if (!usuarioId) {
-              Swal.fire("Atención", "Selecciona un trabajador.", "info");
-              return;
-          }
-          if (!mesValue) {
-              Swal.fire("Atención", "Selecciona un mes.", "info");
-              return;
-          }
-          const [anio, mes] = mesValue.split("-");
-          const container = document.getElementById("informeMensualContainer");
-          container.innerHTML = "Generando informe...";
-          btnExportar.style.display = "none";
+    const usuarioId = selectUsuario.value;
+    const periodoValue = document.getElementById("selectPeriodo").value; // Cambiado de selectMes a selectPeriodo
 
-          const segundosAFormatoDuracion = (totalSegundos) => {
-              totalSegundos = Math.floor(totalSegundos || 0);
-              const horas = Math.floor(totalSegundos / 3600);
-              const minutos = Math.floor((totalSegundos % 3600) / 60);
-              const segundos = totalSegundos % 60;
-              
-              const pad = (num) => String(num).padStart(2, '0');
+    if (!usuarioId) {
+        Swal.fire("Atención", "Selecciona un trabajador.", "info");
+        return;
+    }
+    if (!periodoValue) {
+        Swal.fire("Atención", "Selecciona un periodo.", "info");
+        return;
+    }
 
-              return `${horas}:${pad(minutos)}:${pad(segundos)}`;
-          };
+    // Obtenemos fecha de inicio y fin del valor del select
+    const [fechaInicio, fechaFin] = periodoValue.split("_");
+    
+    const container = document.getElementById("informeMensualContainer");
+    container.innerHTML = "Generando informe...";
+    btnExportar.style.display = "none";
 
-          try {
-              const url = `/api/informe-mensual?anio=${anio}&mes=${mes}&usuarioId=${usuarioId}`;
-              const res = await fetch(url, {
-                  headers: { Authorization: `Bearer ${token}` },
-              });
-              if (!res.ok) {
-                  const errData = await res
-                      .json()
-                      .catch(() => ({ message: `Error: ${res.status}` }));
-                  throw new Error(errData.message);
-              }
-              const informe = await res.json();
-              
-              let html = `<h3>Informe para ${
-                  selectUsuario.options[selectUsuario.selectedIndex].text
-              }</h3>`;
-              if (Object.keys(informe.resumenSemanas).length === 0) {
-                  html += "<p>No hay datos de trabajo para el mes seleccionado.</p>";
-                  container.innerHTML = html;
-                  return;
-              }
-              html += "<h4>Resumen Semanal:</h4><ul>";
-              for (const numSemana in informe.resumenSemanas) {
-                  const semana = informe.resumenSemanas[numSemana];
-                  html += `<li><strong>Semana ${numSemana}:</strong><ul><li>Horas Trabajadas: ${segundosAFormatoDuracion(
-                      semana.totalSegundos
-                  )}</li><li>Horas Extra (sobre 40h/sem): ${segundosAFormatoDuracion(
-                      semana.horasExtraSegundos
-                  )}</li></ul></li>`;
-              }
-              html += '</ul><hr style="margin: 20px 0;">';
-              html += `<p><strong>Total Horas en el Mes:</strong> ${segundosAFormatoDuracion(
-                  informe.totalHorasMesSegundos
-              )}</p>`;
-              html += `<p><strong>Total Horas Extra en el Mes:</strong> ${segundosAFormatoDuracion(
-                  informe.totalHorasExtraMesSegundos
-              )}</p>`;
-              container.innerHTML = html;
-              if (informe.totalHorasMesSegundos > 0)
-                  btnExportar.style.display = "inline-block";
-          } catch (error) {
-              Swal.fire(
-                  "Error",
-                  `No se pudo generar el informe: ${error.message}`,
-                  "error"
-              );
-              container.innerHTML = "";
-          }
-      }
+    const segundosAFormatoDuracion = (totalSegundos) => {
+        totalSegundos = Math.floor(totalSegundos || 0);
+        const horas = Math.floor(totalSegundos / 3600);
+        const minutos = Math.floor((totalSegundos % 3600) / 60);
+        const segundos = totalSegundos % 60;
+        const pad = (num) => String(num).padStart(2, '0');
+        return `${horas}:${pad(minutos)}:${pad(segundos)}`;
+    };
+
+    try {
+        // Actualizamos la URL para enviar el rango de fechas
+        const url = `/api/informe-mensual?usuarioId=${usuarioId}&fechaInicio=${fechaInicio}&fechaFin=${fechaFin}`;
+        const res = await fetch(url, {
+            headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) {
+            const errData = await res.json().catch(() => ({ message: `Error: ${res.status}` }));
+            throw new Error(errData.message);
+        }
+        const informe = await res.json();
+        
+        let html = `<h3>Informe para ${selectUsuario.options[selectUsuario.selectedIndex].text}</h3>`;
+        if (Object.keys(informe.resumenSemanas).length === 0) {
+            html += "<p>No hay datos de trabajo para el periodo seleccionado.</p>";
+            container.innerHTML = html;
+            return;
+        }
+        html += "<h4>Resumen Semanal:</h4><ul>";
+        for (const numSemana in informe.resumenSemanas) {
+            const semana = informe.resumenSemanas[numSemana];
+            html += `<li><strong>Semana ${numSemana}:</strong><ul><li>Horas Trabajadas: ${segundosAFormatoDuracion(semana.totalSegundos)}</li><li>Horas Extra (sobre 40h/sem): ${segundosAFormatoDuracion(semana.horasExtraSegundos)}</li></ul></li>`;
+        }
+        html += '</ul><hr style="margin: 20px 0;">';
+        html += `<p><strong>Total Horas en el Periodo:</strong> ${segundosAFormatoDuracion(informe.totalHorasMesSegundos)}</p>`;
+        html += `<p><strong>Total Horas Extra en el Periodo:</strong> ${segundosAFormatoDuracion(informe.totalHorasExtraMesSegundos)}</p>`;
+        container.innerHTML = html;
+        if (informe.totalHorasMesSegundos > 0)
+            btnExportar.style.display = "inline-block";
+    } catch (error) {
+        Swal.fire("Error", `No se pudo generar el informe: ${error.message}`, "error");
+        container.innerHTML = "";
+    }
+}
 
       async function exportarCSV() {
-        const usuarioId = selectUsuario.value;
-        const [anio, mes] = selectMes.value.split("-");
-        if (!usuarioId) return;
-        btnExportar.textContent = "Exportando...";
-        btnExportar.disabled = true;
-        try {
-          const url = `/api/exportar-csv?anio=${anio}&mes=${mes}&usuarioId=${usuarioId}`;
-          const res = await fetch(url, {
+    const usuarioId = selectUsuario.value;
+    const periodoValue = document.getElementById("selectPeriodo").value;
+
+    if (!usuarioId || !periodoValue) return;
+
+    const [fechaInicio, fechaFin] = periodoValue.split("_");
+    
+    btnExportar.textContent = "Exportando...";
+    btnExportar.disabled = true;
+
+    try {
+        const url = `/api/exportar-csv?usuarioId=${usuarioId}&fechaInicio=${fechaInicio}&fechaFin=${fechaFin}`;
+        const res = await fetch(url, {
             headers: { Authorization: `Bearer ${token}` },
-          });
-          if (!res.ok) {
-            const errorData = await res
-              .json()
-              .catch(() => ({ message: `Error: ${res.status}` }));
+        });
+        if (!res.ok) {
+            const errorData = await res.json().catch(() => ({ message: `Error: ${res.status}` }));
             throw new Error(errorData.message);
-          }
-          const blob = await res.blob();
-          const contentDisposition = res.headers.get("content-disposition");
-          let fileName = `informe-${anio}-${mes}.csv`;
-          if (contentDisposition) {
+        }
+        const blob = await res.blob();
+        const contentDisposition = res.headers.get("content-disposition");
+        let fileName = `informe-${fechaInicio}-al-${fechaFin}.csv`;
+        if (contentDisposition) {
             const fileNameMatch = contentDisposition.match(/filename="(.+)"/);
             if (fileNameMatch.length === 2) fileName = fileNameMatch[1];
-          }
-          const link = document.createElement("a");
-          link.href = window.URL.createObjectURL(blob);
-          link.download = fileName;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          window.URL.revokeObjectURL(link.href);
-        } catch (error) {
-          Swal.fire("Error", `No se pudo exportar: ${error.message}`, "error");
-        } finally {
-          btnExportar.textContent = "Exportar a CSV";
-          btnExportar.disabled = false;
         }
-      }
+        const link = document.createElement("a");
+        link.href = window.URL.createObjectURL(blob);
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(link.href);
+    } catch (error) {
+        Swal.fire("Error", `No se pudo exportar: ${error.message}`, "error");
+    } finally {
+        btnExportar.textContent = "Exportar a CSV";
+        btnExportar.disabled = false;
+    }
+}
 
       document
         .getElementById("createUserForm")
@@ -1564,12 +1593,11 @@
         document.getElementById("manualFechaHora").value = hoyLocal
           .toISOString()
           .slice(0, 16);
-        selectMes.value = `${hoy.getFullYear()}-${String(
-          hoy.getMonth() + 1
-        ).padStart(2, "0")}`;
         
+
         getReport();
         loadUsers();
+        poblarSelectorPeriodos();
         poblarSelectorUsuarios("selectUsuario");
         poblarSelectorUsuarios("manualUsuario");
         poblarSelectorUsuarios("vacacionesUsuario");
@@ -1627,24 +1655,28 @@
         // LÓGICA DE ACTUALIZACIÓN MANUAL
         const manualRefreshBtn = document.getElementById("manualRefreshBtn");
         const refreshIcon = manualRefreshBtn.querySelector("i");
-        const timestampElement = document.getElementById("lastUpdatedTimestamp");
+        const timestampElement = document.getElementById(
+          "lastUpdatedTimestamp"
+        );
 
         const refreshDynamicData = async () => {
           console.log("Actualizando datos del panel...");
-          
+
           manualRefreshBtn.disabled = true;
           refreshIcon.classList.add("is-loading");
-          
+
           try {
             await Promise.all([
               cargarDashboard(),
               cargarSolicitudesPendientes(),
               cargarJustificantes(),
             ]);
-            
-            const now = new Date();
-            timestampElement.textContent = `Última act: ${now.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}`;
 
+            const now = new Date();
+            timestampElement.textContent = `Última act: ${now.toLocaleTimeString(
+              "es-ES",
+              { hour: "2-digit", minute: "2-digit" }
+            )}`;
           } catch (error) {
             console.error("Error al refrescar los datos:", error);
             timestampElement.textContent = "Error al actualizar";
@@ -1657,7 +1689,7 @@
         refreshDynamicData();
 
         manualRefreshBtn.addEventListener("click", refreshDynamicData);
-      }; // <-- ¡ESTA ES LA LLAVE QUE FALTABA!
+      } // <-- ¡ESTA ES LA LLAVE QUE FALTABA!
 
       document.addEventListener("DOMContentLoaded", () => {
         const hamburgerBtn = document.getElementById("hamburger-btn");
@@ -1667,7 +1699,7 @@
           sidebar.classList.remove("sidebar-visible");
           overlay.classList.remove("visible");
         }
-        
+
         if (hamburgerBtn && sidebar && overlay) {
           hamburgerBtn.addEventListener("click", () => {
             sidebar.classList.toggle("sidebar-visible");
