@@ -319,48 +319,65 @@ app.post('/api/fichaje-manual', authenticateToken, async (req, res) => {
 app.get('/api/informe-mensual', authenticateToken, async (req, res) => {
     if (req.user.rol !== 'admin') return res.status(403).json({ message: 'Acceso denegado.' });
     const { anio, mes, usuarioId } = req.query;
-    const sql = `SELECT fecha_hora, tipo FROM registros WHERE usuario_id = $1 AND date_trunc('month', fecha_hora) = make_date($2, $3, 1) ORDER BY fecha_hora ASC`;
-    try {
-        const { rows: registros } = await db.query(sql, [usuarioId, anio, mes]);
 
-        // PASO 1: Calcular las horas trabajadas para cada día individualmente.
-        const segundosPorDia = {}; // Usaremos un objeto para guardar los totales diarios.
+    // --- INICIO DE LA NUEVA LÓGICA DE FECHAS ---
+    const anioNum = parseInt(anio, 10);
+    const mesNum = parseInt(mes, 10);
+    const timeZone = 'Europe/Madrid';
+
+    // La fecha de fin es el día 20 del mes seleccionado, al final del día.
+    const fechaFin = DateTime.fromObject({ year: anioNum, month: mesNum, day: 20 }, { zone: timeZone }).endOf('day');
+    
+    // La fecha de inicio es el día 21 del mes ANTERIOR, al principio del día.
+    // Luxon maneja el cambio de año automáticamente (ej: si mes es Enero, .minus({ months: 1 }) dará Diciembre del año anterior).
+    const fechaInicio = DateTime.fromObject({ year: anioNum, month: mesNum, day: 21 }, { zone: timeZone })
+                                .minus({ months: 1 })
+                                .startOf('day');
+    // --- FIN DE LA NUEVA LÓGICA DE FECHAS ---
+
+    // Modificamos la consulta SQL para usar el rango de fechas calculado
+    const sql = `
+        SELECT fecha_hora, tipo 
+        FROM registros 
+        WHERE usuario_id = $1 
+          AND fecha_hora >= $2 
+          AND fecha_hora <= $3 
+        ORDER BY fecha_hora ASC
+    `;
+    try {
+        // Pasamos las fechas de inicio y fin como parámetros
+        const { rows: registros } = await db.query(sql, [usuarioId, fechaInicio.toJSDate(), fechaFin.toJSDate()]);
+
+        // El resto de la lógica para procesar los registros no necesita cambios.
+        const segundosPorDia = {};
         let entradaActual = null;
 
         for (const registro of registros) {
             const fecha = DateTime.fromJSDate(registro.fecha_hora);
-            const diaISO = fecha.toISODate(); // Clave única para cada día.
+            const diaISO = fecha.toISODate();
 
             if (registro.tipo === 'entrada') {
                 entradaActual = fecha;
             } else if (registro.tipo === 'salida' && entradaActual) {
-                // Asegurarnos de que la salida corresponde al mismo día que la entrada
                 if (entradaActual.hasSame(fecha, 'day')) {
                     const duracion = fecha.diff(entradaActual, 'seconds').seconds;
                     if (duracion > 0) {
-                        // Si es el primer cálculo para este día, inicializamos
                         if (!segundosPorDia[diaISO]) {
                             segundosPorDia[diaISO] = 0;
                         }
-                        // Acumulamos los segundos para ese día
                         segundosPorDia[diaISO] += duracion;
                     }
                 }
-                // Cerramos el par, esté en el mismo día o no.
                 entradaActual = null;
             }
         }
         
-        // PASO 2: Ahora, con los totales diarios correctos, calculamos los resúmenes.
         const informe = { resumenSemanas: {}, totalHorasMesSegundos: 0, totalHorasExtraMesSegundos: 0 };
 
         for (const dia in segundosPorDia) {
             const segundosDelDia = segundosPorDia[dia];
-            
-            // ACUMULACIÓN MENSUAL (CORREGIDA)
             informe.totalHorasMesSegundos += segundosDelDia;
             
-            // ACUMULACIÓN SEMANAL
             const numSemana = DateTime.fromISO(dia).weekNumber;
             if (!informe.resumenSemanas[numSemana]) {
                 informe.resumenSemanas[numSemana] = { totalSegundos: 0, horasExtraSegundos: 0 };
@@ -368,7 +385,6 @@ app.get('/api/informe-mensual', authenticateToken, async (req, res) => {
             informe.resumenSemanas[numSemana].totalSegundos += segundosDelDia;
         }
 
-        // PASO 3: Calcular horas extra (esta parte ya estaba bien).
         const umbralSemanalSegundos = 40 * 3600;
         for (const semana in informe.resumenSemanas) {
             const totalSemana = informe.resumenSemanas[semana].totalSegundos;
@@ -391,12 +407,33 @@ app.get('/api/informe-mensual', authenticateToken, async (req, res) => {
 app.get('/api/exportar-csv', authenticateToken, async (req, res) => {
     if (req.user.rol !== 'admin') return res.status(403).json({ message: 'Acceso denegado.' });
     const { anio, mes, usuarioId } = req.query;
-    const sql = `SELECT u.nombre, r.fecha_hora, r.tipo FROM registros r JOIN usuarios u ON r.usuario_id = u.id WHERE r.usuario_id = $1 AND date_trunc('month', r.fecha_hora) = make_date($2, $3, 1) ORDER BY r.fecha_hora ASC`;
     const timeZone = 'Europe/Madrid';
-    try {
-        const { rows: data } = await db.query(sql, [usuarioId, anio, mes]);
 
-        // PASO 1: Calcular horas diarias
+    // --- INICIO DE LA NUEVA LÓGICA DE FECHAS (idéntica a la anterior) ---
+    const anioNum = parseInt(anio, 10);
+    const mesNum = parseInt(mes, 10);
+
+    const fechaFin = DateTime.fromObject({ year: anioNum, month: mesNum, day: 20 }, { zone: timeZone }).endOf('day');
+    const fechaInicio = DateTime.fromObject({ year: anioNum, month: mesNum, day: 21 }, { zone: timeZone })
+                                .minus({ months: 1 })
+                                .startOf('day');
+    // --- FIN DE LA NUEVA LÓGICA DE FECHAS ---
+    
+    // Modificamos la consulta SQL para usar el rango de fechas
+    const sql = `
+        SELECT u.nombre, r.fecha_hora, r.tipo 
+        FROM registros r 
+        JOIN usuarios u ON r.usuario_id = u.id 
+        WHERE r.usuario_id = $1 
+          AND r.fecha_hora >= $2 
+          AND r.fecha_hora <= $3 
+        ORDER BY r.fecha_hora ASC
+    `;
+    
+    try {
+        const { rows: data } = await db.query(sql, [usuarioId, fechaInicio.toJSDate(), fechaFin.toJSDate()]);
+
+        // El resto de la lógica para procesar y generar el CSV no necesita cambios.
         const segundosPorDia = {};
         let entradaActual = null;
         for (const registro of data) {
@@ -416,7 +453,6 @@ app.get('/api/exportar-csv', authenticateToken, async (req, res) => {
             }
         }
 
-        // PASO 2: Calcular totales
         let totalHorasMesSegundos = 0;
         let totalHorasExtraMesSegundos = 0;
         const resumenSemanas = {};
@@ -435,7 +471,6 @@ app.get('/api/exportar-csv', authenticateToken, async (req, res) => {
             }
         }
 
-        // El resto del código para generar el CSV ya estaba bien
         const datosProcesados = data.map(registro => {
             const fechaLocal = DateTime.fromJSDate(registro.fecha_hora, { zone: 'utc' }).setZone(timeZone);
             return { "Nombre": registro.nombre, "Fecha y Hora (Local)": fechaLocal.toFormat('dd/MM/yyyy HH:mm:ss'), "Tipo": registro.tipo };
