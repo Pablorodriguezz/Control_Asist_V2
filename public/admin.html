@@ -200,45 +200,27 @@
         </section>
         <hr />
 
-        <!-- admin.html -->
-<section id="informe-mensual">
-  <h2>Informe Mensual por Trabajador</h2>
-  
-  <!-- INICIO DEL BLOQUE MODIFICADO -->
-  <div>
-    <select id="selectUsuario" required>
-      <option value="">-- Selecciona un trabajador --</option>
-    </select>
-    
-    <select id="selectMes" required>
-        <option value="1">Enero</option>
-        <option value="2">Febrero</option>
-        <option value="3">Marzo</option>
-        <option value="4">Abril</option>
-        <option value="5">Mayo</option>
-        <option value="6">Junio</option>
-        <option value="7">Julio</option>
-        <option value="8">Agosto</option>
-        <option value="9">Septiembre</option>
-        <option value="10">Octubre</option>
-        <option value="11">Noviembre</option>
-        <option value="12">Diciembre</option>
-    </select>
-    
-    <input type="number" id="selectAnio" required style="width: 100px;">
-    
-    <button onclick="generarInformeMensual()">Generar Informe</button>
-    <button id="btnExportar" style="display: none" onclick="exportarCSV()">
-      Exportar a CSV
-    </button>
-    <small style="display: block; margin-top: 5px; color: #555;">
-      El informe se genera del día 21 del mes anterior al 20 del mes seleccionado.
-    </small>
-  </div>
-  <!-- FIN DEL BLOQUE MODIFICADO -->
-  
-  <div id="informeMensualContainer" style="margin-top: 20px"></div>
-</section>
+        <section id="informe-mensual">
+          <h2>Informe Mensual por Trabajador</h2>
+          <div>
+            <select id="selectUsuario" required>
+              <option value="">-- Selecciona un trabajador --</option>
+            </select>
+            <input type="month" id="selectMes" required /><button
+              onclick="generarInformeMensual()"
+            >
+              Generar Informe
+            </button>
+            <button
+              id="btnExportar"
+              style="display: none"
+              onclick="exportarCSV()"
+            >
+              Exportar a CSV
+            </button>
+          </div>
+          <div id="informeMensualContainer" style="margin-top: 20px"></div>
+        </section>
         <hr />
 
         <section id="gestion-usuarios">
@@ -976,25 +958,18 @@
         }
       }
 
-      // admin.html -> <script>
-
-      // Busca esta función y reemplázala
       async function generarInformeMensual() {
           const usuarioId = selectUsuario.value;
-          // --- INICIO CAMBIO ---
-          const mes = document.getElementById("selectMes").value;
-          const anio = document.getElementById("selectAnio").value;
-          // --- FIN CAMBIO ---
-
+          const mesValue = selectMes.value;
           if (!usuarioId) {
               Swal.fire("Atención", "Selecciona un trabajador.", "info");
               return;
           }
-          if (!mes || !anio) { // Validamos ambos
-              Swal.fire("Atención", "Selecciona un mes y un año.", "info");
+          if (!mesValue) {
+              Swal.fire("Atención", "Selecciona un mes.", "info");
               return;
           }
-          
+          const [anio, mes] = mesValue.split("-");
           const container = document.getElementById("informeMensualContainer");
           container.innerHTML = "Generando informe...";
           btnExportar.style.display = "none";
@@ -1004,12 +979,13 @@
               const horas = Math.floor(totalSegundos / 3600);
               const minutos = Math.floor((totalSegundos % 3600) / 60);
               const segundos = totalSegundos % 60;
+              
               const pad = (num) => String(num).padStart(2, '0');
+
               return `${horas}:${pad(minutos)}:${pad(segundos)}`;
           };
 
           try {
-              // La URL ahora se construye con los nuevos valores
               const url = `/api/informe-mensual?anio=${anio}&mes=${mes}&usuarioId=${usuarioId}`;
               const res = await fetch(url, {
                   headers: { Authorization: `Bearer ${token}` },
@@ -1026,7 +1002,7 @@
                   selectUsuario.options[selectUsuario.selectedIndex].text
               }</h3>`;
               if (Object.keys(informe.resumenSemanas).length === 0) {
-                  html += "<p>No hay datos de trabajo para el periodo seleccionado.</p>"; // Mensaje actualizado
+                  html += "<p>No hay datos de trabajo para el mes seleccionado.</p>";
                   container.innerHTML = html;
                   return;
               }
@@ -1040,10 +1016,10 @@
                   )}</li></ul></li>`;
               }
               html += '</ul><hr style="margin: 20px 0;">';
-              html += `<p><strong>Total Horas en el Periodo:</strong> ${segundosAFormatoDuracion(
+              html += `<p><strong>Total Horas en el Mes:</strong> ${segundosAFormatoDuracion(
                   informe.totalHorasMesSegundos
               )}</p>`;
-              html += `<p><strong>Total Horas Extra en el Periodo:</strong> ${segundosAFormatoDuracion(
+              html += `<p><strong>Total Horas Extra en el Mes:</strong> ${segundosAFormatoDuracion(
                   informe.totalHorasExtraMesSegundos
               )}</p>`;
               container.innerHTML = html;
@@ -1059,18 +1035,10 @@
           }
       }
 
-      // admin.html -> <script>
-
-      // Busca esta función y reemplázala
       async function exportarCSV() {
         const usuarioId = selectUsuario.value;
-        // --- INICIO CAMBIO ---
-        const mes = document.getElementById("selectMes").value;
-        const anio = document.getElementById("selectAnio").value;
-        // --- FIN CAMBIO ---
-
-        if (!usuarioId || !mes || !anio) return; // Validamos
-
+        const [anio, mes] = selectMes.value.split("-");
+        if (!usuarioId) return;
         btnExportar.textContent = "Exportando...";
         btnExportar.disabled = true;
         try {
@@ -1589,18 +1557,16 @@
       }
 
       function inicializarPagina() {
-         document.getElementById("fecha").valueAsDate = new Date();
+        document.getElementById("fecha").valueAsDate = new Date();
         const hoy = new Date(),
           offset = hoy.getTimezoneOffset(),
           hoyLocal = new Date(hoy.getTime() - offset * 60 * 1000);
         document.getElementById("manualFechaHora").value = hoyLocal
           .toISOString()
           .slice(0, 16);
-
-        // --- INICIO CAMBIO ---
-        // Ponemos el mes y año actual por defecto en los nuevos selectores
-        document.getElementById("selectMes").value = hoy.getMonth() + 1; // getMonth() es 0-11
-        document.getElementById("selectAnio").value = hoy.getFullYear();
+        selectMes.value = `${hoy.getFullYear()}-${String(
+          hoy.getMonth() + 1
+        ).padStart(2, "0")}`;
         
         getReport();
         loadUsers();
