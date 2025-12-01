@@ -97,6 +97,8 @@ app.get('/health', (req, res) => {
 // =================================================================
 // RUTAS DE USUARIOS Y FICHAR (sin cambios)
 // =================================================================
+// En server.js
+
 app.post('/api/login', async (req, res) => {
     const { usuario, password } = req.body;
     if (!usuario || !password) return res.status(400).json({ message: 'Usuario y contraseña requeridos.' });
@@ -106,14 +108,14 @@ app.post('/api/login', async (req, res) => {
         const user = result.rows[0];
         const match = await bcrypt.compare(password, user.password);
         if (match) {
-            const token = jwt.sign({ id: user.id, rol: user.rol, nombre: user.nombre }, JWT_SECRET, { expiresIn: '8h' });
+            // --- LÍNEA MODIFICADA: Añadimos 'usuario: user.usuario' ---
+            const token = jwt.sign({ id: user.id, rol: user.rol, nombre: user.nombre, usuario: user.usuario }, JWT_SECRET, { expiresIn: '8h' });
             res.json({ token, rol: user.rol, nombre: user.nombre });
         } else {
             res.status(401).json({ message: 'Usuario o contraseña incorrectos' });
         }
     } catch (err) { res.status(500).json({ message: 'Error del servidor' }); }
 });
-
 
 
 // --- NUEVA RUTA PÚBLICA PARA OBTENER EMPLEADOS ---
@@ -706,15 +708,42 @@ app.delete('/api/justificantes/:id', authenticateToken, async (req, res) => {
 // RUTAS PARA GESTIÓN DE VACACIONES (MODIFICADAS)
 // =================================================================
 
-// En server.js
-
 app.get('/api/vacaciones', authenticateToken, async (req, res) => {
-    if (req.user.rol !== 'admin' && req.user.rol !== 'gestor_vacaciones') return res.sendStatus(403);
+    if (req.user.rol !== 'admin' && req.user.rol !== 'gestor_vacaciones') {
+        return res.sendStatus(403);
+    }
+
     try {
-        const sql = `SELECT v.id, v.fecha_inicio, v.fecha_fin, u.nombre FROM vacaciones v JOIN usuarios u ON v.usuario_id = u.id WHERE v.estado = 'aprobada'`;
-        const { rows } = await db.query(sql);
+        // Base de la consulta SQL
+        let sql = `
+            SELECT v.id, v.fecha_inicio, v.fecha_fin, u.nombre 
+            FROM vacaciones v 
+            JOIN usuarios u ON v.usuario_id = u.id 
+            WHERE v.estado = 'aprobada'
+        `;
+        const params = [];
+
+        // Lógica de filtrado por departamento para gestores específicos
+        if (req.user.rol === 'gestor_vacaciones') {
+            // Usamos el 'usuario' del token, que es único y fiable
+            if (req.user.usuario === 'vacaciones_comerciales') {
+                sql += ` AND u.departamento = $1`;
+                params.push('comercial');
+            } else if (req.user.usuario === 'vacaciones_almacen') {
+                sql += ` AND u.departamento = $1`;
+                params.push('almacén');
+            }
+            // NOTA: Un gestor de vacaciones genérico (si lo creas) vería a todos.
+        }
+        // El rol 'admin' no necesita filtro, por lo que recibe la consulta base.
+
+        const { rows } = await db.query(sql, params);
         res.json(rows);
-    } catch (err) { res.status(500).json({ message: 'Error al obtener vacaciones.' }); }
+
+    } catch (err) {
+        console.error("Error al obtener vacaciones:", err);
+        res.status(500).json({ message: 'Error al obtener vacaciones.' });
+    }
 });
 
 // MODIFICADO: (ADMIN/GESTOR) Asigna vacaciones y valida saldo
