@@ -28,6 +28,22 @@ const init = async () => {
                 fecha_contratacion DATE
             );
         `);
+        
+        // --- NOVEDAD: SCRIPT PARA AÑADIR LA COLUMNA departamento SI NO EXISTE ---
+        const resColDepto = await pool.query("SELECT 1 FROM information_schema.columns WHERE table_name='usuarios' AND column_name='departamento'");
+        if (resColDepto.rowCount === 0) {
+            await pool.query("ALTER TABLE usuarios ADD COLUMN departamento TEXT");
+            console.log('Columna "departamento" añadida a la tabla usuarios.');
+        }
+
+        // --- NOVEDAD: AÑADIMOS RESTRICCIÓN PARA LOS VALORES DE DEPARTAMENTO ---
+        try {
+            await pool.query(`ALTER TABLE usuarios DROP CONSTRAINT IF EXISTS usuarios_departamento_check;`);
+            await pool.query(`ALTER TABLE usuarios ADD CONSTRAINT usuarios_departamento_check CHECK(departamento IN ('comercial', 'almacén', 'oficina', NULL));`);
+            console.log('Restricción de departamentos actualizada correctamente.');
+        } catch(err) {
+            console.warn('Advertencia al actualizar restricción de departamentos:', err.message);
+        }
 
         // --- SCRIPT PARA AÑADIR dias_compensatorios SI NO EXISTE ---
         const resColComp = await pool.query("SELECT 1 FROM information_schema.columns WHERE table_name='usuarios' AND column_name='dias_compensatorios'");
@@ -90,7 +106,6 @@ const init = async () => {
         await pool.query("ALTER TABLE vacaciones ADD CONSTRAINT vacaciones_estado_check CHECK(estado IN ('aprobada', 'pendiente', 'rechazada'));");
         console.log('Tabla "vacaciones" actualizada con estados.');
 
-        // --- NUEVO: CREACIÓN DE LA TABLA DE JUSTIFICANTES ---
         await pool.query(`
             CREATE TABLE IF NOT EXISTS justificantes (
                 id SERIAL PRIMARY KEY,
@@ -113,13 +128,11 @@ const init = async () => {
                 nombre_archivo VARCHAR(255) NOT NULL,
                 archivo_path VARCHAR(512) NOT NULL,
                 fecha_subida TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-                UNIQUE(usuario_id, mes, anio) -- Un empleado solo puede tener una nómina por mes/año
+                UNIQUE(usuario_id, mes, anio)
             );
         `);
         console.log("Tabla 'nominas' asegurada y lista.");
 
-        
-        
         // --- CREACIÓN DEL USUARIO ADMIN POR DEFECTO ---
         const adminUser = 'admin';
         const adminPass = 'admin123';

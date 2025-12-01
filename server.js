@@ -212,13 +212,34 @@ app.get('/api/informe', authenticateToken, async (req, res) => {
         res.json(result.rows);
     } catch (err) { res.status(500).json({ message: 'Error al obtener informe.' }); }
 });
-// En server.js
+// --- NOVEDAD: RUTA DE USUARIOS ACTUALIZADA CON LÓGICA DE DEPARTAMENTOS ---
 app.get('/api/usuarios', authenticateToken, async (req, res) => {
-    if (req.user.rol !== 'admin' && req.user.rol !== 'gestor_vacaciones') return res.sendStatus(403);
+    // Solo admin y gestores de vacaciones pueden ver la lista de usuarios.
+    if (req.user.rol !== 'admin' && req.user.rol !== 'gestor_vacaciones') {
+        return res.sendStatus(403);
+    }
+    
     try {
-        const result = await db.query("SELECT id, nombre, usuario, rol, dias_vacaciones_anuales, dias_compensatorios, fecha_contratacion FROM usuarios ORDER BY nombre");
+        let sql = "SELECT id, nombre, usuario, rol, dias_vacaciones_anuales, dias_compensatorios, fecha_contratacion, departamento FROM usuarios";
+        const params = [];
+
+        // Lógica de permisos para gestores de vacaciones específicos
+        if (req.user.rol === 'gestor_vacaciones') {
+            if (req.user.nombre === 'vacaciones_comerciales') {
+                sql += " WHERE departamento = 'comercial'";
+            } else if (req.user.nombre === 'vacaciones_almacen') {
+                sql += " WHERE departamento = 'almacén'";
+            }
+            // Un gestor genérico o un admin los ven a todos
+        }
+
+        sql += " ORDER BY nombre";
+
+        const result = await db.query(sql, params);
         res.json(result.rows);
-    } catch(err) { res.status(500).json({ message: "Error al obtener usuarios." }); }
+    } catch(err) { 
+        res.status(500).json({ message: "Error al obtener usuarios." }); 
+    }
 });
 
 // En server.js (NUEVA RUTA)
@@ -234,22 +255,59 @@ app.put('/api/usuarios/:id/dias-compensatorios', authenticateToken, async (req, 
     } catch (err) { res.status(500).json({ message: 'Error al actualizar los días.' }); }
 });
 
+// --- NOVEDAD: RUTA PARA ACTUALIZAR EL DEPARTAMENTO DE UN USUARIO ---
+app.put('/api/usuarios/:id/departamento', authenticateToken, async (req, res) => {
+    if (req.user.rol !== 'admin') return res.status(403).json({ message: 'Acceso denegado.' });
+    
+    const { id } = req.params;
+    const { departamento } = req.body;
+
+    if (!['comercial', 'almacén', 'oficina'].includes(departamento)) {
+        return res.status(400).json({ message: 'Departamento no válido.' });
+    }
+
+    try {
+        const result = await db.query('UPDATE usuarios SET departamento = $1 WHERE id = $2', [departamento, id]);
+        if (result.rowCount === 0) {
+            return res.status(404).json({ message: 'Usuario no encontrado.' });
+        }
+        res.json({ message: 'Departamento actualizado correctamente.' });
+    } catch (err) {
+        console.error("Error al actualizar departamento:", err);
+        res.status(500).json({ message: 'Error del servidor.' });
+    }
+});
+
+// --- NOVEDAD: CREACIÓN DE USUARIO AHORA INCLUYE DEPARTAMENTO ---
 app.post('/api/usuarios', authenticateToken, async (req, res) => {
     if (req.user.rol !== 'admin') return res.status(403).json({ message: 'Acceso denegado.' });
-    const { nombre, usuario, password, rol, fechaContratacion } = req.body;
-    if (!nombre || !usuario || !password || !rol || !fechaContratacion) return res.status(400).json({ message: 'Faltan datos.' });
+    
+    // Añadimos 'departamento' a la desestructuración
+    const { nombre, usuario, password, rol, fechaContratacion, departamento } = req.body;
+
+    if (!nombre || !usuario || !password || !rol || !fechaContratacion) {
+        return res.status(400).json({ message: 'Faltan datos obligatorios.' });
+    }
+    // Si es empleado, el departamento es obligatorio
+    if (rol === 'empleado' && !departamento) {
+        return res.status(400).json({ message: 'El departamento es obligatorio para los empleados.' });
+    }
+
     try {
         const hash = await bcrypt.hash(password, 10);
         const result = await db.query(
-            'INSERT INTO usuarios (nombre, usuario, password, rol, fecha_contratacion) VALUES ($1, $2, $3, $4, $5) RETURNING id', 
-            [nombre, usuario, hash, rol, fechaContratacion]
+            'INSERT INTO usuarios (nombre, usuario, password, rol, fecha_contratacion, departamento) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id', 
+            // Añadimos 'departamento' a la inserción
+            [nombre, usuario, hash, rol, fechaContratacion, departamento]
         );
         res.status(201).json({ message: `Usuario '${nombre}' creado.`, id: result.rows[0].id });
     } catch (err) {
-        if (err.code === '23505') return res.status(409).json({ message: 'El usuario ya existe.' });
+        if (err.code === '23505') return res.status(409).json({ message: 'El nombre de usuario ya existe.' });
+        console.error(err);
         res.status(500).json({ message: 'Error al crear el usuario.' });
     }
 });
+
 app.put('/api/usuarios/:id/password', authenticateToken, async (req, res) => {
     if (req.user.rol !== 'admin') return res.status(403).json({ message: 'Acceso denegado.' });
     const { password } = req.body;
@@ -450,6 +508,7 @@ app.get('/api/exportar-csv', authenticateToken, async (req, res) => {
                     }
                 }
                 entradaActual = null;
+            
             }
         }
 
@@ -551,6 +610,7 @@ app.post('/api/justificantes', authenticateToken, upload.single('justificante'),
     }
 });
 
+// === NUEVA RUTA: OBTENER TODOS LOS JUSTIFICANTES (ADMIN) ===
 app.get('/api/justificantes', authenticateToken, async (req, res) => {
     if (req.user.rol !== 'admin') {
         return res.status(403).json({ message: 'Acceso denegado.' });
@@ -571,6 +631,7 @@ app.get('/api/justificantes', authenticateToken, async (req, res) => {
     }
 });
 
+// === NUEVA RUTA: EDITAR UN JUSTIFICANTE (ADMIN) ===
 app.put('/api/justificantes/:id', authenticateToken, async (req, res) => {
     if (req.user.rol !== 'admin') {
         return res.status(403).json({ message: 'Acceso denegado.' });
@@ -601,7 +662,7 @@ app.put('/api/justificantes/:id', authenticateToken, async (req, res) => {
     }
 });
 
-// --- NUEVO: RUTA PARA ELIMINAR UN JUSTIFICANTE ---
+// === NUEVA RUTA: ELIMINAR UN JUSTIFICANTE (ADMIN) ===
 app.delete('/api/justificantes/:id', authenticateToken, async (req, res) => {
     if (req.user.rol !== 'admin') {
         return res.status(403).json({ message: 'Acceso denegado.' });

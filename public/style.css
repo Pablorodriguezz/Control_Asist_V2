@@ -475,3 +475,17 @@ body.login-page .logo-img {
     transform: rotate(360deg); 
   } 
 }
+
+/* Estilo para el botón "Ver" de los justificantes, para que parezca un botón */
+.action-btn[target="_blank"] {
+    background-color: #3498db; /* Un color azul para "ver" o "descargar" */
+    color: white;
+    text-decoration: none;
+    display: inline-block;
+    border-radius: 4px; /* Ajusta el radio si usas otro */
+}
+
+.action-btn[target="_blank"]:hover {
+    background-color: #2980b9;
+    color: white;
+}
