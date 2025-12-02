@@ -87,6 +87,24 @@ function authenticateToken(req, res, next) {
     });
 }
 
+// --- NOVEDAD: Nueva ruta para obtener info básica de un usuario (para fichaje rápido) ---
+app.get('/api/usuario-info', async (req, res) => {
+    const { usuarioId } = req.query;
+    if (!usuarioId) {
+        return res.status(400).json({ message: 'Falta el ID del usuario.' });
+    }
+    try {
+        const result = await db.query("SELECT departamento FROM usuarios WHERE id = $1", [usuarioId]);
+        if (result.rows.length === 0) {
+            return res.status(404).json({ message: 'Usuario no encontrado.' });
+        }
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error("Error al obtener info del usuario:", err);
+        res.status(500).json({ message: "Error del servidor." });
+    }
+});
+
 // --- RUTA PARA EL PING / HEALTH CHECK ---
 // Esta ruta es súper ligera y NO toca la base de datos.
 // Su único propósito es responder a Uptime Robot para mantener despierto el servidor de Render.
@@ -134,8 +152,15 @@ app.post('/api/login', async (req, res) => {
 // No necesita autenticación porque es para la pantalla de inicio.
 app.get('/api/empleados-para-fichaje', async (req, res) => {
     try {
-        // Obtenemos solo los empleados activos para el fichaje
-        const result = await db.query("SELECT id, nombre FROM usuarios WHERE rol = 'empleado' ORDER BY nombre ASC");
+        // La consulta ahora tiene un WHERE para filtrar por departamento
+        const sql = `
+            SELECT id, nombre 
+            FROM usuarios 
+            WHERE rol = 'empleado' 
+              AND (departamento = 'almacén' OR departamento = 'oficina') 
+            ORDER BY nombre ASC
+        `;
+        const result = await db.query(sql);
         res.json(result.rows);
     } catch (err) {
         console.error("Error al obtener la lista de empleados para fichaje:", err);
@@ -146,27 +171,23 @@ app.get('/api/empleados-para-fichaje', async (req, res) => {
 // --- NUEVA RUTA PARA PROCESAR EL FICHAJE RÁPIDO ---
 // Usa el mismo middleware de 'upload' que la ruta '/api/fichar'
 app.post('/api/fichar-rapido', upload.single('foto'), async (req, res) => {
-    // Obtenemos el ID del usuario desde el cuerpo de la petición, no del token
-    const { tipo, usuarioId } = req.body;
+    const { tipo, usuarioId, latitud, longitud } = req.body;
     const fecha_hora = new Date();
 
-    if (!usuarioId) return res.status(400).json({ message: 'Falta el ID del empleado.' });
-    if (!req.file) return res.status(400).json({ message: 'La foto es obligatoria para el fichaje.' });
-    if (!tipo || (tipo !== 'entrada' && tipo !== 'salida')) return res.status(400).json({ message: 'Tipo de fichaje inválido.' });
+    if (!usuarioId || !req.file || !tipo) {
+        return res.status(400).json({ message: 'Faltan datos para el fichaje.' });
+    }
 
     try {
         const fileName = `${crypto.randomBytes(16).toString('hex')}.jpeg`;
         const putCommand = new PutObjectCommand({
-            Bucket: process.env.R2_BUCKET_NAME,
-            Key: fileName,
-            Body: req.file.buffer,
-            ContentType: req.file.mimetype
+            Bucket: process.env.R2_BUCKET_NAME, Key: fileName, Body: req.file.buffer, ContentType: req.file.mimetype
         });
         await s3Client.send(putCommand);
         
         const foto_path = `${process.env.R2_PUBLIC_URL}/${fileName}`;
-        const sql = 'INSERT INTO registros (usuario_id, fecha_hora, tipo, foto_path) VALUES ($1, $2, $3, $4)';
-        await db.query(sql, [usuarioId, fecha_hora, tipo, foto_path]);
+        const sql = 'INSERT INTO registros (usuario_id, fecha_hora, tipo, foto_path, latitud, longitud) VALUES ($1, $2, $3, $4, $5, $6)';
+        await db.query(sql, [usuarioId, fecha_hora, tipo, foto_path, latitud || null, longitud || null]);
 
         res.json({ message: `Fichaje de ${tipo} registrado correctamente.` });
     } catch (err) {
@@ -176,18 +197,21 @@ app.post('/api/fichar-rapido', upload.single('foto'), async (req, res) => {
 });
 
 app.post('/api/fichar', authenticateToken, upload.single('foto'), async (req, res) => {
-    const { tipo } = req.body;
+    const { tipo, latitud, longitud } = req.body;
     const usuario_id = req.user.id;
     const fecha_hora = new Date();
-    if (!req.file) return res.status(400).json({ message: 'Falta foto.' });
-    if (!tipo || (tipo !== 'entrada' && tipo !== 'salida')) return res.status(400).json({ message: 'Tipo inválido.' });
+    
+    if (!req.file || !tipo) return res.status(400).json({ message: 'Faltan datos.' });
+    
     try {
         const fileName = `${crypto.randomBytes(16).toString('hex')}.jpeg`;
         const putCommand = new PutObjectCommand({ Bucket: process.env.R2_BUCKET_NAME, Key: fileName, Body: req.file.buffer, ContentType: req.file.mimetype });
         await s3Client.send(putCommand);
         const foto_path = `${process.env.R2_PUBLIC_URL}/${fileName}`;
-        const sql = 'INSERT INTO registros (usuario_id, fecha_hora, tipo, foto_path) VALUES ($1, $2, $3, $4)';
-        await db.query(sql, [usuario_id, fecha_hora, tipo, foto_path]);
+        
+        const sql = 'INSERT INTO registros (usuario_id, fecha_hora, tipo, foto_path, latitud, longitud) VALUES ($1, $2, $3, $4, $5, $6)';
+        await db.query(sql, [usuario_id, fecha_hora, tipo, foto_path, latitud || null, longitud || null]);
+        
         res.json({ message: `Fichaje de ${tipo} registrado.` });
     } catch (err) {
         console.error("Error al subir a R2 o guardar en DB:", err);
@@ -220,7 +244,14 @@ app.get('/api/informe', authenticateToken, async (req, res) => {
     if (req.user.rol !== 'admin') return res.status(403).json({ message: 'Acceso denegado.' });
     const { fecha } = req.query;
     if (!fecha) return res.status(400).json({ message: 'Fecha requerida.' });
-    const sql = `SELECT r.id, u.nombre, r.fecha_hora, r.tipo, r.foto_path, r.es_modificado, r.fecha_hora_original, r.motivo_modificacion FROM registros r JOIN usuarios u ON r.usuario_id = u.id WHERE r.fecha_hora::date = $1 ORDER BY u.nombre, r.fecha_hora`;
+    const sql = `
+        SELECT r.id, u.nombre, r.fecha_hora, r.tipo, r.foto_path, r.es_modificado, 
+               r.fecha_hora_original, r.motivo_modificacion, r.latitud, r.longitud 
+        FROM registros r 
+        JOIN usuarios u ON r.usuario_id = u.id 
+        WHERE r.fecha_hora::date = $1 
+        ORDER BY u.nombre, r.fecha_hora
+    `;
     try {
         const result = await db.query(sql, [fecha]);
         res.json(result.rows);

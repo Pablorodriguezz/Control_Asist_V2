@@ -86,6 +86,19 @@ const init = async () => {
             );
         `);
 
+        // --- NOVEDAD: Script para añadir las columnas de geolocalización si no existen ---
+        const resColLat = await pool.query("SELECT 1 FROM information_schema.columns WHERE table_name='registros' AND column_name='latitud'");
+        if (resColLat.rowCount === 0) {
+            await pool.query("ALTER TABLE registros ADD COLUMN latitud DECIMAL(9, 6)");
+            console.log('Columna "latitud" añadida a la tabla registros.');
+        }
+        
+        const resColLon = await pool.query("SELECT 1 FROM information_schema.columns WHERE table_name='registros' AND column_name='longitud'");
+        if (resColLon.rowCount === 0) {
+            await pool.query("ALTER TABLE registros ADD COLUMN longitud DECIMAL(10, 6)");
+            console.log('Columna "longitud" añadida a la tabla registros.');
+        }
+
         await pool.query(`
             CREATE TABLE IF NOT EXISTS vacaciones (
                 id SERIAL PRIMARY KEY,

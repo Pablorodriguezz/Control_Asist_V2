@@ -262,6 +262,28 @@
       let stream;
       let miCalendario;
 
+      // --- NOVEDAD: Función para obtener la ubicación del usuario ---
+      function obtenerUbicacion() {
+        return new Promise((resolve, reject) => {
+            if (!navigator.geolocation) {
+                reject(new Error('Geolocalización no es soportada por este navegador.'));
+                return;
+            }
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    resolve({
+                        latitud: position.coords.latitude,
+                        longitud: position.coords.longitude
+                    });
+                },
+                () => {
+                    reject(new Error('No se pudo obtener la ubicación. Asegúrate de dar permisos.'));
+                },
+                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+            );
+        });
+      }
+
       function confirmarLogout() {
         Swal.fire({
           title: "¿Cerrar sesión?",
@@ -481,30 +503,71 @@ function aplicarRestriccionesPorDepartamento() {
 
       async function iniciarFichaje(tipo) {
         cameraModal.style.display = "flex";
+        let ubicacion = null;
+
         try {
-          stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: "user" },
-          });
-          video.srcObject = stream;
-          setTimeout(() => tomarFotoYFichar(tipo), 3000);
+            const payload = JSON.parse(atob(token.split('.')[1]));
+            const departamento = (payload.departamento || '').toLowerCase();
+            
+            // SOLO si es comercial, intentamos obtener la ubicación
+            if (departamento === 'comercial') {
+                Swal.fire({
+                    title: 'Obteniendo ubicación...',
+                    toast: true,
+                    position: 'top-end',
+                    showConfirmButton: false,
+                    didOpen: () => { Swal.showLoading() }
+                });
+
+                try {
+                    ubicacion = await obtenerUbicacion();
+                    Swal.close(); // Cierra el toast si todo va bien
+                } catch (errorUbicacion) {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Sin ubicación',
+                        text: errorUbicacion.message,
+                        toast: true,
+                        position: 'top-end',
+                        showConfirmButton: false,
+                        timer: 3500
+                    });
+                }
+            }
+        } catch (e) { console.error("Error al procesar token:", e); }
+
+        try {
+            stream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: "user" },
+            });
+            video.srcObject = stream;
+            setTimeout(() => tomarFotoYFichar(tipo, ubicacion), 3000);
         } catch (err) {
-          alert("No se pudo acceder a la cámara.");
-          cameraModal.style.display = "none";
+            Swal.fire('Error', 'No se pudo acceder a la cámara.', 'error');
+            cameraModal.style.display = "none";
         }
       }
 
-      function tomarFotoYFichar(tipo) {
+        // --- FUNCIÓN MODIFICADA: tomarFotoYFichar ahora recibe y envía la ubicación ---
+      function tomarFotoYFichar(tipo, ubicacion) {
         const context = canvas.getContext("2d");
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
         context.drawImage(video, 0, 0, canvas.width, canvas.height);
-        stream.getTracks().forEach((track) => track.stop());
+        if(stream) stream.getTracks().forEach((track) => track.stop());
         cameraModal.style.display = "none";
+        
         canvas.toBlob((blob) => {
-          const formData = new FormData();
-          formData.append("tipo", tipo);
-          formData.append("foto", blob, "fichaje.jpeg");
-          enviarFichaje(formData);
+            const formData = new FormData();
+            formData.append("tipo", tipo);
+            formData.append("foto", blob, "fichaje.jpeg");
+            
+            if (ubicacion) {
+                formData.append("latitud", ubicacion.latitud);
+                formData.append("longitud", ubicacion.longitud);
+            }
+            
+            enviarFichaje(formData);
         }, "image/jpeg");
       }
 

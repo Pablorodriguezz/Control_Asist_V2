@@ -1,4 +1,3 @@
-<!-- public/fichaje-rapido.html -->
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -9,8 +8,7 @@
     <link href='https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css' rel='stylesheet'>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <link rel="manifest" href="/manifest.json">
-<!-- Color de la barra de estado en móviles -->
-<meta name="theme-color" content="#e91e63">
+    <meta name="theme-color" content="#e91e63">
 </head>
 <body>
     <div class="container">
@@ -32,153 +30,143 @@
         <button id="btnNoSoyYo" class="btn-secundario" style="margin-top: 30px;">No soy yo, volver</button>
     </div>
 
-    <!-- El modal de la cámara y el canvas (copiado de panel.html) -->
     <div id="cameraModal" class="modal"><div class="modal-content"><h2>Sonríe para la foto</h2><video id="video" autoplay playsinline></video><p>Tomando foto en 3 segundos...</p></div></div>
     <canvas id="canvas" style="display:none;"></canvas>
 
-    <!-- En fichaje-rapido.html -->
-<script>
-    const nombreEmpleadoSpan = document.getElementById('nombreEmpleado');
-    // --- OBTENEMOS LOS BOTONES ---
-    const btnEntrada = document.getElementById('btnEntrada');
-    const btnSalida = document.getElementById('btnSalida');
-    const [cameraModal, video, canvas] = [document.getElementById('cameraModal'), document.getElementById('video'), document.getElementById('canvas')];
-    let stream;
-    let userId; 
+    <!-- SCRIPT SIMPLIFICADO SIN GEOLOCALIZACIÓN -->
+    <script>
+        const nombreEmpleadoSpan = document.getElementById('nombreEmpleado');
+        const btnEntrada = document.getElementById('btnEntrada');
+        const btnSalida = document.getElementById('btnSalida');
+        const [cameraModal, video, canvas] = [document.getElementById('cameraModal'), document.getElementById('video'), document.getElementById('canvas')];
+        let stream;
+        let userId; 
 
-    // --- CONVERTIMOS EL EVENT LISTENER EN ASYNC PARA USAR AWAIT ---
-    document.addEventListener('DOMContentLoaded', async () => {
-        const params = new URLSearchParams(window.location.search);
-        userId = params.get('id');
-        const nombre = params.get('nombre');
+        document.addEventListener('DOMContentLoaded', async () => {
+            const params = new URLSearchParams(window.location.search);
+            userId = params.get('id');
+            const nombre = params.get('nombre');
 
-        if (!userId || !nombre) {
-            alert('Error: No se ha seleccionado un empleado.');
-            window.location.href = '/index.html';
-            return;
-        }
-
-        nombreEmpleadoSpan.textContent = nombre;
-
-        // ==========================================================
-        // ===== NUEVA LÓGICA PARA HABILITAR/DESHABILITAR BOTONES =====
-        // ==========================================================
-        
-        // 1. Deshabilitamos ambos botones al principio para evitar clics accidentales
-        btnEntrada.disabled = true;
-        btnSalida.disabled = true;
-        btnEntrada.classList.add('disabled');
-        btnSalida.classList.add('disabled');
-
-        try {
-            // 2. Llamamos a nuestra nueva ruta para saber el estado del empleado
-            const res = await fetch(`/api/estado-rapido?usuarioId=${userId}`);
-            if (!res.ok) {
-                const errData = await res.json();
-                throw new Error(errData.message || 'No se pudo obtener el estado del fichaje.');
-            }
-            const data = await res.json();
-            const estadoActual = data.estado; // Esto será 'entrada' o 'salida'
-
-            // 3. Aplicamos la lógica para habilitar solo el botón correcto
-            if (estadoActual === 'entrada') {
-                // Si el último fichaje fue una entrada, solo puede fichar la salida
-                btnSalida.disabled = false;
-                btnSalida.classList.remove('disabled');
-            } else { 
-                // Si fue una salida (o no ha fichado hoy), solo puede fichar la entrada
-                btnEntrada.disabled = false;
-                btnEntrada.classList.remove('disabled');
-            }
-
-        } catch (error) {
-            console.error('Error al obtener estado de fichaje:', error);
-            Swal.fire({
-                icon: 'error',
-                title: 'Error de Conexión',
-                text: error.message,
-                willClose: () => { window.location.href = '/index.html'; }
-            });
-            // Si hay un error, los botones permanecerán deshabilitados
-        }
-    });
-
-    document.getElementById('btnNoSoyYo').addEventListener('click', () => {
-        window.location.href = '/index.html';
-    });
-
-    async function iniciarFichaje(tipo) {
-        cameraModal.style.display = 'flex';
-        try {
-            stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
-            video.srcObject = stream;
-            setTimeout(() => tomarFotoYFichar(tipo), 3000);
-        } catch (err) {
-            Swal.fire('Error', 'No se pudo acceder a la cámara. Asegúrate de dar permisos.', 'error');
-            cameraModal.style.display = 'none';
-        }
-    }
-
-    function tomarFotoYFichar(tipo) {
-        const context = canvas.getContext('2d');
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        context.drawImage(video, 0, 0, canvas.width, canvas.height);
-        if (stream) {
-            stream.getTracks().forEach(track => track.stop());
-        }
-        cameraModal.style.display = 'none';
-        canvas.toBlob(blob => {
-            const formData = new FormData();
-            formData.append('tipo', tipo);
-            formData.append('foto', blob, 'fichaje.jpeg');
-            formData.append('usuarioId', userId);
-            enviarFichaje(formData);
-        }, 'image/jpeg');
-    }
-
-    async function enviarFichaje(formData) {
-        try {
-            const res = await fetch('/api/fichar-rapido', {
-                method: 'POST',
-                body: formData
-            });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.message);
-
-            Swal.fire({
-                icon: 'success',
-                title: '¡Fichaje Correcto!',
-                text: data.message,
-                timer: 2500,
-                showConfirmButton: false,
-                willClose: () => {
-                    window.location.href = '/index.html';
-                }
-            });
-        } catch (error) {
-            Swal.fire({
-                icon: 'error',
-                title: 'Error en el Fichaje',
-                text: error.message || 'Hubo un problema al registrar el fichaje.'
-            }).then(() => {
+            if (!userId || !nombre) {
+                alert('Error: No se ha seleccionado un empleado.');
                 window.location.href = '/index.html';
-            });
-        }
-    }
-</script>
-<script>
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('/sw.js')
-        .then(registration => {
-          console.log('ServiceWorker registrado con éxito:', registration.scope);
-        })
-        .catch(err => {
-          console.log('El registro del ServiceWorker falló:', err);
+                return;
+            }
+
+            nombreEmpleadoSpan.textContent = nombre;
+            
+            btnEntrada.disabled = true;
+            btnSalida.disabled = true;
+            btnEntrada.classList.add('disabled');
+            btnSalida.classList.add('disabled');
+
+            try {
+                const res = await fetch(`/api/estado-rapido?usuarioId=${userId}`);
+                if (!res.ok) {
+                    const errData = await res.json();
+                    throw new Error(errData.message || 'No se pudo obtener el estado del fichaje.');
+                }
+                const data = await res.json();
+                const estadoActual = data.estado;
+
+                if (estadoActual === 'entrada') {
+                    btnSalida.disabled = false;
+                    btnSalida.classList.remove('disabled');
+                } else { 
+                    btnEntrada.disabled = false;
+                    btnEntrada.classList.remove('disabled');
+                }
+
+            } catch (error) {
+                console.error('Error al obtener estado de fichaje:', error);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error de Conexión',
+                    text: error.message,
+                    willClose: () => { window.location.href = '/index.html'; }
+                });
+            }
         });
-    });
-  }
-</script>
+
+        document.getElementById('btnNoSoyYo').addEventListener('click', () => {
+            window.location.href = '/index.html';
+        });
+
+        // La función iniciarFichaje vuelve a su versión simple
+        async function iniciarFichaje(tipo) {
+            cameraModal.style.display = 'flex';
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+                video.srcObject = stream;
+                setTimeout(() => tomarFotoYFichar(tipo), 3000);
+            } catch (err) {
+                Swal.fire('Error', 'No se pudo acceder a la cámara. Asegúrate de dar permisos.', 'error');
+                cameraModal.style.display = 'none';
+            }
+        }
+
+        // La función tomarFotoYFichar vuelve a su versión simple
+        function tomarFotoYFichar(tipo) {
+            const context = canvas.getContext('2d');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+            cameraModal.style.display = 'none';
+            canvas.toBlob(blob => {
+                const formData = new FormData();
+                formData.append('tipo', tipo);
+                formData.append('foto', blob, 'fichaje.jpeg');
+                formData.append('usuarioId', userId);
+                // Ya no se añade latitud ni longitud
+                enviarFichaje(formData);
+            }, 'image/jpeg');
+        }
+
+        async function enviarFichaje(formData) {
+            try {
+                const res = await fetch('/api/fichar-rapido', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.message);
+
+                Swal.fire({
+                    icon: 'success',
+                    title: '¡Fichaje Correcto!',
+                    text: data.message,
+                    timer: 2500,
+                    showConfirmButton: false,
+                    willClose: () => {
+                        window.location.href = '/index.html';
+                    }
+                });
+            } catch (error) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error en el Fichaje',
+                    text: error.message || 'Hubo un problema al registrar el fichaje.'
+                }).then(() => {
+                    window.location.href = '/index.html';
+                });
+            }
+        }
+    </script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then(registration => {
+              console.log('ServiceWorker registrado con éxito:', registration.scope);
+            })
+            .catch(err => {
+              console.log('El registro del ServiceWorker falló:', err);
+            });
+        });
+      }
+    </script>
 </body>
 </html>
