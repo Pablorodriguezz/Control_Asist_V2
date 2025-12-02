@@ -280,10 +280,13 @@
         window.location.href = "/index.html";
       }
 
+      // --- VERSIÓN MEJORADA DE LA FUNCIÓN ---
       function aplicarRestriccionesPorDepartamento() {
           try {
               const payload = JSON.parse(atob(token.split('.')[1]));
-              const departamento = payload.departamento;
+              // Usamos (payload.departamento || '') para evitar errores si el campo no existe en un token antiguo.
+              // Usamos .toLowerCase() para que funcione con 'almacén', 'Almacén', 'ALMACÉN', etc.
+              const departamento = (payload.departamento || '').toLowerCase();
 
               if (departamento === 'almacén') {
                   const fichajeSection = document.querySelector('.fichaje-section');
