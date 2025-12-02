@@ -97,7 +97,7 @@ app.get('/health', (req, res) => {
 // =================================================================
 // RUTAS DE USUARIOS Y FICHAR (sin cambios)
 // =================================================================
-// En server.js
+
 
 app.post('/api/login', async (req, res) => {
     const { usuario, password } = req.body;
@@ -105,16 +105,28 @@ app.post('/api/login', async (req, res) => {
     try {
         const result = await db.query('SELECT * FROM usuarios WHERE usuario = $1', [usuario]);
         if (result.rows.length === 0) return res.status(401).json({ message: 'Usuario o contraseña incorrectos' });
+        
         const user = result.rows[0];
         const match = await bcrypt.compare(password, user.password);
+        
         if (match) {
-            // --- LÍNEA MODIFICADA: Añadimos 'usuario: user.usuario' ---
-            const token = jwt.sign({ id: user.id, rol: user.rol, nombre: user.nombre, usuario: user.usuario }, JWT_SECRET, { expiresIn: '8h' });
+            // --- NOVEDAD: Añadimos 'departamento: user.departamento' al token ---
+            const tokenPayload = { 
+                id: user.id, 
+                rol: user.rol, 
+                nombre: user.nombre, 
+                usuario: user.usuario, 
+                departamento: user.departamento // Aquí está la clave
+            };
+            const token = jwt.sign(tokenPayload, JWT_SECRET, { expiresIn: '8h' });
             res.json({ token, rol: user.rol, nombre: user.nombre });
         } else {
             res.status(401).json({ message: 'Usuario o contraseña incorrectos' });
         }
-    } catch (err) { res.status(500).json({ message: 'Error del servidor' }); }
+    } catch (err) { 
+        console.error("Error en login:", err);
+        res.status(500).json({ message: 'Error del servidor' }); 
+    }
 });
 
 

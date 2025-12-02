@@ -489,3 +489,28 @@ body.login-page .logo-img {
     background-color: #2980b9;
     color: white;
 }
+
+/* Pega esto al final de tu style.css */
+
+.fichaje-restringido {
+    text-align: center;
+    background-color: #f8f9fa;
+    padding: 20px 15px;
+    border-radius: 12px;
+    border: 1px solid #e9ecef;
+    margin-top: 15px;
+}
+
+.fichaje-restringido i {
+    font-size: 2.2rem;
+    color: var(--primary-color);
+    display: block;
+    margin-bottom: 10px;
+}
+
+.fichaje-restringido p {
+    margin: 0;
+    color: #555;
+    font-size: 0.95rem;
+    line-height: 1.5;
+}

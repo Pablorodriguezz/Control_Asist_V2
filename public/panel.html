@@ -16,11 +16,9 @@
     <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/luxon@3.4.4/build/global/luxon.min.js"></script>
     <link rel="manifest" href="/manifest.json">
-<!-- Color de la barra de estado en móviles prueba -->
-<meta name="theme-color" content="#e91e63">
+    <meta name="theme-color" content="#e91e63">
   </head>
   <body>
-    <!-- ===== HEADER ===== -->
     <header class="main-header">
       <div class="logo-container">
         <img src="/images/logo2.png" alt="Logo" class="header-logo" />
@@ -37,9 +35,7 @@
       </div>
     </header>
 
-    <!-- ===== CONTENEDOR PRINCIPAL DE PESTAÑAS ===== -->
     <main class="main-content">
-      <!-- PESTAÑA 1: INICIO (activa por defecto) -->
       <div id="inicio-content" class="tab-content active">
         <section class="highlight-section">
           <h2>Destacados</h2>
@@ -102,6 +98,7 @@
             </div>
           </div>
         </section>
+
         <section class="historial-section">
           <h2>Último Fichaje</h2>
           <div id="ultimoFichaje" class="ultimo-fichaje-card">
@@ -110,7 +107,6 @@
         </section>
       </div>
 
-      <!-- PESTAÑA 2: HISTORIAL -->
       <div id="historial-content" class="tab-content">
         <section class="historial-completo-section">
           <h2>Mi Historial de Fichajes</h2>
@@ -134,11 +130,9 @@
               <tbody></tbody>
             </table>
           </div>
-          
         </section>
       </div>
 
-      <!-- PESTAÑA 3: CALENDARIO -->
       <div id="calendario-content" class="tab-content">
         <section class="calendario-section">
           <h2>Mi Calendario de Vacaciones</h2>
@@ -149,7 +143,6 @@
         </section>
       </div>
 
-      <!-- PESTAÑA 4: SOLICITUDES -->
       <div id="solicitudes-content" class="tab-content">
         <section class="solicitudes-section">
           <h2>Solicitar Vacaciones</h2>
@@ -179,8 +172,6 @@
             </table>
           </div>
         </section>
-
-        <!-- --- NUEVO: SECCIÓN PARA SUBIR JUSTIFICANTE --- -->
         <hr />
         <section id="subir-justificante" class="solicitudes-section">
           <h2>
@@ -192,18 +183,15 @@
               >Fecha de Inicio de la Ausencia:</label
             >
             <input type="date" id="fechaInicioJustificante" required />
-
             <label for="fechaFinJustificante"
               >Fecha de Fin de la Ausencia:</label
             >
             <input type="date" id="fechaFinJustificante" required />
-
             <label for="motivoJustificante">Motivo (opcional):</label>
             <textarea
               id="motivoJustificante"
               placeholder="Ej: Visita médica, baja por enfermedad..."
             ></textarea>
-
             <label for="archivoJustificante"
               >Seleccionar Archivo (PDF, JPG, PNG):</label
             >
@@ -213,12 +201,10 @@
               accept=".pdf,.jpg,.jpeg,.png"
               required
             />
-
             <button type="submit">Enviar Justificante</button>
           </form>
         </section>
       </div>
-
       <div id="nominas-content" class="tab-content">
         <section class="nominas-section">
           <h2>Mis Nóminas</h2>
@@ -236,8 +222,6 @@
         </section>
       </div>
     </main>
-
-    <!-- ===== BARRA DE NAVEGACIÓN INFERIOR ===== -->
     <nav class="bottom-nav">
       <a href="#" class="nav-item active" data-target="inicio-content"
         ><i class="bi bi-house-door-fill"></i><span>Inicio</span></a
@@ -255,7 +239,6 @@
         ><i class="bi bi-send-fill"></i><span>Solicitudes</span></a
       >
     </nav>
-
     <div id="cameraModal" class="modal">
       <div class="modal-content">
         <h2>Sonríe para la foto</h2>
@@ -264,11 +247,9 @@
       </div>
     </div>
     <canvas id="canvas" style="display: none"></canvas>
-
     <script>
       const token = localStorage.getItem("token");
       if (!token) window.location.href = "/index.html";
-
       const [btnEntrada, btnSalida] = [
         document.getElementById("btnEntrada"),
         document.getElementById("btnSalida"),
@@ -280,6 +261,61 @@
       ];
       let stream;
       let miCalendario;
+
+      function confirmarLogout() {
+        Swal.fire({
+          title: "¿Cerrar sesión?",
+          text: "¿Estás seguro?",
+          icon: "question",
+          showCancelButton: true,
+          confirmButtonText: "Sí, cerrar sesión",
+          cancelButtonText: "Cancelar",
+        }).then((result) => {
+          if (result.isConfirmed) logout();
+        });
+      }
+
+      function logout() {
+        localStorage.removeItem("token");
+        window.location.href = "/index.html";
+      }
+
+      function aplicarRestriccionesPorDepartamento() {
+          try {
+              const payload = JSON.parse(atob(token.split('.')[1]));
+              const departamento = payload.departamento;
+
+              if (departamento === 'almacén') {
+                  const fichajeSection = document.querySelector('.fichaje-section');
+                  if (fichajeSection) {
+                      fichajeSection.innerHTML = `
+                          <h2>Fichaje</h2>
+                          <div class="fichaje-restringido">
+                              <i class="bi bi-tablet-landscape"></i>
+                              <p>Tu fichaje debe realizarse desde la pantalla de <strong>Fichaje Rápido</strong>.</p>
+                          </div>
+                      `;
+                  }
+              }
+          } catch (e) {
+              console.error("Error al decodificar el token o aplicar restricciones:", e);
+          }
+      }
+
+      function inicializarPaginaEmpleado() {
+        const hoy = new Date();
+        document.getElementById(
+          "selectMesHistorial"
+        ).value = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(
+          2,
+          "0"
+        )}`;
+        
+        aplicarRestriccionesPorDepartamento();
+
+        inicializarPanel();
+        cargarDatosInicio();
+      }
 
       function calcularDiasLaborables(fechaInicio, fechaFin) {
         const inicio = new Date(fechaInicio);
@@ -294,23 +330,6 @@
           curDate.setDate(curDate.getDate() + 1);
         }
         return count;
-      }
-
-      function confirmarLogout() {
-        Swal.fire({
-          title: "¿Cerrar sesión?",
-          text: "¿Estás seguro?",
-          icon: "question",
-          showCancelButton: true,
-          confirmButtonText: "Sí, cerrar sesión",
-          cancelButtonText: "Cancelar",
-        }).then((result) => {
-          if (result.isConfirmed) logout();
-        });
-      }
-      function logout() {
-        localStorage.removeItem("token");
-        window.location.href = "/index.html";
       }
 
       async function cargarHistorialCompleto() {
@@ -456,6 +475,7 @@
           console.error("Error al inicializar panel:", error);
         }
       }
+
       async function iniciarFichaje(tipo) {
         cameraModal.style.display = "flex";
         try {
@@ -469,6 +489,7 @@
           cameraModal.style.display = "none";
         }
       }
+
       function tomarFotoYFichar(tipo) {
         const context = canvas.getContext("2d");
         canvas.width = video.videoWidth;
@@ -483,6 +504,7 @@
           enviarFichaje(formData);
         }, "image/jpeg");
       }
+
       async function cargarDatosInicio() {
         const mesValue = document.getElementById("selectMesHistorial").value;
         if (!mesValue) return;
@@ -549,6 +571,7 @@
           console.error("Error cargando datos de inicio:", error);
         }
       }
+
       async function enviarFichaje(formData) {
         const tipo = formData.get("tipo");
         const button = tipo === "entrada" ? btnEntrada : btnSalida;
@@ -582,6 +605,7 @@
           button.innerHTML = `<i class="bi ${iconClass}"></i>`;
         }
       }
+
       function actualizarBotones(estado) {
         btnEntrada.disabled = estado === "entrada";
         btnSalida.disabled = estado !== "entrada";
@@ -590,7 +614,6 @@
       document.addEventListener("DOMContentLoaded", () => {
         const navItems = document.querySelectorAll(".nav-item");
         const tabContents = document.querySelectorAll(".tab-content");
-
         navItems.forEach((item) => {
           item.addEventListener("click", (e) => {
             e.preventDefault();
@@ -603,8 +626,8 @@
             item.classList.add("active");
             if (targetId === "historial-content") {
               cargarHistorialCompleto();
-            } else if (targetId === "nominas-content") { // <-- AÑADE ESTA LÍNEA
-              cargarNominas();                        // <-- Y ESTA OTRA
+            } else if (targetId === "nominas-content") { 
+              cargarNominas();                        
             } else if (targetId === "calendario-content") {
               cargarContadorVacaciones();
               if (!miCalendario) {
@@ -624,7 +647,6 @@
               "fechaInicioSolicitud"
             ).value;
             const fechaFin = document.getElementById("fechaFinSolicitud").value;
-
             if (!fechaInicio || !fechaFin) {
               Swal.fire(
                 "Atención",
@@ -633,7 +655,6 @@
               );
               return;
             }
-
             const diasLaborablesSeleccionados = calcularDiasLaborables(
               fechaInicio,
               fechaFin
@@ -654,11 +675,9 @@
               });
               return;
             }
-
             const btn = e.target.querySelector("button");
             btn.disabled = true;
             btn.textContent = "Enviando...";
-
             try {
               const res = await fetch("/api/solicitar-vacaciones", {
                 method: "POST",
@@ -670,7 +689,6 @@
               });
               const data = await res.json();
               if (!res.ok) throw new Error(data.message);
-
               Swal.fire("¡Éxito!", data.message, "success");
               e.target.reset();
               cargarDatosSolicitudes();
@@ -682,20 +700,16 @@
             }
           });
 
-        // --- NUEVO: EVENT LISTENER PARA EL FORMULARIO DE JUSTIFICANTE ---
         document
           .getElementById("formJustificante")
           .addEventListener("submit", async (e) => {
             e.preventDefault();
-
             const form = e.target;
             const formData = new FormData();
-
             formData.append("fechaInicio", form.fechaInicioJustificante.value);
             formData.append("fechaFin", form.fechaFinJustificante.value);
             formData.append("motivo", form.motivoJustificante.value);
             formData.append("justificante", form.archivoJustificante.files[0]);
-
             Swal.fire({
               title: "Subiendo justificante...",
               text: "Por favor, espera.",
@@ -704,17 +718,14 @@
                 Swal.showLoading();
               },
             });
-
             try {
               const res = await fetch("/api/justificantes", {
                 method: "POST",
                 headers: { Authorization: `Bearer ${token}` },
                 body: formData,
               });
-
               const data = await res.json();
               if (!res.ok) throw new Error(data.message);
-
               Swal.fire(
                 "¡Éxito!",
                 "Tu justificante ha sido enviado correctamente.",
@@ -730,20 +741,18 @@
             }
           });
 
-              async function cargarNominas() {
+      async function cargarNominas() {
         const tbody = document.querySelector("#misNominasTable tbody");
         tbody.innerHTML = '<tr><td colspan="2">Cargando tus nóminas...</td></tr>';
         try {
             const res = await fetch('/api/mis-nominas', { headers: { Authorization: `Bearer ${token}` } });
             const nominas = await res.json();
             if (!res.ok) throw new Error(nominas.message);
-
             tbody.innerHTML = '';
             if (nominas.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="2">Aún no tienes nóminas disponibles.</td></tr>';
                 return;
             }
-
             const meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
             nominas.forEach(n => {
                 const tr = document.createElement('tr');
@@ -757,34 +766,23 @@
             tbody.innerHTML = `<tr><td colspan="2">Error al cargar las nóminas.</td></tr>`;
         }
       }
+        
+      inicializarPaginaEmpleado();
 
-        function inicializarPaginaEmpleado() {
-          const hoy = new Date();
-          document.getElementById(
-            "selectMesHistorial"
-          ).value = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(
-            2,
-            "0"
-          )}`;
-          inicializarPanel();
-          cargarDatosInicio();
-        }
-
-        inicializarPaginaEmpleado();
       });
     </script>
     <script>
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('/sw.js')
-        .then(registration => {
-          console.log('ServiceWorker registrado con éxito:', registration.scope);
-        })
-        .catch(err => {
-          console.log('El registro del ServiceWorker falló:', err);
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then(registration => {
+              console.log('ServiceWorker registrado con éxito:', registration.scope);
+            })
+            .catch(err => {
+              console.log('El registro del ServiceWorker falló:', err);
+            });
         });
-    });
-  }
-</script>
+      }
+    </script>
   </body>
 </html>
