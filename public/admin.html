@@ -183,6 +183,8 @@
                   <th>Fecha y Hora</th>
                   <th>Tipo</th>
                   <th>Foto</th>
+                  <!-- NOVEDAD: Columna para ubicación -->
+                  <th>Ubicación</th>
                   <th>Acciones</th>
                 </tr>
               </thead>
@@ -213,10 +215,6 @@
           <div id="informeMensualContainer" style="margin-top: 20px"></div>
         </section>
         <hr />
-        
-        <!-- ======================================================= -->
-        <!-- === GESTIÓN DE USUARIOS ACTUALIZADA CON DEPARTAMENTOS === -->
-        <!-- ======================================================= -->
         <section id="gestion-usuarios">
           <h2>Gestión de Usuarios</h2>
           <div class="table-container">
@@ -226,7 +224,6 @@
                   <th>Nombre</th>
                   <th>Usuario</th>
                   <th>Rol</th>
-                  <!-- NOVEDAD: Nueva columna -->
                   <th>Departamento</th>
                   <th>Acciones</th>
                 </tr>
@@ -236,10 +233,6 @@
           </div>
         </section>
         <hr />
-
-        <!-- ======================================================= -->
-        <!-- === CREACIÓN DE USUARIOS ACTUALIZADA CON DEPARTAMENTOS === -->
-        <!-- ======================================================= -->
         <section id="crear-usuario">
           <h2>Crear Nuevo Usuario</h2>
           <form id="createUserForm">
@@ -272,8 +265,6 @@
               <option value="admin">Administrador</option>
               <option value="gestor_vacaciones">Gestor de Vacaciones</option>
             </select>
-            
-            <!-- NOVEDAD: Selector de departamento -->
             <div id="departamento-container" style="margin-top: 15px;">
                 <label for="departamento">Departamento:</label>
                 <select id="departamento" required>
@@ -283,12 +274,10 @@
                     <option value="oficina">Oficina</option>
                 </select>
             </div>
-
             <button type="submit" class="btn-create">Crear Usuario</button>
           </form>
         </section>
         <hr />
-
         <section id="fichaje-manual">
           <h2>Crear Fichaje Manual</h2>
           <form id="manualAttendanceForm">
@@ -414,8 +403,6 @@
       let calendario;
       let vacationData;
       
-      // ... (Las funciones calcularDiasLaborables, logout, cargarDashboard, getReport, abrirModalEdicion, cargarJustificantes, etc. se quedan igual)
-      
       function calcularDiasLaborables(fechaInicio, fechaFin) {
         const inicio = new Date(fechaInicio);
         const fin = new Date(fechaFin);
@@ -484,6 +471,7 @@
           });
         }
       }
+
       async function getReport() {
         const fecha = document.getElementById("fecha").value;
         if (!fecha) return;
@@ -497,7 +485,7 @@
           tbody.innerHTML = "";
           if (data.length === 0) {
             tbody.innerHTML =
-              '<tr><td colspan="5">No hay registros para esta fecha.</td></tr>';
+              '<tr><td colspan="6">No hay registros para esta fecha.</td></tr>';
           } else {
             data.forEach((row) => {
               const tr = document.createElement("tr");
@@ -521,13 +509,31 @@
                   : `Registro manual. Motivo: ${motivo}`;
                 indicadorEditado = `<span title="${title}" style="cursor: help; color: #f39c12; font-weight: bold;"> ✏️</span>`;
               }
-              tr.innerHTML = `<td>${row.nombre}</td><td>${fechaHora}${indicadorEditado}</td><td>${row.tipo}</td><td>${fotoHtml}</td><td><button class="action-btn btn-reset" onclick="abrirModalEdicion(${row.id}, '${row.fecha_hora}', '${row.nombre}')">Editar</button><button class="action-btn btn-delete" onclick="eliminarRegistro(${row.id}, '${row.nombre}', '${fechaHora}')">Eliminar</button></td>`;
+              // --- NOVEDAD: Lógica para la celda de ubicación ---
+              let ubicacionHtml = 'N/A';
+              if (row.latitud && row.longitud) {
+                  const mapsUrl = `https://www.google.com/maps?q=${row.latitud},${row.longitud}`;
+                  // Usamos una clase para poder estilizar el enlace si es necesario
+                  ubicacionHtml = `<a href="${mapsUrl}" target="_blank" class="action-btn" title="Ver en Google Maps"><i class="bi bi-geo-alt-fill"></i> Ver Mapa</a>`;
+              }
+
+              tr.innerHTML = `
+                  <td>${row.nombre}</td>
+                  <td>${fechaHora}${indicadorEditado}</td>
+                  <td>${row.tipo}</td>
+                  <td>${fotoHtml}</td>
+                  <td>${ubicacionHtml}</td> 
+                  <td>
+                      <button class="action-btn btn-reset" onclick="abrirModalEdicion(${row.id}, '${row.fecha_hora}', '${row.nombre}')">Editar</button>
+                      <button class="action-btn btn-delete" onclick="eliminarRegistro(${row.id}, '${row.nombre}', '${fechaHora}')">Eliminar</button>
+                  </td>
+              `;
               tbody.appendChild(tr);
             });
           }
         } catch (error) {
-          document.querySelector("#reportTable tbody").innerHTML =
-            '<tr><td colspan="5">Error al cargar datos.</td></tr>';
+          console.error("Error al cargar informe:", error);
+          document.querySelector("#reportTable tbody").innerHTML = '<tr><td colspan="6">Error al cargar datos.</td></tr>';
         }
       }
       async function abrirModalEdicion(
@@ -780,8 +786,6 @@
           }
         });
       }
-
-      // --- NOVEDAD: FUNCIÓN loadUsers ACTUALIZADA ---
       async function loadUsers() {
         try {
           const res = await fetch("/api/usuarios", {
@@ -795,10 +799,7 @@
           users.forEach((user) => {
             const tr = document.createElement("tr");
             const diasCompensatorios = user.dias_compensatorios || 0;
-            // Mostramos el departamento o un texto por defecto
             const departamentoDisplay = user.departamento ? user.departamento.charAt(0).toUpperCase() + user.departamento.slice(1) : '<em>Sin asignar</em>';
-            
-            // Creamos un string con el departamento actual para pasarlo a la función de edición
             const departamentoActual = user.departamento || '';
 
             tr.innerHTML = `
@@ -807,7 +808,6 @@
                 <td>${user.rol}</td>
                 <td>${departamentoDisplay}</td>
                 <td>
-                    <!-- NOVEDAD: Nuevo botón para editar departamento -->
                     <button class="action-btn" onclick="editarDepartamentoUsuario(${user.id}, '${user.nombre}', '${departamentoActual}')">Depto.</button>
                     <button class="action-btn" style="background-color: #3498db;" onclick="ajustarDiasCompensatorios(${user.id}, '${user.nombre}', ${diasCompensatorios})">Días</button>
                     <button class="action-btn btn-reset" onclick="resetPassword(${user.id}, '${user.nombre}')">Resetear</button>
@@ -819,8 +819,6 @@
           console.error("Error en loadUsers:", error);
         }
       }
-
-      // --- NOVEDAD: NUEVA FUNCIÓN PARA EDITAR DEPARTAMENTO ---
       async function editarDepartamentoUsuario(userId, userName, currentDepartment) {
         const { value: nuevoDepartamento } = await Swal.fire({
             title: `Asignar departamento a ${userName}`,
@@ -850,14 +848,12 @@
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.message);
                 Swal.fire('¡Actualizado!', data.message, 'success');
-                loadUsers(); // Recargar la tabla para ver el cambio
+                loadUsers();
             } catch (error) {
                 Swal.fire('Error', `No se pudo actualizar: ${error.message}`, 'error');
             }
         }
       }
-
-
       async function resetPassword(userId, userName) {
         const { value: newPassword } = await Swal.fire({
           title: `Nueva contraseña para ${userName}`,
@@ -1008,8 +1004,6 @@
           }
         }
       }
-
-      // ... (El resto de funciones como generarInformeMensual, exportarCSV, etc., se quedan igual)
       async function generarInformeMensual() {
           const usuarioId = selectUsuario.value;
           const mesValue = selectMes.value;
@@ -1124,14 +1118,10 @@
           btnExportar.disabled = false;
         }
       }
-
-
-      // --- NOVEDAD: event listener para createUserForm actualizado ---
       document
         .getElementById("createUserForm")
         .addEventListener("submit", async (e) => {
           e.preventDefault();
-          // Añadimos 'departamento' a la lista
           const [nombre, usuario, password, rol, fechaContratacion, departamento] = [
             e.target.nombre.value,
             e.target.usuario.value,
@@ -1153,7 +1143,7 @@
                 password,
                 rol,
                 fechaContratacion,
-                departamento, // Lo enviamos al backend
+                departamento,
               }),
             });
             const data = await res.json();
@@ -1174,8 +1164,6 @@
             Swal.fire("Error", error.message, "error");
           }
         });
-
-      // --- NOVEDAD: Lógica para mostrar/ocultar el selector de departamento ---
       document.getElementById('rol').addEventListener('change', (e) => {
         const departamentoContainer = document.getElementById('departamento-container');
         if (e.target.value === 'empleado') {
@@ -1186,7 +1174,6 @@
             document.getElementById('departamento').required = false;
         }
       });
-      
       document
         .getElementById("manualAttendanceForm")
         .addEventListener("submit", async (e) => {
