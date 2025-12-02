@@ -280,30 +280,30 @@
         window.location.href = "/index.html";
       }
       
-      function aplicarRestriccionesPorDepartamento() {
-          try {
-              const payload = JSON.parse(atob(token.split('.')[1]));
-              const departamento = (payload.departamento || '').toLowerCase();
-              
-              // --- NOVEDAD: Normalizamos el string para quitar tildes ---
-              const departamentoNormalizado = departamento.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      // --- VERSIÓN DEFINITIVA A PRUEBA DE ERRORES DE CODIFICACIÓN ---
+function aplicarRestriccionesPorDepartamento() {
+    try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        const departamento = (payload.departamento || '').toLowerCase();
 
-              if (departamentoNormalizado === 'almacen') {
-                  const fichajeSection = document.querySelector('.fichaje-section');
-                  if (fichajeSection) {
-                      fichajeSection.innerHTML = `
-                          <h2>Fichaje</h2>
-                          <div class="fichaje-restringido">
-                              <i class="bi bi-tablet-landscape"></i>
-                              <p>Tu fichaje debe realizarse desde la pantalla de <strong>Fichaje Rápido</strong>.</p>
-                          </div>
-                      `;
-                  }
-              }
-          } catch (e) {
-              console.error("Error al decodificar el token o aplicar restricciones:", e);
-          }
-      }
+        // Esta condición comprueba tanto la versión correcta ('almacén') 
+        // como la versión mal codificada que nos llega ('almacã©n').
+        if (departamento === 'almacén' || departamento === 'almacã©n') {
+            const fichajeSection = document.querySelector('.fichaje-section');
+            if (fichajeSection) {
+                fichajeSection.innerHTML = `
+                    <h2>Fichaje</h2>
+                    <div class="fichaje-restringido">
+                        <i class="bi bi-tablet-landscape"></i>
+                        <p>Tu fichaje debe realizarse desde la pantalla de <strong>Fichaje Rápido</strong>.</p>
+                    </div>
+                `;
+            }
+        }
+    } catch (e) {
+        console.error("Error al decodificar el token o aplicar restricciones:", e);
+    }
+}
 
       function inicializarPaginaEmpleado() {
         const hoy = new Date();
