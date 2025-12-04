@@ -258,8 +258,8 @@ app.get('/api/informe', authenticateToken, async (req, res) => {
     } catch (err) { res.status(500).json({ message: 'Error al obtener informe.' }); }
 });
 // --- NOVEDAD: RUTA DE USUARIOS ACTUALIZADA CON LÓGICA DE DEPARTAMENTOS ---
+
 app.get('/api/usuarios', authenticateToken, async (req, res) => {
-    // Solo admin y gestores de vacaciones pueden ver la lista de usuarios.
     if (req.user.rol !== 'admin' && req.user.rol !== 'gestor_vacaciones') {
         return res.sendStatus(403);
     }
@@ -270,12 +270,17 @@ app.get('/api/usuarios', authenticateToken, async (req, res) => {
 
         // Lógica de permisos para gestores de vacaciones específicos
         if (req.user.rol === 'gestor_vacaciones') {
-            if (req.user.nombre === 'vacaciones_comerciales') {
-                sql += " WHERE departamento = 'comercial'";
-            } else if (req.user.nombre === 'vacaciones_almacen') {
-                sql += " WHERE departamento = 'almacén'";
+            // --- LÍNEA CORREGIDA: Usamos req.user.usuario en lugar de req.user.nombre ---
+            if (req.user.usuario === 'vacaciones_comerciales') {
+                sql += " WHERE departamento = 'comercial' AND rol = 'empleado'";
+            } else if (req.user.usuario === 'vacaciones_almacen') {
+                // --- LÍNEA CORREGIDA: Usamos req.user.usuario en lugar de req.user.nombre ---
+                sql += " WHERE departamento = 'almacén' AND rol = 'empleado'";
             }
-            // Un gestor genérico o un admin los ven a todos
+            // Si se crea otro gestor_vacaciones genérico, verá a todos los empleados
+            else {
+                 sql += " WHERE rol = 'empleado'";
+            }
         }
 
         sql += " ORDER BY nombre";
@@ -283,6 +288,7 @@ app.get('/api/usuarios', authenticateToken, async (req, res) => {
         const result = await db.query(sql, params);
         res.json(result.rows);
     } catch(err) { 
+        console.error("Error al obtener usuarios:", err);
         res.status(500).json({ message: "Error al obtener usuarios." }); 
     }
 });
