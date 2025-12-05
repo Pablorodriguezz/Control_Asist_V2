@@ -1393,29 +1393,34 @@
           }
         }
       }
-      async function mostrarDiasRestantes() {
-        const usuarioId = document.getElementById("vacacionesUsuario").value;
-        const infoSpan = document.getElementById("infoDiasRestantes");
-        if (!usuarioId) {
-          infoSpan.textContent = "";
-          window.vacationData = null;
-          return;
-        }
-        try {
-          const res = await fetch(
+      // En admin.html, dentro del <script>
+
+async function mostrarDiasRestantes() {
+    const usuarioId = document.getElementById("vacacionesUsuario").value;
+    const infoSpan = document.getElementById("infoDiasRestantes");
+    if (!usuarioId) {
+        infoSpan.textContent = "";
+        window.vacationData = null;
+        return;
+    }
+    try {
+        const res = await fetch(
             `/api/usuarios/${usuarioId}/vacaciones-restantes`,
             { headers: { Authorization: `Bearer ${token}` } }
-          );
-          const data = await res.json();
-          if (!res.ok) throw new Error(data.message);
-          window.vacationData = data;
-          infoSpan.innerHTML = `Disponibles (laborables): <span style="color: green;">${data.diasRestantes}</span> / ${data.diasTotales} (Gastados: ${data.diasGastados})`;
-        } catch (error) {
-          infoSpan.textContent = "Error al calcular días.";
-          infoSpan.style.color = "red";
-          window.vacationData = null;
-        }
-      }
+        );
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message);
+        window.vacationData = data;
+        
+        // --- LÍNEA MODIFICADA ---
+        infoSpan.innerHTML = `Disponibles (laborables): <span style="color: green;">${Math.floor(data.diasRestantes)}</span> / ${Math.floor(data.diasTotales)} (Gastados: ${data.diasGastados})`;
+
+    } catch (error) {
+        infoSpan.textContent = "Error al calcular días.";
+        infoSpan.style.color = "red";
+        window.vacationData = null;
+    }
+}
       async function cargarSolicitudesPendientes() {
         const tbody = document.querySelector("#tablaSolicitudes tbody");
         tbody.innerHTML = '<tr><td colspan="3">Cargando...</td></tr>';

@@ -461,9 +461,7 @@ function aplicarRestriccionesPorDepartamento() {
           ]);
 
           const dataDias = await resDias.json();
-          infoP.innerHTML = `Disponibles (laborables): <span class="dias-restantes">${dataDias.diasRestantes.toFixed(
-            1
-          )}</span> / ${dataDias.diasTotales.toFixed(1)}`;
+          infoP.innerHTML = `Disponibles (laborables): <span class="dias-restantes">${Math.floor(dataDias.diasRestantes)}</span> / ${Math.floor(dataDias.diasTotales)}`;
           const dataSol = await resSol.json();
           tbody.innerHTML = "";
           if (dataSol.length > 0) {
@@ -589,8 +587,7 @@ function aplicarRestriccionesPorDepartamento() {
           const dataVac = await resVac.json();
           const dataReg = await resReg.json();
 
-          document.getElementById("dias-vacaciones").textContent =
-            dataVac.diasRestantes.toFixed(1) ?? "--";
+          document.getElementById("dias-vacaciones").textContent = Math.floor(dataVac.diasRestantes) ?? "--";
 
           if (dataVac.fechaContratacion) {
             const container = document.getElementById("seniority-container");

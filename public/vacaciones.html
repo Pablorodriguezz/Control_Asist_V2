@@ -206,7 +206,7 @@ function calcularDiasLaborables(fechaInicio, fechaFin) {
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.message);
                 window.vacationData = data;
-                infoSpan.innerHTML = `Disponibles: <span style="color: green;">${data.diasRestantes}</span> / ${data.diasTotales} (Gastados: ${data.diasGastados})`;
+                infoSpan.innerHTML = `Disponibles: <span style="color: green;">${Math.floor(data.diasRestantes)}</span> / ${Math.floor(data.diasTotales)} (Gastados: ${data.diasGastados})`;
             } catch (error) {
                 infoSpan.textContent = 'Error al calcular días.';
                 infoSpan.style.color = 'red';
