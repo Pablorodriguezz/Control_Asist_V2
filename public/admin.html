@@ -432,45 +432,53 @@
         window.location.href = "/index.html";
       }
 
-      async function cargarDashboard() {
-        const ids = {
-          dentro: document.getElementById("empleados-dentro"),
-          fuera: document.getElementById("empleados-fuera"),
-          ausencias: document.getElementById("ausencias-hoy"),
-          total: document.querySelector("#total-fichajes span"),
-          manuales: document.querySelector("#fichajes-manuales span"),
-        };
-        try {
-          const res = await fetch("/api/dashboard", {
+      // En admin.html, dentro del <script>
+
+async function cargarDashboard() {
+    const ids = {
+        dentro: document.getElementById("empleados-dentro"),
+        fuera: document.getElementById("empleados-fuera"),
+        ausencias: document.getElementById("ausencias-hoy"), // <-- El ID del widget de ausencias
+        total: document.querySelector("#total-fichajes span"),
+        manuales: document.querySelector("#fichajes-manuales span"),
+    };
+    try {
+        const res = await fetch("/api/dashboard", {
             headers: { Authorization: `Bearer ${token}` },
-          });
-          if (!res.ok) throw new Error("No se pudo cargar el dashboard.");
-          const data = await res.json();
-          const rellenarLista = (ulElement, items) => {
+        });
+        if (!res.ok) throw new Error("No se pudo cargar el dashboard.");
+        const data = await res.json();
+        
+        const rellenarLista = (ulElement, items) => {
             ulElement.innerHTML = "";
             if (items.length === 0) {
-              ulElement.innerHTML = "<li></li>";
+                ulElement.innerHTML = "<li></li>"; // Para que muestre el contenedor vacío
             } else {
-              items.forEach((item) => {
-                const li = document.createElement("li");
-                li.textContent = item;
-                ulElement.appendChild(li);
-              });
+                items.forEach((item) => {
+                    const li = document.createElement("li");
+                    li.textContent = item;
+                    ulElement.appendChild(li);
+                });
             }
-          };
-          rellenarLista(ids.dentro, data.empleadosDentro);
-          rellenarLista(ids.fuera, data.empleadosFuera);
-          rellenarLista(ids.ausencias, data.ausenciasHoy);
-          ids.total.textContent = data.resumen.totalFichajes;
-          ids.manuales.textContent = data.resumen.fichajesManuales;
-        } catch (error) {
-          console.error("Error en cargarDashboard:", error);
-          Object.values(ids).forEach((el) => {
+        };
+        
+        rellenarLista(ids.dentro, data.empleadosDentro);
+        rellenarLista(ids.fuera, data.empleadosFuera);
+        // --- ESTA LÍNEA ES LA IMPORTANTE ---
+        // Se asegura de que se use el array "ausenciasHoy" que viene del servidor,
+        // que ya incluye el nombre y el motivo.
+        rellenarLista(ids.ausencias, data.ausenciasHoy); 
+        
+        ids.total.textContent = data.resumen.totalFichajes;
+        ids.manuales.textContent = data.resumen.fichajesManuales;
+    } catch (error) {
+        console.error("Error en cargarDashboard:", error);
+        Object.values(ids).forEach((el) => {
             if (el.tagName === "UL") el.innerHTML = "<li>Error al cargar</li>";
             else if (el.tagName === "SPAN") el.textContent = "Error";
-          });
-        }
-      }
+        });
+    }
+}
 
       async function getReport() {
         const fecha = document.getElementById("fecha").value;
