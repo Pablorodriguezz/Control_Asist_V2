@@ -599,10 +599,6 @@ app.get('/api/exportar-csv', authenticateToken, async (req, res) => {
         res.status(500).json({ message: 'Error al exportar.' });
     }
 });
-
-
-// En server.js
-
 app.get('/api/dashboard', authenticateToken, async (req, res) => {
     if (req.user.rol !== 'admin') {
         return res.status(403).json({ message: 'Acceso denegado.' });
@@ -611,58 +607,20 @@ app.get('/api/dashboard', authenticateToken, async (req, res) => {
         const hoy = DateTime.local().toISODate();
         const { rows: todosLosEmpleados } = await db.query("SELECT id, nombre FROM usuarios WHERE rol = 'empleado' ORDER BY nombre");
         const { rows: ultimosFichajes } = await db.query(`SELECT DISTINCT ON (usuario_id) usuario_id, tipo FROM registros WHERE fecha_hora::date = $1 ORDER BY usuario_id, fecha_hora DESC`, [hoy]);
-        
-        // --- CONSULTA CORREGIDA Y MÁS ROBUSTA ---
-        const { rows: ausenciasHoy } = await db.query(`
-            WITH ausentes_hoy AS (
-                -- Parte 1: Ausencias por vacaciones
-                SELECT u.nombre, 'Vacaciones' as motivo 
-                FROM vacaciones v 
-                JOIN usuarios u ON v.usuario_id = u.id 
-                WHERE $1 BETWEEN v.fecha_inicio AND v.fecha_fin 
-                  AND v.estado = 'aprobada' 
-                  AND u.rol = 'empleado'
-                
-                UNION ALL -- Usamos UNION ALL que es ligeramente más rápido si no hay duplicados exactos
-                
-                -- Parte 2: Ausencias por bajas o permisos
-                SELECT u.nombre, a.tipo_ausencia as motivo 
-                FROM ausencias a
-                JOIN usuarios u ON a.usuario_id = u.id
-                WHERE a.estado = 'activa' AND (
-                    ($1 BETWEEN a.fecha_inicio AND a.fecha_fin) -- Con fecha de fin
-                    OR 
-                    (a.fecha_fin IS NULL AND $1 >= a.fecha_inicio) -- Abiertas
-                )
-            )
-            SELECT * FROM ausentes_hoy;
-        `, [hoy]);
-
+        const { rows: ausenciasHoy } = await db.query(`SELECT u.nombre FROM vacaciones v JOIN usuarios u ON v.usuario_id = u.id WHERE $1 BETWEEN v.fecha_inicio AND v.fecha_fin AND v.estado = 'aprobada' AND u.rol = 'empleado'`, [hoy]);
         const { rows: resumenFichajes } = await db.query(`SELECT COUNT(*) AS total_fichajes, COUNT(*) FILTER (WHERE es_modificado = TRUE) AS fichajes_manuales FROM registros WHERE fecha_hora::date = $1`, [hoy]);
-        
         const empleadosFichadosMap = new Map();
         ultimosFichajes.forEach(fichaje => { if (fichaje.tipo === 'entrada') { empleadosFichadosMap.set(fichaje.usuario_id, true); } });
-        
         const empleadosDentro = [];
         const empleadosFuera = [];
         todosLosEmpleados.forEach(empleado => { (empleadosFichadosMap.has(empleado.id)) ? empleadosDentro.push(empleado.nombre) : empleadosFuera.push(empleado.nombre); });
-        
-        const ausenciasConMotivo = ausenciasHoy.map(a => `${a.nombre} (${a.motivo})`);
-        
-        res.json({ 
-            empleadosDentro, 
-            empleadosFuera, 
-            ausenciasHoy: ausenciasConMotivo,
-            resumen: { 
-                totalFichajes: resumenFichajes[0]?.total_fichajes || 0, 
-                fichajesManuales: resumenFichajes[0]?.fichajes_manuales || 0 
-            } 
-        });
+        res.json({ empleadosDentro, empleadosFuera, ausenciasHoy: ausenciasHoy.map(a => a.nombre), resumen: { totalFichajes: resumenFichajes[0]?.total_fichajes || 0, fichajesManuales: resumenFichajes[0]?.fichajes_manuales || 0 } });
     } catch (err) {
         console.error("Error al obtener datos del dashboard:", err);
         res.status(500).json({ message: 'Error del servidor al cargar el dashboard.' });
     }
 });
+
 
 // --- RUTAS PARA GESTIÓN DE JUSTIFICANTES ---
 app.post('/api/justificantes', authenticateToken, upload.single('justificante'), async (req, res) => {
