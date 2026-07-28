@@ -1,4 +1,4 @@
-const CACHE_NAME = 'asistencia-cache-v1';
+const CACHE_NAME = 'asistencia-cache-v2';
 const urlsToCache = [
   '/',
   '/index.html',
@@ -12,29 +12,35 @@ const urlsToCache = [
   'https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css'
 ];
 
-// Evento de instalación: se abre el caché y se guardan los archivos principales.
+// Instalación: cachea los archivos principales y activa el SW nuevo de inmediato.
 self.addEventListener('install', event => {
+  self.skipWaiting();
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => {
-        console.log('Cache abierto');
-        return cache.addAll(urlsToCache);
-      })
+    caches.open(CACHE_NAME).then(cache => cache.addAll(urlsToCache))
   );
 });
 
-// Evento fetch: intercepta las peticiones de la app.
+// Activación: borra las cachés antiguas para que no sirvan páginas viejas.
+self.addEventListener('activate', event => {
+  event.waitUntil(
+    caches.keys().then(nombres =>
+      Promise.all(nombres.filter(n => n !== CACHE_NAME).map(n => caches.delete(n)))
+    ).then(() => self.clients.claim())
+  );
+});
+
+// Fetch: network-first. Trae siempre lo último; si no hay red, tira de la caché.
 self.addEventListener('fetch', event => {
   event.respondWith(
-    // Intenta buscar el recurso en el caché primero.
-    caches.match(event.request)
-      .then(response => {
-        // Si lo encuentra en el caché, lo devuelve.
-        if (response) {
-          return response;
+    fetch(event.request)
+      .then(respuesta => {
+        // Solo cacheamos GET (POST/PUT/DELETE no se pueden guardar en caché).
+        if (event.request.method === 'GET') {
+          const copia = respuesta.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, copia)).catch(() => {});
         }
-        // Si no, hace la petición a la red.
-        return fetch(event.request);
+        return respuesta;
       })
+      .catch(() => caches.match(event.request))
   );
 });
