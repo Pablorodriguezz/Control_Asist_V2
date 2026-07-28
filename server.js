@@ -765,8 +765,8 @@ app.get('/api/vacaciones', authenticateToken, async (req, res) => {
     try {
         // Base de la consulta SQL
         let sql = `
-            SELECT v.id, v.fecha_inicio, v.fecha_fin, u.nombre 
-            FROM vacaciones v 
+            SELECT v.id, v.fecha_inicio, v.fecha_fin, v.comentarios, u.nombre
+            FROM vacaciones v
             JOIN usuarios u ON v.usuario_id = u.id 
             WHERE v.estado = 'aprobada'
         `;
@@ -802,7 +802,7 @@ app.post('/api/vacaciones', authenticateToken, async (req, res) => {
         return res.status(403).json({ message: 'Acceso denegado.' });
     }
 
-    const { usuarioId, fechaInicio, fechaFin } = req.body;
+    const { usuarioId, fechaInicio, fechaFin, comentarios } = req.body;
 
     // Validación de datos
     if (!usuarioId || !fechaInicio || !fechaFin) {
@@ -814,11 +814,11 @@ app.post('/api/vacaciones', authenticateToken, async (req, res) => {
 
     try {
         const sql = `
-            INSERT INTO vacaciones (usuario_id, fecha_inicio, fecha_fin, estado) 
-            VALUES ($1, $2, $3, 'aprobada')
+            INSERT INTO vacaciones (usuario_id, fecha_inicio, fecha_fin, estado, comentarios)
+            VALUES ($1, $2, $3, 'aprobada', $4)
         `;
         // Como un admin las asigna, se aprueban directamente.
-        await db.query(sql, [usuarioId, fechaInicio, fechaFin]);
+        await db.query(sql, [usuarioId, fechaInicio, fechaFin, comentarios || null]);
         
         res.status(201).json({ message: 'Vacaciones asignadas correctamente.' });
     } catch (err) {

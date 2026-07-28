@@ -319,6 +319,8 @@
             ><input type="date" id="fechaInicio" required />
             <label for="fechaFin">Fecha de Fin:</label
             ><input type="date" id="fechaFin" required />
+            <label for="comentarios">Motivo / Nota (opcional):</label
+            ><textarea id="comentarios" rows="2" placeholder="Ej: baja por enfermedad, asunto propio..."></textarea>
             <button type="submit">Asignar Vacaciones</button>
           </form>
           <hr style="margin: 20px 0" />
@@ -1268,6 +1270,7 @@
                     .split("T")[0],
                   backgroundColor: evento.backgroundColor,
                   borderColor: evento.borderColor,
+                  extendedProps: { comentarios: evento.comentarios },
                 }));
                 successCallback(eventosFinales);
               })
@@ -1295,13 +1298,17 @@
         calendario.render();
       }
       async function handleEventClick(event) {
+        const comentarios = event.extendedProps.comentarios;
+        const rango = `Del ${new Date(
+          event.start
+        ).toLocaleDateString()} al ${new Date(
+          new Date(event.end).getTime() - 86400000
+        ).toLocaleDateString()}`;
         const { value: action } = await Swal.fire({
           title: `Gestionar vacaciones de ${event.title}`,
-          text: `Del ${new Date(
-            event.start
-          ).toLocaleDateString()} al ${new Date(
-            new Date(event.end).getTime() - 86400000
-          ).toLocaleDateString()}`,
+          html: `${rango}${
+            comentarios ? `<br><br><strong>Motivo:</strong> ${comentarios}` : ""
+          }`,
           showCancelButton: true,
           showDenyButton: true,
           confirmButtonText: "✏️ Editar",
@@ -1477,6 +1484,7 @@ async function mostrarDiasRestantes() {
           const usuarioId = document.getElementById("vacacionesUsuario").value;
           const fechaInicio = document.getElementById("fechaInicio").value;
           const fechaFin = document.getElementById("fechaFin").value;
+          const comentarios = document.getElementById("comentarios").value;
           if (!usuarioId || !fechaInicio || !fechaFin) {
             Swal.fire(
               "Atención",
@@ -1512,7 +1520,7 @@ async function mostrarDiasRestantes() {
                 "Content-Type": "application/json",
                 Authorization: `Bearer ${token}`,
               },
-              body: JSON.stringify({ usuarioId, fechaInicio, fechaFin }),
+              body: JSON.stringify({ usuarioId, fechaInicio, fechaFin, comentarios }),
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data.message);

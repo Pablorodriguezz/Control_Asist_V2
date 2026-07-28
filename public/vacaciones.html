@@ -31,7 +31,10 @@
                 
                 <label for="fechaFin">Fecha de Fin:</label>
                 <input type="date" id="fechaFin" required>
-                
+
+                <label for="comentarios">Motivo / Nota (opcional):</label>
+                <textarea id="comentarios" rows="2" placeholder="Ej: baja por enfermedad, asunto propio..."></textarea>
+
                 <button type="submit">Asignar Vacaciones</button>
             </form>
             <hr style="margin: 20px 0;">
@@ -88,7 +91,8 @@
                         const eventosFinales = dataProcesada.map(evento => ({
                             id: evento.id, title: evento.nombre, start: evento.fecha_inicio,
                             end: new Date(new Date(evento.fecha_fin).getTime() + 86400000).toISOString().split('T')[0],
-                            backgroundColor: evento.backgroundColor, borderColor: evento.borderColor
+                            backgroundColor: evento.backgroundColor, borderColor: evento.borderColor,
+                            extendedProps: { comentarios: evento.comentarios }
                         }));
                         successCallback(eventosFinales);
                     })
@@ -102,9 +106,11 @@
         }
 
         async function handleEventClick(event) {
+            const comentarios = event.extendedProps.comentarios;
+            const rango = `Del ${new Date(event.start).toLocaleDateString()} al ${new Date(new Date(event.end).getTime() - 86400000).toLocaleDateString()}`;
             const { value: action } = await Swal.fire({
                 title: `Gestionar vacaciones de ${event.title}`,
-                text: `Del ${new Date(event.start).toLocaleDateString()} al ${new Date(new Date(event.end).getTime() - 86400000).toLocaleDateString()}`,
+                html: `${rango}${comentarios ? `<br><br><strong>Motivo:</strong> ${comentarios}` : ''}`,
                 showCancelButton: true,
                 showDenyButton: true,
                 confirmButtonText: '✏️ Editar',
@@ -240,7 +246,8 @@ document.getElementById('formVacaciones').addEventListener('submit', async (e) =
     const usuarioId = document.getElementById('vacacionesUsuario').value;
     const fechaInicio = document.getElementById('fechaInicio').value;
     const fechaFin = document.getElementById('fechaFin').value;
-    
+    const comentarios = document.getElementById('comentarios').value;
+
     if (!window.vacationData || !usuarioId || !fechaInicio || !fechaFin) {
         Swal.fire('Error', 'Por favor, selecciona un trabajador y las fechas.', 'error');
         return;
@@ -263,7 +270,7 @@ document.getElementById('formVacaciones').addEventListener('submit', async (e) =
         const res = await fetch('/api/vacaciones', { 
             method: 'POST', 
             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, 
-            body: JSON.stringify({ usuarioId, fechaInicio, fechaFin }) 
+            body: JSON.stringify({ usuarioId, fechaInicio, fechaFin, comentarios })
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.message);
