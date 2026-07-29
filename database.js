@@ -133,6 +133,18 @@ const init = async () => {
         console.log('Tabla "justificantes" asegurada.');
 
         await pool.query(`
+            CREATE TABLE IF NOT EXISTS faltas (
+                id SERIAL PRIMARY KEY,
+                usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+                fecha_inicio DATE NOT NULL,
+                fecha_fin DATE NOT NULL,
+                motivo TEXT NOT NULL,
+                fecha_registro TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+            );
+        `);
+        console.log('Tabla "faltas" asegurada.');
+
+        await pool.query(`
             CREATE TABLE IF NOT EXISTS nominas (
                 id SERIAL PRIMARY KEY,
                 usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,

@@ -808,6 +808,58 @@ app.delete('/api/justificantes/:id', authenticateToken, async (req, res) => {
 
 
 // =================================================================
+// RUTAS PARA GESTIÓN DE FALTAS (ausencias que no son vacaciones)
+// =================================================================
+
+app.get('/api/faltas', authenticateToken, async (req, res) => {
+    if (req.user.rol !== 'admin' && req.user.rol !== 'gestor_vacaciones') return res.sendStatus(403);
+    try {
+        const { rows } = await db.query(
+            `SELECT f.id, f.fecha_inicio, f.fecha_fin, f.motivo, f.fecha_registro, u.nombre
+             FROM faltas f JOIN usuarios u ON f.usuario_id = u.id
+             ORDER BY f.fecha_inicio DESC`
+        );
+        res.json(rows);
+    } catch (err) {
+        console.error("Error al obtener faltas:", err);
+        res.status(500).json({ message: 'Error al obtener las faltas.' });
+    }
+});
+
+app.post('/api/faltas', authenticateToken, async (req, res) => {
+    if (req.user.rol !== 'admin' && req.user.rol !== 'gestor_vacaciones') return res.status(403).json({ message: 'Acceso denegado.' });
+    const { usuarioId, fechaInicio, fechaFin, motivo } = req.body;
+    if (!usuarioId || !fechaInicio || !fechaFin || !motivo || !motivo.trim()) {
+        return res.status(400).json({ message: 'Faltan datos: trabajador, fechas y motivo son obligatorios.' });
+    }
+    if (new Date(fechaFin) < new Date(fechaInicio)) {
+        return res.status(400).json({ message: 'La fecha de fin no puede ser anterior a la de inicio.' });
+    }
+    try {
+        await db.query(
+            'INSERT INTO faltas (usuario_id, fecha_inicio, fecha_fin, motivo) VALUES ($1, $2, $3, $4)',
+            [usuarioId, fechaInicio, fechaFin, motivo.trim()]
+        );
+        res.status(201).json({ message: 'Falta registrada correctamente.' });
+    } catch (err) {
+        console.error("Error al registrar falta:", err);
+        res.status(500).json({ message: 'Error del servidor al registrar la falta.' });
+    }
+});
+
+app.delete('/api/faltas/:id', authenticateToken, async (req, res) => {
+    if (req.user.rol !== 'admin' && req.user.rol !== 'gestor_vacaciones') return res.sendStatus(403);
+    try {
+        const result = await db.query('DELETE FROM faltas WHERE id = $1', [req.params.id]);
+        if (result.rowCount === 0) return res.status(404).json({ message: 'Falta no encontrada.' });
+        res.json({ message: 'Falta eliminada correctamente.' });
+    } catch (err) {
+        console.error("Error al eliminar falta:", err);
+        res.status(500).json({ message: 'Error al eliminar la falta.' });
+    }
+});
+
+// =================================================================
 // RUTAS PARA GESTIÓN DE VACACIONES (MODIFICADAS)
 // =================================================================
 

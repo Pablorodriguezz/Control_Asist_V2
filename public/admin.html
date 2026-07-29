@@ -81,6 +81,11 @@
               >
             </li>
             <li>
+              <a href="#gestion-faltas"
+                ><i class="bi bi-person-x"></i> Gestión Faltas</a
+              >
+            </li>
+            <li>
               <a href="#gestion-nominas"
                 ><i class="bi bi-file-earmark-text-fill"></i> Gestión Nóminas</a
               >
@@ -325,6 +330,38 @@
           </form>
           <hr style="margin: 20px 0" />
           <div id="calendarioVacaciones"></div>
+        </section>
+
+        <hr />
+        <section id="gestion-faltas">
+          <h2><i class="bi bi-person-x"></i> Gestión de Faltas</h2>
+          <form id="formFaltas">
+            <label for="faltasUsuario">Trabajador:</label
+            ><select id="faltasUsuario" required>
+              <option value="">-- Selecciona un trabajador --</option>
+            </select>
+            <label for="faltaFechaInicio">Fecha de Inicio:</label
+            ><input type="date" id="faltaFechaInicio" required />
+            <label for="faltaFechaFin">Fecha de Fin:</label
+            ><input type="date" id="faltaFechaFin" required />
+            <label for="faltaMotivo">Motivo:</label
+            ><textarea id="faltaMotivo" rows="2" required placeholder="Ej: asunto personal, falta injustificada, cita médica..."></textarea>
+            <button type="submit">Registrar Falta</button>
+          </form>
+          <hr style="margin: 20px 0" />
+          <div class="table-container">
+            <table id="tablaFaltas">
+              <thead>
+                <tr>
+                  <th>Empleado</th>
+                  <th>Periodo</th>
+                  <th>Motivo</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
         </section>
 
         <hr />
@@ -919,6 +956,69 @@
             }
           }
         });
+      }
+      async function cargarFaltas() {
+        const tbody = document.querySelector("#tablaFaltas tbody");
+        tbody.innerHTML = '<tr><td colspan="4">Cargando faltas...</td></tr>';
+        try {
+          const res = await fetch("/api/faltas", {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (!res.ok) throw new Error("No se pudieron cargar las faltas.");
+          const faltas = await res.json();
+          tbody.innerHTML = "";
+          if (faltas.length === 0) {
+            tbody.innerHTML =
+              '<tr><td colspan="4">No hay faltas registradas.</td></tr>';
+            return;
+          }
+          faltas.forEach((f) => {
+            const tr = document.createElement("tr");
+            const ini = new Date(f.fecha_inicio).toLocaleDateString("es-ES");
+            const fin = new Date(f.fecha_fin).toLocaleDateString("es-ES");
+            const periodo = ini === fin ? ini : `Del ${ini} al ${fin}`;
+            const nombre = document.createElement("td");
+            nombre.textContent = f.nombre;
+            const tdPeriodo = document.createElement("td");
+            tdPeriodo.textContent = periodo;
+            const tdMotivo = document.createElement("td");
+            tdMotivo.textContent = f.motivo || "";
+            const tdAcc = document.createElement("td");
+            const btn = document.createElement("button");
+            btn.className = "action-btn btn-delete";
+            btn.textContent = "Eliminar";
+            btn.addEventListener("click", () => eliminarFalta(f.id, f.nombre));
+            tdAcc.appendChild(btn);
+            tr.append(nombre, tdPeriodo, tdMotivo, tdAcc);
+            tbody.appendChild(tr);
+          });
+        } catch (error) {
+          tbody.innerHTML = `<tr><td colspan="4">Error al cargar las faltas: ${error.message}</td></tr>`;
+        }
+      }
+      async function eliminarFalta(id, nombre) {
+        const result = await Swal.fire({
+          title: "¿Eliminar falta?",
+          text: `Se eliminará la falta de ${nombre}.`,
+          icon: "warning",
+          showCancelButton: true,
+          confirmButtonColor: "#d33",
+          confirmButtonText: "Sí, eliminar",
+          cancelButtonText: "Cancelar",
+        });
+        if (!result.isConfirmed) return;
+        try {
+          const res = await fetch(`/api/faltas/${id}`, {
+            method: "DELETE",
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.message);
+          Swal.fire("¡Eliminada!", data.message, "success");
+          cargarFaltas();
+        } catch (error) {
+          Swal.fire("Error", `No se pudo eliminar: ${error.message}`, "error");
+        }
       }
       async function poblarSelectorUsuarios(selectorId) {
         const selectElement = document.getElementById(selectorId);
@@ -1630,6 +1730,45 @@ async function mostrarDiasRestantes() {
         poblarSelectorUsuarios("manualUsuario");
         poblarSelectorUsuarios("vacacionesUsuario");
         inicializarCalendario();
+        poblarSelectorUsuarios("faltasUsuario");
+        cargarFaltas();
+        document
+          .getElementById("formFaltas")
+          .addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const body = {
+              usuarioId: document.getElementById("faltasUsuario").value,
+              fechaInicio: document.getElementById("faltaFechaInicio").value,
+              fechaFin: document.getElementById("faltaFechaFin").value,
+              motivo: document.getElementById("faltaMotivo").value,
+            };
+            if (!body.usuarioId || !body.fechaInicio || !body.fechaFin || !body.motivo.trim()) {
+              Swal.fire("Atención", "Selecciona trabajador, fechas y escribe el motivo.", "warning");
+              return;
+            }
+            try {
+              const res = await fetch("/api/faltas", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                body: JSON.stringify(body),
+              });
+              const data = await res.json();
+              if (!res.ok) throw new Error(data.message);
+              Swal.fire("¡Éxito!", "Falta registrada.", "success");
+              e.target.reset();
+              cargarFaltas();
+            } catch (error) {
+              Swal.fire("Error", `No se pudo registrar: ${error.message}`, "error");
+            }
+          });
+        const faltaIni = document.getElementById("faltaFechaInicio"),
+          faltaFin = document.getElementById("faltaFechaFin");
+        faltaIni.addEventListener("change", () => {
+          faltaFin.min = faltaIni.value;
+          if (!faltaFin.value || new Date(faltaFin.value) < new Date(faltaIni.value)) {
+            faltaFin.value = faltaIni.value;
+          }
+        });
         poblarSelectorUsuarios("nominaUsuario");
         cargarNominasAdmin();
         document
