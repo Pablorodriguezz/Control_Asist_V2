@@ -847,6 +847,28 @@ app.post('/api/faltas', authenticateToken, async (req, res) => {
     }
 });
 
+app.put('/api/faltas/:id', authenticateToken, async (req, res) => {
+    if (req.user.rol !== 'admin' && req.user.rol !== 'gestor_vacaciones') return res.status(403).json({ message: 'Acceso denegado.' });
+    const { fechaInicio, fechaFin, motivo } = req.body;
+    if (!fechaInicio || !fechaFin || !motivo || !motivo.trim()) {
+        return res.status(400).json({ message: 'Fechas y motivo son obligatorios.' });
+    }
+    if (new Date(fechaFin) < new Date(fechaInicio)) {
+        return res.status(400).json({ message: 'La fecha de fin no puede ser anterior a la de inicio.' });
+    }
+    try {
+        const result = await db.query(
+            'UPDATE faltas SET fecha_inicio = $1, fecha_fin = $2, motivo = $3 WHERE id = $4',
+            [fechaInicio, fechaFin, motivo.trim(), req.params.id]
+        );
+        if (result.rowCount === 0) return res.status(404).json({ message: 'Falta no encontrada.' });
+        res.json({ message: 'Falta actualizada correctamente.' });
+    } catch (err) {
+        console.error("Error al actualizar falta:", err);
+        res.status(500).json({ message: 'Error al actualizar la falta.' });
+    }
+});
+
 app.delete('/api/faltas/:id', authenticateToken, async (req, res) => {
     if (req.user.rol !== 'admin' && req.user.rol !== 'gestor_vacaciones') return res.sendStatus(403);
     try {

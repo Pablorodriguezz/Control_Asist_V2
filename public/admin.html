@@ -984,16 +984,60 @@
             const tdMotivo = document.createElement("td");
             tdMotivo.textContent = f.motivo || "";
             const tdAcc = document.createElement("td");
+            const btnEditar = document.createElement("button");
+            btnEditar.className = "action-btn btn-reset";
+            btnEditar.textContent = "Editar";
+            btnEditar.addEventListener("click", () => editarFalta(f));
             const btn = document.createElement("button");
             btn.className = "action-btn btn-delete";
             btn.textContent = "Eliminar";
             btn.addEventListener("click", () => eliminarFalta(f.id, f.nombre));
-            tdAcc.appendChild(btn);
+            tdAcc.append(btnEditar, btn);
             tr.append(nombre, tdPeriodo, tdMotivo, tdAcc);
             tbody.appendChild(tr);
           });
         } catch (error) {
           tbody.innerHTML = `<tr><td colspan="4">Error al cargar las faltas: ${error.message}</td></tr>`;
+        }
+      }
+      async function editarFalta(f) {
+        const ini = new Date(f.fecha_inicio).toISOString().split("T")[0];
+        const fin = new Date(f.fecha_fin).toISOString().split("T")[0];
+        const { value: v } = await Swal.fire({
+          title: `Editar falta de ${f.nombre}`,
+          html: `
+            <label for="swal-falta-ini" style="display:block;text-align:left;margin-top:1rem;">Fecha de Inicio:</label>
+            <input id="swal-falta-ini" type="date" class="swal2-input" value="${ini}">
+            <label for="swal-falta-fin" style="display:block;text-align:left;margin-top:1rem;">Fecha de Fin:</label>
+            <input id="swal-falta-fin" type="date" class="swal2-input" value="${fin}">
+            <label for="swal-falta-motivo" style="display:block;text-align:left;margin-top:1rem;">Motivo:</label>
+            <textarea id="swal-falta-motivo" class="swal2-textarea"></textarea>`,
+          focusConfirm: false,
+          showCancelButton: true,
+          confirmButtonText: "Guardar Cambios",
+          cancelButtonText: "Cancelar",
+          didOpen: () => {
+            document.getElementById("swal-falta-motivo").value = f.motivo || "";
+          },
+          preConfirm: () => ({
+            fechaInicio: document.getElementById("swal-falta-ini").value,
+            fechaFin: document.getElementById("swal-falta-fin").value,
+            motivo: document.getElementById("swal-falta-motivo").value,
+          }),
+        });
+        if (!v) return;
+        try {
+          const res = await fetch(`/api/faltas/${f.id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+            body: JSON.stringify(v),
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.message);
+          Swal.fire("¡Actualizada!", data.message, "success");
+          cargarFaltas();
+        } catch (error) {
+          Swal.fire("Error", `No se pudo actualizar: ${error.message}`, "error");
         }
       }
       async function eliminarFalta(id, nombre) {
