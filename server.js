@@ -5,7 +5,6 @@ const multer = require('multer');
 const db = require('./database.js');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { Parser } = require('json2csv');
 const { DateTime } = require('luxon');
 // --- LÍNEA CORREGIDA ---
 const { S3Client, PutObjectCommand, DeleteObjectCommand } = require("@aws-sdk/client-s3");
@@ -542,7 +541,11 @@ app.get('/api/exportar-csv', authenticateToken, async (req, res) => {
     try {
         const { rows: data } = await db.query(sql, [usuarioId, fechaInicio.toJSDate(), fechaFin.toJSDate()]);
 
-        // El resto de la lógica para procesar y generar el CSV no necesita cambios.
+        // Nombre del trabajador (puede no haber fichajes si solo hubo vacaciones)
+        const resNombre = await db.query('SELECT nombre FROM usuarios WHERE id = $1', [usuarioId]);
+        const nombre = (data[0] && data[0].nombre) || (resNombre.rows[0] && resNombre.rows[0].nombre) || 'Trabajador';
+
+        // Segundos trabajados por día (emparejando entrada/salida del mismo día)
         const segundosPorDia = {};
         let entradaActual = null;
         for (const registro of data) {
@@ -553,46 +556,97 @@ app.get('/api/exportar-csv', authenticateToken, async (req, res) => {
             } else if (registro.tipo === 'salida' && entradaActual) {
                 if (entradaActual.hasSame(fecha, 'day')) {
                     const duracion = fecha.diff(entradaActual, 'seconds').seconds;
-                    if (duracion > 0) {
-                        if (!segundosPorDia[diaISO]) segundosPorDia[diaISO] = 0;
-                        segundosPorDia[diaISO] += duracion;
-                    }
+                    if (duracion > 0) segundosPorDia[diaISO] = (segundosPorDia[diaISO] || 0) + duracion;
                 }
                 entradaActual = null;
-            
             }
         }
 
-        let totalHorasMesSegundos = 0;
-        let totalHorasExtraMesSegundos = 0;
-        const resumenSemanas = {};
-
+        // Agrupar por semana ISO. Clave año-semana para ordenar bien en cambios de año.
+        const HORAS_DIA_SEGUNDOS = 8 * 3600; // jornada de referencia por día laborable
+        const semanas = {}; // clave -> { num, totalSegundos }
         for (const dia in segundosPorDia) {
-            totalHorasMesSegundos += segundosPorDia[dia];
-            const numSemana = DateTime.fromISO(dia).weekNumber;
-            if (!resumenSemanas[numSemana]) resumenSemanas[numSemana] = 0;
-            resumenSemanas[numSemana] += segundosPorDia[dia];
+            const dt = DateTime.fromISO(dia);
+            const clave = `${dt.weekYear}-${String(dt.weekNumber).padStart(2, '0')}`;
+            if (!semanas[clave]) semanas[clave] = { num: dt.weekNumber, totalSegundos: 0 };
+            semanas[clave].totalSegundos += segundosPorDia[dia];
         }
 
-        const umbralSemanalSegundos = 40 * 3600;
-        for (const semana in resumenSemanas) {
-            if (resumenSemanas[semana] > umbralSemanalSegundos) {
-                totalHorasExtraMesSegundos += resumenSemanas[semana] - umbralSemanalSegundos;
+        // Semanas cubiertas por vacaciones aprobadas dentro del periodo
+        const { rows: vacaciones } = await db.query(
+            "SELECT fecha_inicio, fecha_fin FROM vacaciones WHERE usuario_id = $1 AND estado = 'aprobada' AND fecha_inicio <= $2 AND fecha_fin >= $3",
+            [usuarioId, fechaFin.toISODate(), fechaInicio.toISODate()]
+        );
+        const semanasVacaciones = {}; // clave -> num
+        const diasVacacion = new Set(); // fechas ISO cubiertas por vacaciones dentro del periodo
+        const iniPeriodo = fechaInicio.toISODate(), finPeriodo = fechaFin.toISODate();
+        for (const vac of vacaciones) {
+            let d = DateTime.fromISO(vac.fecha_inicio.toISOString().split('T')[0]);
+            const fin = DateTime.fromISO(vac.fecha_fin.toISOString().split('T')[0]);
+            while (d <= fin) {
+                const iso = d.toISODate();
+                if (iso >= iniPeriodo && iso <= finPeriodo) {
+                    semanasVacaciones[`${d.weekYear}-${String(d.weekNumber).padStart(2, '0')}`] = d.weekNumber;
+                    diasVacacion.add(iso);
+                }
+                d = d.plus({ days: 1 });
             }
         }
 
-        const datosProcesados = data.map(registro => {
+        // Días laborables (L-V, sin vacaciones) que caen en el periodo por semana.
+        // Así una semana de borde (ej. hasta el jueves) computa sobre 4x8h, no 40h.
+        const laborablesSemana = {}; // clave -> nº de días laborables
+        for (let d = fechaInicio; d <= fechaFin; d = d.plus({ days: 1 })) {
+            if (d.weekday <= 5 && !diasVacacion.has(d.toISODate())) {
+                const clave = `${d.weekYear}-${String(d.weekNumber).padStart(2, '0')}`;
+                laborablesSemana[clave] = (laborablesSemana[clave] || 0) + 1;
+            }
+        }
+
+        // "+ 24H 18MIN" / "- 31H 0MIN" / "+ 59MIN"
+        const fmtExtra = (seg) => {
+            const signo = seg < 0 ? '-' : '+';
+            const abs = Math.abs(Math.floor(seg));
+            const h = Math.floor(abs / 3600), m = Math.floor((abs % 3600) / 60);
+            return h > 0 ? `${signo} ${h}H ${m}MIN` : `${signo} ${m}MIN`;
+        };
+
+        // Resumen semanal ordenado cronológicamente
+        const claves = Array.from(new Set([...Object.keys(semanas), ...Object.keys(semanasVacaciones)])).sort();
+        const lineasResumen = [];
+        let totalHorasExtraMesSegundos = 0;
+        for (const clave of claves) {
+            if (semanas[clave]) {
+                const umbral = (laborablesSemana[clave] || 0) * HORAS_DIA_SEGUNDOS;
+                const extra = semanas[clave].totalSegundos - umbral;
+                if (extra > 0) totalHorasExtraMesSegundos += extra;
+                lineasResumen.push(`SEMANA ${semanas[clave].num}: ${fmtExtra(extra)}`);
+            } else {
+                lineasResumen.push(`SEMANA ${semanasVacaciones[clave]}: VACACIONES`);
+            }
+        }
+
+        // Cabecera "NOMBRE 21-20 JUN-JUL"
+        const meses = ['', 'ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN', 'JUL', 'AGO', 'SEP', 'OCT', 'NOV', 'DIC'];
+        const titulo = `${nombre} 21-20 ${meses[fechaInicio.month]}-${meses[fechaFin.month]}`;
+        const totH = Math.floor(totalHorasExtraMesSegundos / 3600);
+        const totM = Math.floor((totalHorasExtraMesSegundos % 3600) / 60);
+
+        // Montar el CSV: bloque resumen, línea en blanco, y fichajes en crudo
+        const escapa = (s) => `"${String(s).replace(/"/g, '""')}"`;
+        const filas = [escapa(titulo)];
+        for (const l of lineasResumen) filas.push(escapa(l));
+        filas.push(escapa(`TOTAL HORAS EXTRA: + ${totH} H ${totM} MIN`));
+        filas.push('');
+        filas.push(['Nombre', 'Fecha y Hora (Local)', 'Tipo'].map(escapa).join(','));
+        for (const registro of data) {
             const fechaLocal = DateTime.fromJSDate(registro.fecha_hora, { zone: 'utc' }).setZone(timeZone);
-            return { "Nombre": registro.nombre, "Fecha y Hora (Local)": fechaLocal.toFormat('dd/MM/yyyy HH:mm:ss'), "Tipo": registro.tipo };
-        });
-        const segundosAFormatoHora = (s) => DateTime.fromSeconds(s, { zone: 'utc' }).toFormat('HH:mm:ss');
-        datosProcesados.push({}, { "Nombre": "Total Horas Mes", "Fecha y Hora (Local)": segundosAFormatoHora(totalHorasMesSegundos) }, { "Nombre": "Total Horas Extra", "Fecha y Hora (Local)": segundosAFormatoHora(totalHorasExtraMesSegundos) });
-        const fields = ["Nombre", "Fecha y Hora (Local)", "Tipo"];
-        const json2csvParser = new Parser({ fields });
-        const csv = json2csvParser.parse(datosProcesados);
-        res.header('Content-Type', 'text/csv');
+            filas.push([registro.nombre, fechaLocal.toFormat('dd/MM/yyyy HH:mm:ss'), registro.tipo].map(escapa).join(','));
+        }
+
+        res.header('Content-Type', 'text/csv; charset=utf-8');
         res.attachment(`informe-${anio}-${mes}-usuario-${usuarioId}.csv`);
-        res.send(csv);
+        res.send('﻿' + filas.join('\r\n')); // BOM para que Excel muestre bien los acentos
 
     } catch (err) {
         console.error("Error al exportar CSV:", err);
