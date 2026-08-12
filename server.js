@@ -51,6 +51,45 @@ const calcularDiasLaborables = (fechaInicio, fechaFin) => {
     return count;
 };
 
+// Empareja entradas/salidas en orden cronológico. Devuelve los segundos trabajados
+// por día y una lista de incidencias (fichajes incompletos o que cruzan medianoche),
+// para que esos casos no se pierdan en silencio y el admin pueda revisarlos.
+const procesarFichajes = (registros) => {
+    const segundosPorDia = {};
+    const incidencias = []; // { fecha, tipo }
+    let entradaActual = null;
+
+    for (const registro of registros) {
+        const fecha = DateTime.fromJSDate(registro.fecha_hora);
+        if (registro.tipo === 'entrada') {
+            if (entradaActual) {
+                // La entrada anterior nunca tuvo salida
+                incidencias.push({ fecha: entradaActual.toISODate(), tipo: 'Entrada sin salida' });
+            }
+            entradaActual = fecha;
+        } else if (registro.tipo === 'salida') {
+            if (!entradaActual) {
+                incidencias.push({ fecha: fecha.toISODate(), tipo: 'Salida sin entrada' });
+            } else if (!entradaActual.hasSame(fecha, 'day')) {
+                // Entrada un día y salida en otro: no se computan las horas
+                incidencias.push({ fecha: entradaActual.toISODate(), tipo: 'Fichaje cruza medianoche' });
+                entradaActual = null;
+            } else {
+                const duracion = fecha.diff(entradaActual, 'seconds').seconds;
+                if (duracion > 0) {
+                    const diaISO = entradaActual.toISODate();
+                    segundosPorDia[diaISO] = (segundosPorDia[diaISO] || 0) + duracion;
+                }
+                entradaActual = null;
+            }
+        }
+    }
+    if (entradaActual) {
+        incidencias.push({ fecha: entradaActual.toISODate(), tipo: 'Entrada sin salida' });
+    }
+    return { segundosPorDia, incidencias };
+};
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -460,31 +499,9 @@ app.get('/api/informe-mensual', authenticateToken, async (req, res) => {
         // Pasamos las fechas de inicio y fin como parámetros
         const { rows: registros } = await db.query(sql, [usuarioId, fechaInicio.toJSDate(), fechaFin.toJSDate()]);
 
-        // El resto de la lógica para procesar los registros no necesita cambios.
-        const segundosPorDia = {};
-        let entradaActual = null;
+        const { segundosPorDia, incidencias } = procesarFichajes(registros);
 
-        for (const registro of registros) {
-            const fecha = DateTime.fromJSDate(registro.fecha_hora);
-            const diaISO = fecha.toISODate();
-
-            if (registro.tipo === 'entrada') {
-                entradaActual = fecha;
-            } else if (registro.tipo === 'salida' && entradaActual) {
-                if (entradaActual.hasSame(fecha, 'day')) {
-                    const duracion = fecha.diff(entradaActual, 'seconds').seconds;
-                    if (duracion > 0) {
-                        if (!segundosPorDia[diaISO]) {
-                            segundosPorDia[diaISO] = 0;
-                        }
-                        segundosPorDia[diaISO] += duracion;
-                    }
-                }
-                entradaActual = null;
-            }
-        }
-        
-        const informe = { resumenSemanas: {}, totalHorasMesSegundos: 0, totalHorasExtraMesSegundos: 0 };
+        const informe = { resumenSemanas: {}, totalHorasMesSegundos: 0, totalHorasExtraMesSegundos: 0, incidencias };
 
         for (const dia in segundosPorDia) {
             const segundosDelDia = segundosPorDia[dia];
@@ -549,22 +566,8 @@ app.get('/api/exportar-csv', authenticateToken, async (req, res) => {
         const resNombre = await db.query('SELECT nombre FROM usuarios WHERE id = $1', [usuarioId]);
         const nombre = (data[0] && data[0].nombre) || (resNombre.rows[0] && resNombre.rows[0].nombre) || 'Trabajador';
 
-        // Segundos trabajados por día (emparejando entrada/salida del mismo día)
-        const segundosPorDia = {};
-        let entradaActual = null;
-        for (const registro of data) {
-            const fecha = DateTime.fromJSDate(registro.fecha_hora);
-            const diaISO = fecha.toISODate();
-            if (registro.tipo === 'entrada') {
-                entradaActual = fecha;
-            } else if (registro.tipo === 'salida' && entradaActual) {
-                if (entradaActual.hasSame(fecha, 'day')) {
-                    const duracion = fecha.diff(entradaActual, 'seconds').seconds;
-                    if (duracion > 0) segundosPorDia[diaISO] = (segundosPorDia[diaISO] || 0) + duracion;
-                }
-                entradaActual = null;
-            }
-        }
+        // Segundos trabajados por día e incidencias (fichajes incompletos / cruzan medianoche)
+        const { segundosPorDia, incidencias } = procesarFichajes(data);
 
         // Agrupar por semana ISO. Clave año-semana para ordenar bien en cambios de año.
         const HORAS_DIA_SEGUNDOS = 8 * 3600; // jornada de referencia por día laborable
@@ -641,6 +644,13 @@ app.get('/api/exportar-csv', authenticateToken, async (req, res) => {
         const filas = [escapa(titulo)];
         for (const l of lineasResumen) filas.push(escapa(l));
         filas.push(escapa(`TOTAL HORAS EXTRA: + ${totH} H ${totM} MIN`));
+        if (incidencias.length > 0) {
+            filas.push('');
+            filas.push(escapa('AVISO - FICHAJES A REVISAR (no computados):'));
+            for (const inc of incidencias) {
+                filas.push(escapa(`  ${DateTime.fromISO(inc.fecha).toFormat('dd/MM/yyyy')}: ${inc.tipo}`));
+            }
+        }
         filas.push('');
         filas.push(['Nombre', 'Fecha y Hora (Local)', 'Tipo'].map(escapa).join(','));
         for (const registro of data) {

@@ -1214,6 +1214,15 @@
               html += `<p><strong>Total Horas Extra en el Mes:</strong> ${segundosAFormatoDuracion(
                   informe.totalHorasExtraMesSegundos
               )}</p>`;
+              if (informe.incidencias && informe.incidencias.length > 0) {
+                  html += `<div style="margin-top:15px;padding:12px;border-left:4px solid #e67e22;background:#fdf3e7;border-radius:6px;">
+                      <strong>⚠️ Fichajes a revisar (no computados):</strong><ul style="margin:8px 0 0;">`;
+                  informe.incidencias.forEach((inc) => {
+                      const fecha = inc.fecha.split("-").reverse().join("/");
+                      html += `<li>${fecha}: ${inc.tipo}</li>`;
+                  });
+                  html += "</ul></div>";
+              }
               container.innerHTML = html;
               if (informe.totalHorasMesSegundos > 0)
                   btnExportar.style.display = "inline-block";
