@@ -158,17 +158,22 @@ const init = async () => {
         `);
         console.log("Tabla 'nominas' asegurada y lista.");
 
-        // --- CREACIÓN DEL USUARIO ADMIN POR DEFECTO ---
+        // --- CREACIÓN DEL USUARIO ADMIN POR DEFECTO (solo en BD nueva) ---
         const adminUser = 'admin';
-        const adminPass = 'admin123';
         const res = await pool.query('SELECT * FROM usuarios WHERE usuario = $1', [adminUser]);
         if (res.rowCount === 0) {
+            // Contraseña desde ADMIN_PASSWORD; si no se define, se genera una aleatoria (nunca un valor conocido).
+            const adminPass = process.env.ADMIN_PASSWORD || require('crypto').randomBytes(9).toString('base64url');
             const hash = await bcrypt.hash(adminPass, 10);
             await pool.query(
                 'INSERT INTO usuarios (nombre, usuario, password, rol, fecha_contratacion) VALUES ($1, $2, $3, $4, $5)',
                 ['Administrador', adminUser, hash, 'admin', new Date().toISOString().split('T')[0]]
             );
-            console.log('Usuario administrador creado.');
+            if (process.env.ADMIN_PASSWORD) {
+                console.log('Usuario administrador creado con la contraseña de ADMIN_PASSWORD.');
+            } else {
+                console.log(`Usuario administrador creado. Contraseña temporal: ${adminPass}  (cámbiala cuanto antes)`);
+            }
         }
         console.log('¡Base de datos lista!');
     } catch (err) {

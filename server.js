@@ -53,7 +53,11 @@ const calcularDiasLaborables = (fechaInicio, fechaFin) => {
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const JWT_SECRET = process.env.JWT_SECRET || 'tu_secreto_super_secreto_y_largo_y_dificil_de_adivinar_987654';
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+    console.error('Error Crítico: falta la variable de entorno JWT_SECRET. Defínela antes de arrancar.');
+    process.exit(1);
+}
 
 app.use(cors());
 app.use(express.json());
@@ -1215,17 +1219,6 @@ app.get('/api/mis-vacaciones', authenticateToken, async (req, res) => {
     } catch(err) {
         res.status(500).json({ message: 'Error al obtener mis vacaciones.' });
     }
-});
-
-app.put('/api/vacaciones/:id/gestionar', authenticateToken, async (req, res) => {
-    if (req.user.rol !== 'admin' && req.user.rol !== 'gestor_vacaciones') return res.sendStatus(403);
-    const { nuevoEstado } = req.body;
-    if (!['aprobada', 'rechazada'].includes(nuevoEstado)) return res.status(400).json({ message: 'Estado no válido.' });
-    try {
-        const result = await db.query("UPDATE vacaciones SET estado = $1 WHERE id = $2 AND estado = 'pendiente'", [nuevoEstado, req.params.id]);
-        if (result.rowCount === 0) return res.status(404).json({ message: 'Solicitud no encontrada o ya gestionada.' });
-        res.json({ message: `Solicitud ${nuevoEstado}.` });
-    } catch(err) { res.status(500).json({ message: 'Error al gestionar.' }); }
 });
 
 app.get('/api/mis-solicitudes', authenticateToken, async (req, res) => {
