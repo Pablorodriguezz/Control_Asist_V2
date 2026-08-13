@@ -308,19 +308,26 @@ app.get('/api/no-fichados', authenticateToken, async (req, res) => {
     const hoy = DateTime.now().setZone('Europe/Madrid').startOf('day');
     const inicio = hoy.minus({ days: diasNum }).toISODate(); // desde N días atrás
     const fin = hoy.minus({ days: 1 }).toISODate();          // hasta ayer
+    const depto = req.query.departamento;
+    const params = [inicio, fin];
+    let filtroDepto = '';
+    if (depto && depto !== 'todos') {
+        params.push(depto);
+        filtroDepto = ` AND u.departamento = $${params.length}`;
+    }
     try {
         const sql = `
             SELECT to_char(d.dia, 'YYYY-MM-DD') AS fecha, u.nombre
             FROM generate_series($1::date, $2::date, '1 day') AS d(dia)
             CROSS JOIN usuarios u
-            WHERE u.rol = 'empleado'
+            WHERE u.rol = 'empleado'${filtroDepto}
               AND EXTRACT(ISODOW FROM d.dia) < 6
               AND NOT EXISTS (SELECT 1 FROM registros r WHERE r.usuario_id = u.id AND r.fecha_hora::date = d.dia::date)
               AND NOT EXISTS (SELECT 1 FROM vacaciones v WHERE v.usuario_id = u.id AND v.estado = 'aprobada' AND d.dia::date BETWEEN v.fecha_inicio AND v.fecha_fin)
               AND NOT EXISTS (SELECT 1 FROM faltas f WHERE f.usuario_id = u.id AND d.dia::date BETWEEN f.fecha_inicio AND f.fecha_fin)
             ORDER BY d.dia DESC, u.nombre
         `;
-        const { rows } = await db.query(sql, [inicio, fin]);
+        const { rows } = await db.query(sql, params);
         const porDia = new Map();
         for (const r of rows) {
             if (!porDia.has(r.fecha)) porDia.set(r.fecha, []);

@@ -216,6 +216,13 @@
               <option value="15">15 días</option>
               <option value="30">30 días</option>
             </select>
+            <label for="deptoSinFichar" style="margin:0;">Departamento:</label>
+            <select id="deptoSinFichar" style="width:auto;margin:0;">
+              <option value="almacén" selected>Almacén</option>
+              <option value="comercial">Comercial</option>
+              <option value="oficina">Oficina</option>
+              <option value="todos">Todos</option>
+            </select>
           </div>
           <div id="contenedorSinFichar"></div>
         </section>
@@ -1080,10 +1087,13 @@
       }
       async function cargarSinFichar() {
         const dias = document.getElementById("diasSinFichar").value;
+        const depto = document.getElementById("deptoSinFichar").value;
         const cont = document.getElementById("contenedorSinFichar");
         cont.innerHTML = "<p>Cargando...</p>";
         try {
-          const res = await fetch(`/api/no-fichados?dias=${dias}`, {
+          const res = await fetch(
+            `/api/no-fichados?dias=${dias}&departamento=${encodeURIComponent(depto)}`,
+            {
             headers: { Authorization: `Bearer ${token}` },
           });
           if (!res.ok) throw new Error("No se pudo cargar.");
@@ -1975,6 +1985,9 @@ async function mostrarDiasRestantes() {
         cargarSinFichar();
         document
           .getElementById("diasSinFichar")
+          .addEventListener("change", cargarSinFichar);
+        document
+          .getElementById("deptoSinFichar")
           .addEventListener("change", cargarSinFichar);
         document
           .getElementById("formFaltas")
