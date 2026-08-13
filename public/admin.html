@@ -969,42 +969,81 @@
           return;
         }
         const [anio, mes] = val.split("-").map(Number);
-        const primerDia = new Date(anio, mes - 1, 1);
-        const ultimoDia = new Date(anio, mes, 0);
         const meses = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+        const diasSem = ["LUN","MAR","MIÉ","JUE","VIE","SÁB","DOM"];
+        const esc = (s) =>
+          String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+        const soloFecha = (s) => { const d = new Date(s); return new Date(d.getFullYear(), d.getMonth(), d.getDate()); };
+        const diff = (a, b) => Math.round((a - b) / 86400000);
+        const clamp = (n) => Math.max(0, Math.min(6, n));
         try {
-          const res = await fetch("/api/vacaciones", {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          if (!res.ok) throw new Error("No se pudieron cargar las vacaciones.");
-          const data = await res.json();
-          // Vacaciones que solapan el mes elegido
-          const delMes = data
-            .filter((v) => new Date(v.fecha_inicio) <= ultimoDia && new Date(v.fecha_fin) >= primerDia)
-            .sort((a, b) => new Date(a.fecha_inicio) - new Date(b.fecha_inicio));
-          const esc = (s) =>
-            String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-          const fmt = (f) => new Date(f).toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit", year: "numeric" });
-          const filas = delMes.length
-            ? delMes.map((v) => `<tr><td>${esc(v.nombre)}</td><td>${fmt(v.fecha_inicio)}</td><td>${fmt(v.fecha_fin)}</td></tr>`).join("")
-            : `<tr><td colspan="3" style="text-align:center;">No hay vacaciones este mes.</td></tr>`;
+          const headers = { Authorization: `Bearer ${token}` };
+          const [vac, faltas] = await Promise.all([
+            fetch("/api/vacaciones", { headers }).then((r) => (r.ok ? r.json() : Promise.reject())),
+            fetch("/api/faltas", { headers }).then((r) => (r.ok ? r.json() : Promise.reject())),
+          ]);
+          const eventos = [
+            ...vac.map((v) => ({ nombre: v.nombre, s: soloFecha(v.fecha_inicio), e: soloFecha(v.fecha_fin), clase: "vac" })),
+            ...faltas.map((f) => ({ nombre: `${f.nombre} (Falta)`, s: soloFecha(f.fecha_inicio), e: soloFecha(f.fecha_fin), clase: "falta" })),
+          ];
+          // Rejilla del mes: de lunes anterior al día 1 hasta domingo del último día
+          const ultimo = new Date(anio, mes, 0);
+          const offIni = (new Date(anio, mes - 1, 1).getDay() + 6) % 7;
+          const inicioGrid = new Date(anio, mes - 1, 1 - offIni);
+          const offFin = 6 - ((ultimo.getDay() + 6) % 7);
+          const finGrid = new Date(anio, mes - 1, ultimo.getDate() + offFin);
+          const nSemanas = (diff(finGrid, inicioGrid) + 1) / 7;
+
+          let semanasHtml = "";
+          for (let w = 0; w < nSemanas; w++) {
+            const lunes = new Date(inicioGrid);
+            lunes.setDate(lunes.getDate() + w * 7);
+            const domingo = new Date(lunes);
+            domingo.setDate(domingo.getDate() + 6);
+            let numsHtml = "";
+            for (let i = 0; i < 7; i++) {
+              const d = new Date(lunes);
+              d.setDate(d.getDate() + i);
+              numsHtml += `<div class="${d.getMonth() === mes - 1 ? "" : "otro"}">${d.getDate()}</div>`;
+            }
+            const enSemana = eventos
+              .filter((ev) => ev.e >= lunes && ev.s <= domingo)
+              .sort((a, b) => a.nombre.localeCompare(b.nombre));
+            let barrasHtml = "";
+            for (const ev of enSemana) {
+              const c1 = clamp(diff(ev.s, lunes)) + 1;
+              const c2 = clamp(diff(ev.e, lunes)) + 2;
+              barrasHtml += `<div class="evrow"><div class="bar ${ev.clase}" style="grid-column:${c1}/${c2}">${esc(ev.nombre)}</div></div>`;
+            }
+            semanasHtml += `<div class="semana"><div class="nums">${numsHtml}</div>${barrasHtml}</div>`;
+          }
+
           const html = `<!doctype html><html lang="es"><head><meta charset="utf-8">
             <title>Vacaciones ${meses[mes - 1]} ${anio}</title>
             <style>
-              body{font-family:Arial,Helvetica,sans-serif;margin:40px;color:#111;}
-              h1{text-align:center;font-size:28px;margin:0 0 4px;}
-              .sub{text-align:center;color:#555;margin:0 0 24px;font-size:14px;}
-              table{width:100%;border-collapse:collapse;font-size:18px;}
-              th,td{border:1px solid #999;padding:10px 14px;text-align:left;}
-              th{background:#f0f0f0;}
-              tr:nth-child(even) td{background:#fafafa;}
-              @media print{ .noprint{display:none;} body{margin:15mm;} }
+              *{box-sizing:border-box;}
+              body{font-family:Arial,Helvetica,sans-serif;margin:20px;color:#111;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+              h1{text-align:center;font-size:22px;margin:0 0 2px;}
+              .sub{text-align:center;color:#555;margin:0 0 14px;font-size:13px;}
+              .cab,.nums,.evrow{display:grid;grid-template-columns:repeat(7,1fr);}
+              .cab>div{text-align:center;font-weight:bold;font-size:12px;padding:4px 0;background:#333;color:#fff;border-right:1px solid #fff;}
+              .semana{border:1px solid #999;border-top:none;}
+              .nums>div{text-align:right;font-size:12px;padding:2px 6px;color:#333;border-right:1px solid #ddd;min-height:20px;}
+              .nums>div.otro{color:#bbb;}
+              .evrow{margin:1px 0;}
+              .bar{font-size:12px;color:#fff;padding:2px 6px;border-radius:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+              .bar.vac{background:#e74c3c;}
+              .bar.falta{background:#8e44ad;}
+              .leyenda{margin-top:14px;font-size:12px;text-align:center;color:#333;}
+              .leyenda i{display:inline-block;width:12px;height:12px;border-radius:2px;vertical-align:middle;margin:0 4px 0 12px;}
+              @media print{ .noprint{display:none;} body{margin:8mm;} }
             </style></head><body>
-            <h1>VACACIONES · ${meses[mes - 1].toUpperCase()} ${anio}</h1>
+            <h1>CUADRANTE DE VACACIONES · ${esc(meses[mes - 1].toUpperCase())} ${anio}</h1>
             <p class="sub">Hostel Cleaning</p>
-            <table><thead><tr><th>Trabajador</th><th>Desde</th><th>Hasta</th></tr></thead>
-            <tbody>${filas}</tbody></table>
-            <button class="noprint" onclick="window.print()" style="display:block;margin:30px auto 0;padding:12px 24px;font-size:16px;cursor:pointer;">🖨️ Imprimir</button>
+            <div class="cab">${diasSem.map((d) => `<div>${d}</div>`).join("")}</div>
+            ${semanasHtml}
+            <p class="leyenda"><i style="background:#e74c3c"></i>Vacaciones <i style="background:#8e44ad"></i>Falta</p>
+            <button class="noprint" onclick="window.print()" style="display:block;margin:24px auto 0;padding:12px 24px;font-size:16px;cursor:pointer;">🖨️ Imprimir</button>
             </body></html>`;
           const win = window.open("", "_blank");
           if (!win) {
