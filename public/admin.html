@@ -1036,6 +1036,7 @@
           if (!res.ok) throw new Error(data.message);
           Swal.fire("¡Actualizada!", data.message, "success");
           cargarFaltas();
+          if (calendario) calendario.refetchEvents();
         } catch (error) {
           Swal.fire("Error", `No se pudo actualizar: ${error.message}`, "error");
         }
@@ -1060,6 +1061,7 @@
           if (!res.ok) throw new Error(data.message);
           Swal.fire("¡Eliminada!", data.message, "success");
           cargarFaltas();
+          if (calendario) calendario.refetchEvents();
         } catch (error) {
           Swal.fire("Error", `No se pudo eliminar: ${error.message}`, "error");
         }
@@ -1383,55 +1385,65 @@
             handleEventClick(info.event);
           },
           events: function (fetchInfo, successCallback, failureCallback) {
-            fetch("/api/vacaciones", {
-              method: "GET",
-              headers: {
-                Authorization: `Bearer ${localStorage.getItem("token")}`,
-              },
-            })
-              .then((res) =>
-                res.ok
-                  ? res.json()
-                  : Promise.reject("Respuesta no válida del servidor")
-              )
-              .then((data) => {
-                const dataProcesada = data.map((evento) => {
+            const headers = {
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+            };
+            const finExclusivo = (fechaFin) =>
+              new Date(new Date(fechaFin).getTime() + 86400000)
+                .toISOString()
+                .split("T")[0];
+            Promise.all([
+              fetch("/api/vacaciones", { headers }).then((r) =>
+                r.ok ? r.json() : Promise.reject("vacaciones")
+              ),
+              fetch("/api/faltas", { headers }).then((r) =>
+                r.ok ? r.json() : Promise.reject("faltas")
+              ),
+            ])
+              .then(([vacaciones, faltas]) => {
+                const eventosVac = vacaciones.map((evento) => {
                   let solapado = false;
                   const inicioEvento = new Date(evento.fecha_inicio);
                   const finEvento = new Date(evento.fecha_fin);
-                  for (const otroEvento of data) {
-                    if (evento.id === otroEvento.id) continue;
-                    const inicioOtro = new Date(otroEvento.fecha_inicio);
-                    const finOtro = new Date(otroEvento.fecha_fin);
-                    if (inicioEvento <= finOtro && finEvento >= inicioOtro) {
+                  for (const otro of vacaciones) {
+                    if (evento.id === otro.id) continue;
+                    if (
+                      inicioEvento <= new Date(otro.fecha_fin) &&
+                      finEvento >= new Date(otro.fecha_inicio)
+                    ) {
                       solapado = true;
                       break;
                     }
                   }
                   return {
-                    ...evento,
+                    id: evento.id,
+                    title: evento.nombre,
+                    start: evento.fecha_inicio,
+                    end: finExclusivo(evento.fecha_fin),
                     backgroundColor: solapado ? "#e74c3c" : "#3498db",
                     borderColor: solapado ? "#c0392b" : "#2980b9",
+                    extendedProps: {
+                      tipo: "vacacion",
+                      comentarios: evento.comentarios,
+                    },
                   };
                 });
-                const eventosFinales = dataProcesada.map((evento) => ({
-                  id: evento.id,
-                  title: evento.nombre,
-                  start: evento.fecha_inicio,
-                  end: new Date(new Date(evento.fecha_fin).getTime() + 86400000)
-                    .toISOString()
-                    .split("T")[0],
-                  backgroundColor: evento.backgroundColor,
-                  borderColor: evento.borderColor,
-                  extendedProps: { comentarios: evento.comentarios },
+                const eventosFaltas = faltas.map((f) => ({
+                  id: `falta-${f.id}`,
+                  title: `${f.nombre} (Falta)`,
+                  start: f.fecha_inicio,
+                  end: finExclusivo(f.fecha_fin),
+                  backgroundColor: "#8e44ad",
+                  borderColor: "#6c3483",
+                  extendedProps: { tipo: "falta", motivo: f.motivo },
                 }));
-                successCallback(eventosFinales);
+                successCallback([...eventosVac, ...eventosFaltas]);
               })
               .catch((error) => {
                 failureCallback(error);
                 Swal.fire(
                   "Error",
-                  "No se pudieron cargar las vacaciones en el calendario.",
+                  "No se pudieron cargar los eventos del calendario.",
                   "error"
                 );
               });
@@ -1451,12 +1463,22 @@
         calendario.render();
       }
       async function handleEventClick(event) {
-        const comentarios = event.extendedProps.comentarios;
         const rango = `Del ${new Date(
           event.start
         ).toLocaleDateString()} al ${new Date(
           new Date(event.end).getTime() - 86400000
         ).toLocaleDateString()}`;
+        if (event.extendedProps.tipo === "falta") {
+          Swal.fire({
+            icon: "info",
+            title: `Falta de ${event.title.replace(" (Falta)", "")}`,
+            html: `${rango}<br><br><strong>Motivo:</strong> ${
+              event.extendedProps.motivo || ""
+            }<br><br><em>Para editar o eliminar, usa la sección Gestión de Faltas.</em>`,
+          });
+          return;
+        }
+        const comentarios = event.extendedProps.comentarios;
         const { value: action } = await Swal.fire({
           title: `Gestionar vacaciones de ${event.title}`,
           html: `${rango}${
@@ -1810,6 +1832,7 @@ async function mostrarDiasRestantes() {
               Swal.fire("¡Éxito!", "Falta registrada.", "success");
               e.target.reset();
               cargarFaltas();
+              if (calendario) calendario.refetchEvents();
             } catch (error) {
               Swal.fire("Error", `No se pudo registrar: ${error.message}`, "error");
             }
