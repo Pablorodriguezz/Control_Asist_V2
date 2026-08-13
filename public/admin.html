@@ -56,6 +56,11 @@
               >
             </li>
             <li>
+              <a href="#control-sin-fichar"
+                ><i class="bi bi-person-dash-fill"></i> Sin Fichar</a
+              >
+            </li>
+            <li>
               <a href="#informe-mensual"
                 ><i class="bi bi-calendar-month-fill"></i> Informe Mensual</a
               >
@@ -196,6 +201,23 @@
               <tbody></tbody>
             </table>
           </div>
+        </section>
+        <hr />
+        <section id="control-sin-fichar">
+          <h2><i class="bi bi-person-dash-fill"></i> Empleados sin fichar</h2>
+          <p style="color:#555;margin:0 0 12px;">
+            Días laborables (L-V) en los que un empleado no fichó y no estaba de
+            vacaciones ni de falta.
+          </p>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:15px;">
+            <label for="diasSinFichar" style="margin:0;">Ver últimos:</label>
+            <select id="diasSinFichar" style="width:auto;margin:0;">
+              <option value="7">7 días</option>
+              <option value="15">15 días</option>
+              <option value="30">30 días</option>
+            </select>
+          </div>
+          <div id="contenedorSinFichar"></div>
         </section>
         <hr />
         <section id="informe-mensual">
@@ -1056,6 +1078,46 @@
           Swal.fire("Error", `No se pudo generar: ${error.message}`, "error");
         }
       }
+      async function cargarSinFichar() {
+        const dias = document.getElementById("diasSinFichar").value;
+        const cont = document.getElementById("contenedorSinFichar");
+        cont.innerHTML = "<p>Cargando...</p>";
+        try {
+          const res = await fetch(`/api/no-fichados?dias=${dias}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (!res.ok) throw new Error("No se pudo cargar.");
+          const datos = await res.json();
+          if (datos.length === 0) {
+            cont.innerHTML =
+              '<p style="color:#27ae60;font-weight:bold;">✔ Todos los empleados ficharon en los días laborables de este periodo.</p>';
+            return;
+          }
+          cont.innerHTML = "";
+          datos.forEach((dia) => {
+            const fecha = new Date(dia.fecha + "T00:00:00").toLocaleDateString(
+              "es-ES",
+              { weekday: "long", day: "2-digit", month: "long" }
+            );
+            const bloque = document.createElement("div");
+            bloque.style.cssText =
+              "margin-bottom:14px;padding:10px 14px;border-left:4px solid #e67e22;background:#fdf3e7;border-radius:6px;";
+            const titulo = document.createElement("strong");
+            titulo.textContent = fecha;
+            const ul = document.createElement("ul");
+            ul.style.margin = "6px 0 0";
+            dia.empleados.forEach((nombre) => {
+              const li = document.createElement("li");
+              li.textContent = nombre;
+              ul.appendChild(li);
+            });
+            bloque.append(titulo, ul);
+            cont.appendChild(bloque);
+          });
+        } catch (error) {
+          cont.innerHTML = `<p style="color:#c0392b;">Error: ${error.message}</p>`;
+        }
+      }
       async function cargarFaltas() {
         const tbody = document.querySelector("#tablaFaltas tbody");
         tbody.innerHTML = '<tr><td colspan="4">Cargando faltas...</td></tr>';
@@ -1910,6 +1972,10 @@ async function mostrarDiasRestantes() {
           .addEventListener("click", imprimirVacacionesMes);
         poblarSelectorUsuarios("faltasUsuario");
         cargarFaltas();
+        cargarSinFichar();
+        document
+          .getElementById("diasSinFichar")
+          .addEventListener("change", cargarSinFichar);
         document
           .getElementById("formFaltas")
           .addEventListener("submit", async (e) => {

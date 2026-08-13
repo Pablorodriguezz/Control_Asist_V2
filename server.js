@@ -299,6 +299,39 @@ app.get('/api/informe', authenticateToken, async (req, res) => {
         res.json(result.rows);
     } catch (err) { res.status(500).json({ message: 'Error al obtener informe.' }); }
 });
+
+// Empleados que NO ficharon en los últimos N días laborables (L-V), excluyendo
+// a quienes ese día estaban de vacaciones o de falta (ausencias sin justificar).
+app.get('/api/no-fichados', authenticateToken, async (req, res) => {
+    if (req.user.rol !== 'admin') return res.status(403).json({ message: 'Acceso denegado.' });
+    const diasNum = Math.min(Math.max(parseInt(req.query.dias, 10) || 7, 1), 60);
+    const hoy = DateTime.now().setZone('Europe/Madrid').startOf('day');
+    const inicio = hoy.minus({ days: diasNum }).toISODate(); // desde N días atrás
+    const fin = hoy.minus({ days: 1 }).toISODate();          // hasta ayer
+    try {
+        const sql = `
+            SELECT to_char(d.dia, 'YYYY-MM-DD') AS fecha, u.nombre
+            FROM generate_series($1::date, $2::date, '1 day') AS d(dia)
+            CROSS JOIN usuarios u
+            WHERE u.rol = 'empleado'
+              AND EXTRACT(ISODOW FROM d.dia) < 6
+              AND NOT EXISTS (SELECT 1 FROM registros r WHERE r.usuario_id = u.id AND r.fecha_hora::date = d.dia::date)
+              AND NOT EXISTS (SELECT 1 FROM vacaciones v WHERE v.usuario_id = u.id AND v.estado = 'aprobada' AND d.dia::date BETWEEN v.fecha_inicio AND v.fecha_fin)
+              AND NOT EXISTS (SELECT 1 FROM faltas f WHERE f.usuario_id = u.id AND d.dia::date BETWEEN f.fecha_inicio AND f.fecha_fin)
+            ORDER BY d.dia DESC, u.nombre
+        `;
+        const { rows } = await db.query(sql, [inicio, fin]);
+        const porDia = new Map();
+        for (const r of rows) {
+            if (!porDia.has(r.fecha)) porDia.set(r.fecha, []);
+            porDia.get(r.fecha).push(r.nombre);
+        }
+        res.json([...porDia.entries()].map(([fecha, empleados]) => ({ fecha, empleados })));
+    } catch (err) {
+        console.error("Error en no-fichados:", err);
+        res.status(500).json({ message: 'Error al obtener los no fichados.' });
+    }
+});
 // --- NOVEDAD: RUTA DE USUARIOS ACTUALIZADA CON LÓGICA DE DEPARTAMENTOS ---
 
 app.get('/api/usuarios', authenticateToken, async (req, res) => {
