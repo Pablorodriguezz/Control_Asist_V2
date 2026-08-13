@@ -1100,7 +1100,7 @@
           const datos = await res.json();
           if (datos.length === 0) {
             cont.innerHTML =
-              '<p style="color:#27ae60;font-weight:bold;">✔ Todos los empleados ficharon en los días laborables de este periodo.</p>';
+              '<p style="color:#27ae60;font-weight:bold;">✔ Todos los empleados ficharon correctamente en los días laborables de este periodo.</p>';
             return;
           }
           cont.innerHTML = "";
@@ -1116,9 +1116,15 @@
             titulo.textContent = fecha;
             const ul = document.createElement("ul");
             ul.style.margin = "6px 0 0";
-            dia.empleados.forEach((nombre) => {
+            dia.items.forEach((item) => {
               const li = document.createElement("li");
-              li.textContent = nombre;
+              const nombre = document.createElement("span");
+              nombre.textContent = item.nombre + " ";
+              const tag = document.createElement("span");
+              const incompleto = item.motivo !== "No fichó";
+              tag.textContent = item.motivo;
+              tag.style.cssText = `font-size:12px;color:#fff;padding:1px 7px;border-radius:10px;background:${incompleto ? "#e67e22" : "#c0392b"};`;
+              li.append(nombre, tag);
               ul.appendChild(li);
             });
             bloque.append(titulo, ul);

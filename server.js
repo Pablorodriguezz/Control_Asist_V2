@@ -309,32 +309,74 @@ app.get('/api/no-fichados', authenticateToken, async (req, res) => {
     const inicio = hoy.minus({ days: diasNum }).toISODate(); // desde N días atrás
     const fin = hoy.minus({ days: 1 }).toISODate();          // hasta ayer
     const depto = req.query.departamento;
-    const params = [inicio, fin];
-    let filtroDepto = '';
-    if (depto && depto !== 'todos') {
-        params.push(depto);
-        filtroDepto = ` AND u.departamento = $${params.length}`;
-    }
     try {
-        const sql = `
-            SELECT to_char(d.dia, 'YYYY-MM-DD') AS fecha, u.nombre
-            FROM generate_series($1::date, $2::date, '1 day') AS d(dia)
-            CROSS JOIN usuarios u
-            WHERE u.rol = 'empleado'${filtroDepto}
-              AND EXTRACT(ISODOW FROM d.dia) < 6
-              AND (u.fecha_contratacion IS NULL OR d.dia >= u.fecha_contratacion)
-              AND NOT EXISTS (SELECT 1 FROM registros r WHERE r.usuario_id = u.id AND r.fecha_hora::date = d.dia::date)
-              AND NOT EXISTS (SELECT 1 FROM vacaciones v WHERE v.usuario_id = u.id AND v.estado = 'aprobada' AND d.dia::date BETWEEN v.fecha_inicio AND v.fecha_fin)
-              AND NOT EXISTS (SELECT 1 FROM faltas f WHERE f.usuario_id = u.id AND d.dia::date BETWEEN f.fecha_inicio AND f.fecha_fin)
-            ORDER BY d.dia DESC, u.nombre
-        `;
-        const { rows } = await db.query(sql, params);
-        const porDia = new Map();
-        for (const r of rows) {
-            if (!porDia.has(r.fecha)) porDia.set(r.fecha, []);
-            porDia.get(r.fecha).push(r.nombre);
+        // Empleados (opcionalmente de un departamento)
+        const paramsEmp = [];
+        let filtroDepto = '';
+        if (depto && depto !== 'todos') { paramsEmp.push(depto); filtroDepto = ' AND departamento = $1'; }
+        const { rows: empleados } = await db.query(
+            `SELECT id, nombre, to_char(fecha_contratacion, 'YYYY-MM-DD') AS fecha_contratacion
+             FROM usuarios WHERE rol = 'empleado'${filtroDepto}`, paramsEmp);
+        if (empleados.length === 0) return res.json([]);
+        const ids = empleados.map(e => e.id);
+
+        // Fichajes del periodo para esos empleados, en orden cronológico
+        const { rows: registros } = await db.query(
+            `SELECT usuario_id, to_char(fecha_hora::date, 'YYYY-MM-DD') AS dia, tipo
+             FROM registros WHERE usuario_id = ANY($1) AND fecha_hora::date BETWEEN $2 AND $3
+             ORDER BY usuario_id, fecha_hora`, [ids, inicio, fin]);
+        const porClave = {}; // "uid|dia" -> [tipos en orden]
+        for (const r of registros) {
+            const k = `${r.usuario_id}|${r.dia}`;
+            (porClave[k] = porClave[k] || []).push(r.tipo);
         }
-        res.json([...porDia.entries()].map(([fecha, empleados]) => ({ fecha, empleados })));
+
+        // Días cubiertos por vacaciones/faltas: set de "uid|fecha"
+        const cubiertos = new Set();
+        const marcarRango = (uid, ini, finR) => {
+            let d = DateTime.fromISO(ini < inicio ? inicio : ini);
+            const hasta = DateTime.fromISO(finR > fin ? fin : finR);
+            while (d <= hasta) { cubiertos.add(`${uid}|${d.toISODate()}`); d = d.plus({ days: 1 }); }
+        };
+        const { rows: vacs } = await db.query(
+            `SELECT usuario_id, to_char(fecha_inicio,'YYYY-MM-DD') AS ini, to_char(fecha_fin,'YYYY-MM-DD') AS fin
+             FROM vacaciones WHERE estado='aprobada' AND usuario_id = ANY($1) AND fecha_inicio <= $3 AND fecha_fin >= $2`,
+            [ids, inicio, fin]);
+        vacs.forEach(v => marcarRango(v.usuario_id, v.ini, v.fin));
+        const { rows: fal } = await db.query(
+            `SELECT usuario_id, to_char(fecha_inicio,'YYYY-MM-DD') AS ini, to_char(fecha_fin,'YYYY-MM-DD') AS fin
+             FROM faltas WHERE usuario_id = ANY($1) AND fecha_inicio <= $3 AND fecha_fin >= $2`,
+            [ids, inicio, fin]);
+        fal.forEach(f => marcarRango(f.usuario_id, f.ini, f.fin));
+
+        // Días laborables del periodo, más reciente primero
+        const dias = [];
+        for (let d = DateTime.fromISO(fin); d >= DateTime.fromISO(inicio); d = d.minus({ days: 1 })) {
+            if (d.weekday <= 5) dias.push(d.toISODate());
+        }
+
+        const resultado = [];
+        for (const dia of dias) {
+            const items = [];
+            for (const emp of empleados) {
+                if (emp.fecha_contratacion && dia < emp.fecha_contratacion) continue; // aún no trabajaba
+                if (cubiertos.has(`${emp.id}|${dia}`)) continue;                       // vacaciones/falta
+                const tipos = porClave[`${emp.id}|${dia}`];
+                if (!tipos) { items.push({ nombre: emp.nombre, motivo: 'No fichó' }); continue; }
+                // Emparejar entradas/salidas del día
+                let open = false, faltaSalida = false, faltaEntrada = false;
+                for (const t of tipos) {
+                    if (t === 'entrada') { if (open) faltaSalida = true; open = true; }
+                    else if (t === 'salida') { if (!open) faltaEntrada = true; else open = false; }
+                }
+                if (open) faltaSalida = true;
+                if (faltaSalida && faltaEntrada) items.push({ nombre: emp.nombre, motivo: 'Falta entrada y salida' });
+                else if (faltaSalida) items.push({ nombre: emp.nombre, motivo: 'Falta la salida' });
+                else if (faltaEntrada) items.push({ nombre: emp.nombre, motivo: 'Falta la entrada' });
+            }
+            if (items.length) resultado.push({ fecha: dia, items });
+        }
+        res.json(resultado);
     } catch (err) {
         console.error("Error en no-fichados:", err);
         res.status(500).json({ message: 'Error al obtener los no fichados.' });
