@@ -329,6 +329,11 @@
             <button type="submit">Asignar Vacaciones</button>
           </form>
           <hr style="margin: 20px 0" />
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:15px;">
+            <label for="mesImprimirVacaciones" style="margin:0;">Vacaciones del mes:</label>
+            <input type="month" id="mesImprimirVacaciones" style="width:auto;margin:0;" />
+            <button type="button" id="btnImprimirVacaciones" style="width:auto;">🖨️ Imprimir / PDF</button>
+          </div>
           <div id="calendarioVacaciones"></div>
         </section>
 
@@ -956,6 +961,61 @@
             }
           }
         });
+      }
+      async function imprimirVacacionesMes() {
+        const val = document.getElementById("mesImprimirVacaciones").value;
+        if (!val) {
+          Swal.fire("Atención", "Elige un mes primero.", "warning");
+          return;
+        }
+        const [anio, mes] = val.split("-").map(Number);
+        const primerDia = new Date(anio, mes - 1, 1);
+        const ultimoDia = new Date(anio, mes, 0);
+        const meses = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+        try {
+          const res = await fetch("/api/vacaciones", {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (!res.ok) throw new Error("No se pudieron cargar las vacaciones.");
+          const data = await res.json();
+          // Vacaciones que solapan el mes elegido
+          const delMes = data
+            .filter((v) => new Date(v.fecha_inicio) <= ultimoDia && new Date(v.fecha_fin) >= primerDia)
+            .sort((a, b) => new Date(a.fecha_inicio) - new Date(b.fecha_inicio));
+          const esc = (s) =>
+            String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+          const fmt = (f) => new Date(f).toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit", year: "numeric" });
+          const filas = delMes.length
+            ? delMes.map((v) => `<tr><td>${esc(v.nombre)}</td><td>${fmt(v.fecha_inicio)}</td><td>${fmt(v.fecha_fin)}</td></tr>`).join("")
+            : `<tr><td colspan="3" style="text-align:center;">No hay vacaciones este mes.</td></tr>`;
+          const html = `<!doctype html><html lang="es"><head><meta charset="utf-8">
+            <title>Vacaciones ${meses[mes - 1]} ${anio}</title>
+            <style>
+              body{font-family:Arial,Helvetica,sans-serif;margin:40px;color:#111;}
+              h1{text-align:center;font-size:28px;margin:0 0 4px;}
+              .sub{text-align:center;color:#555;margin:0 0 24px;font-size:14px;}
+              table{width:100%;border-collapse:collapse;font-size:18px;}
+              th,td{border:1px solid #999;padding:10px 14px;text-align:left;}
+              th{background:#f0f0f0;}
+              tr:nth-child(even) td{background:#fafafa;}
+              @media print{ .noprint{display:none;} body{margin:15mm;} }
+            </style></head><body>
+            <h1>VACACIONES · ${meses[mes - 1].toUpperCase()} ${anio}</h1>
+            <p class="sub">Hostel Cleaning</p>
+            <table><thead><tr><th>Trabajador</th><th>Desde</th><th>Hasta</th></tr></thead>
+            <tbody>${filas}</tbody></table>
+            <button class="noprint" onclick="window.print()" style="display:block;margin:30px auto 0;padding:12px 24px;font-size:16px;cursor:pointer;">🖨️ Imprimir</button>
+            </body></html>`;
+          const win = window.open("", "_blank");
+          if (!win) {
+            Swal.fire("Atención", "Permite las ventanas emergentes para imprimir.", "warning");
+            return;
+          }
+          win.document.write(html);
+          win.document.close();
+        } catch (error) {
+          Swal.fire("Error", `No se pudo generar: ${error.message}`, "error");
+        }
       }
       async function cargarFaltas() {
         const tbody = document.querySelector("#tablaFaltas tbody");
@@ -1805,6 +1865,10 @@ async function mostrarDiasRestantes() {
         poblarSelectorUsuarios("manualUsuario");
         poblarSelectorUsuarios("vacacionesUsuario");
         inicializarCalendario();
+        document.getElementById("mesImprimirVacaciones").value = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, "0")}`;
+        document
+          .getElementById("btnImprimirVacaciones")
+          .addEventListener("click", imprimirVacacionesMes);
         poblarSelectorUsuarios("faltasUsuario");
         cargarFaltas();
         document
