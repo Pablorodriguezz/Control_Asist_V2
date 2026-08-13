@@ -322,6 +322,7 @@ app.get('/api/no-fichados', authenticateToken, async (req, res) => {
             CROSS JOIN usuarios u
             WHERE u.rol = 'empleado'${filtroDepto}
               AND EXTRACT(ISODOW FROM d.dia) < 6
+              AND (u.fecha_contratacion IS NULL OR d.dia >= u.fecha_contratacion)
               AND NOT EXISTS (SELECT 1 FROM registros r WHERE r.usuario_id = u.id AND r.fecha_hora::date = d.dia::date)
               AND NOT EXISTS (SELECT 1 FROM vacaciones v WHERE v.usuario_id = u.id AND v.estado = 'aprobada' AND d.dia::date BETWEEN v.fecha_inicio AND v.fecha_fin)
               AND NOT EXISTS (SELECT 1 FROM faltas f WHERE f.usuario_id = u.id AND d.dia::date BETWEEN f.fecha_inicio AND f.fecha_fin)
