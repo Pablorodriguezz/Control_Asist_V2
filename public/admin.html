@@ -184,7 +184,10 @@
         <hr />
         <section id="informe-diario">
           <h2>Informe de Asistencia Diario</h2>
-          <input type="date" id="fecha" onchange="getReport()" />
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px;">
+            <input type="date" id="fecha" onchange="getReport()" style="width:auto;margin:0;" />
+            <button type="button" id="btnImprimirDiario" style="width:auto;">🖨️ Imprimir / PDF</button>
+          </div>
           <div class="table-container">
             <table id="reportTable">
               <thead>
@@ -545,6 +548,69 @@
         }
       }
 
+      async function imprimirInformeDiario() {
+        const fecha = document.getElementById("fecha").value;
+        if (!fecha) {
+          Swal.fire("Atención", "Elige una fecha primero.", "warning");
+          return;
+        }
+        const esc = (s) =>
+          String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+        try {
+          const res = await fetch(`/api/informe?fecha=${fecha}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (!res.ok) throw new Error("No se pudo cargar el informe.");
+          const data = await res.json();
+          const fechaTxt = new Date(fecha + "T00:00:00").toLocaleDateString("es-ES", {
+            weekday: "long",
+            day: "2-digit",
+            month: "long",
+            year: "numeric",
+          });
+          const filas = data.length
+            ? data
+                .map((r) => {
+                  const hora = new Date(r.fecha_hora).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
+                  const editado = r.es_modificado ? " *" : "";
+                  return `<tr><td>${esc(r.nombre)}</td><td class="c">${hora}${editado}</td><td class="c ${r.tipo}">${esc(r.tipo)}</td></tr>`;
+                })
+                .join("")
+            : `<tr><td colspan="3" style="text-align:center;">No hay registros para esta fecha.</td></tr>`;
+          const html = `<!doctype html><html lang="es"><head><meta charset="utf-8">
+            <title>Asistencia ${fechaTxt}</title>
+            <style>
+              body{font-family:Arial,Helvetica,sans-serif;margin:30px;color:#111;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+              h1{text-align:center;font-size:22px;margin:0 0 2px;text-transform:capitalize;}
+              .sub{text-align:center;color:#555;margin:0 0 20px;font-size:13px;}
+              table{width:100%;border-collapse:collapse;font-size:15px;}
+              th,td{border:1px solid #999;padding:8px 12px;text-align:left;}
+              th{background:#333;color:#fff;}
+              td.c{text-align:center;}
+              td.entrada{color:#1e7e34;font-weight:bold;}
+              td.salida{color:#c0392b;font-weight:bold;}
+              tr:nth-child(even) td{background:#fafafa;}
+              .nota{margin-top:12px;font-size:11px;color:#777;}
+              @media print{ .noprint{display:none !important;} body{margin:12mm;} }
+            </style></head><body>
+            <h1>ASISTENCIA · ${esc(fechaTxt)}</h1>
+            <p class="sub">Hostel Cleaning</p>
+            <table><thead><tr><th>Trabajador</th><th>Hora</th><th>Tipo</th></tr></thead>
+            <tbody>${filas}</tbody></table>
+            <p class="nota">* Registro editado o manual.</p>
+            <button class="noprint" onclick="window.print()" style="display:block;margin:24px auto 0;padding:12px 24px;font-size:16px;cursor:pointer;">🖨️ Imprimir</button>
+            </body></html>`;
+          const win = window.open("", "_blank");
+          if (!win) {
+            Swal.fire("Atención", "Permite las ventanas emergentes para imprimir.", "warning");
+            return;
+          }
+          win.document.write(html);
+          win.document.close();
+        } catch (error) {
+          Swal.fire("Error", `No se pudo generar: ${error.message}`, "error");
+        }
+      }
       async function getReport() {
         const fecha = document.getElementById("fecha").value;
         if (!fecha) return;
@@ -1986,6 +2052,9 @@ async function mostrarDiasRestantes() {
         document
           .getElementById("btnImprimirVacaciones")
           .addEventListener("click", imprimirVacacionesMes);
+        document
+          .getElementById("btnImprimirDiario")
+          .addEventListener("click", imprimirInformeDiario);
         poblarSelectorUsuarios("faltasUsuario");
         cargarFaltas();
         cargarSinFichar();
