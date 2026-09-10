@@ -1070,6 +1070,11 @@
           String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
         const soloFecha = (s) => { const d = new Date(s); return new Date(d.getFullYear(), d.getMonth(), d.getDate()); };
         const diff = (a, b) => Math.round((a - b) / 86400000);
+        // Paleta de colores bien diferenciados (todos legibles con texto blanco).
+        // No incluye el morado de las faltas.
+        const PALETA = ["#c0392b","#2980b9","#1e8449","#d35400","#0e6655","#2c3e50",
+          "#a93226","#1f6391","#196f3d","#935116","#117864","#34495e",
+          "#7f8c8d","#cb4335","#0b5345","#b9770e"];
         const clamp = (n) => Math.max(0, Math.min(6, n));
         try {
           const headers = { Authorization: `Bearer ${token}` };
@@ -1081,6 +1086,9 @@
             ...vac.map((v) => ({ nombre: v.nombre, s: soloFecha(v.fecha_inicio), e: soloFecha(v.fecha_fin), clase: "vac" })),
             ...faltas.map((f) => ({ nombre: `${f.nombre} (Falta)`, s: soloFecha(f.fecha_inicio), e: soloFecha(f.fecha_fin), clase: "falta" })),
           ];
+          // Un color por trabajador, repartiendo la paleta entre los que salen este mes
+          const trabajadores = [...new Set(vac.map((v) => v.nombre))].sort((a, b) => a.localeCompare(b));
+          const colorPersona = (nombre) => PALETA[trabajadores.indexOf(nombre) % PALETA.length];
           // Rejilla del mes: de lunes anterior al día 1 hasta domingo del último día
           const ultimo = new Date(anio, mes, 0);
           const offIni = (new Date(anio, mes - 1, 1).getDay() + 6) % 7;
@@ -1108,7 +1116,8 @@
             for (const ev of enSemana) {
               const c1 = clamp(diff(ev.s, lunes)) + 1;
               const c2 = clamp(diff(ev.e, lunes)) + 2;
-              barrasHtml += `<div class="evrow"><div class="bar ${ev.clase}" style="grid-column:${c1}/${c2}">${esc(ev.nombre)}</div></div>`;
+              const bg = ev.clase === "vac" ? `;background:${colorPersona(ev.nombre)}` : "";
+              barrasHtml += `<div class="evrow"><div class="bar ${ev.clase}" style="grid-column:${c1}/${c2}${bg}">${esc(ev.nombre)}</div></div>`;
             }
             semanasHtml += `<div class="semana"><div class="nums">${numsHtml}</div>${barrasHtml}</div>`;
           }
@@ -1137,7 +1146,7 @@
             <p class="sub">Hostel Cleaning</p>
             <div class="cab">${diasSem.map((d) => `<div>${d}</div>`).join("")}</div>
             ${semanasHtml}
-            <p class="leyenda"><i style="background:#e74c3c"></i>Vacaciones <i style="background:#8e44ad"></i>Falta</p>
+            <p class="leyenda">Barras de color = Vacaciones (un color por trabajador) <i style="background:#8e44ad"></i>Falta</p>
             <button class="noprint" onclick="window.print()" style="display:block;margin:24px auto 0;padding:12px 24px;font-size:16px;cursor:pointer;">🖨️ Imprimir</button>
             </body></html>`;
           const win = window.open("", "_blank");
