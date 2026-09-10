@@ -462,6 +462,25 @@ app.get('/api/usuarios/:id/ajustes-dias', authenticateToken, async (req, res) =>
     }
 });
 
+// Edita un ajuste ya registrado (días y/o motivo).
+app.put('/api/ajustes-dias/:ajusteId', authenticateToken, async (req, res) => {
+    if (req.user.rol !== 'admin' && req.user.rol !== 'gestor_vacaciones') return res.sendStatus(403);
+    const { dias, motivo } = req.body;
+    if (!Number.isInteger(dias) || dias === 0) return res.status(400).json({ message: 'Los días deben ser un entero distinto de 0 (ej: 1 o -1).' });
+    if (!motivo || !motivo.trim()) return res.status(400).json({ message: 'El motivo es obligatorio.' });
+    try {
+        const result = await db.query(
+            'UPDATE ajustes_dias SET dias = $1, motivo = $2 WHERE id = $3',
+            [dias, motivo.trim(), req.params.ajusteId]
+        );
+        if (result.rowCount === 0) return res.status(404).json({ message: 'Ajuste no encontrado.' });
+        res.json({ message: 'Ajuste actualizado.' });
+    } catch (err) {
+        console.error('Error al editar ajuste de días:', err);
+        res.status(500).json({ message: 'Error al editar el ajuste.' });
+    }
+});
+
 // Borra un ajuste del historial (corrige un error de registro).
 app.delete('/api/ajustes-dias/:ajusteId', authenticateToken, async (req, res) => {
     if (req.user.rol !== 'admin' && req.user.rol !== 'gestor_vacaciones') return res.sendStatus(403);

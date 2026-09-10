@@ -1359,7 +1359,12 @@
                 <td style="text-align:center;font-weight:bold;color:${a.dias < 0 ? "#c0392b" : "#27ae60"};">${a.dias > 0 ? "+" : ""}${a.dias}</td>
                 <td style="text-align:left;">${escaparHtml(a.motivo)}</td>
                 <td style="font-size:0.8em;color:#666;">${escaparHtml(a.admin_nombre || "—")}</td>
-                <td><button class="action-btn btn-delete" style="padding:2px 8px;" onclick="borrarAjusteDias(${a.id}, ${userId}, '${userName.replace(/'/g, "\\'")}')">✕</button></td>
+                <td style="white-space:nowrap;">
+                  <button class="action-btn" style="padding:2px 8px;background:#f39c12;" onclick='editarAjusteDias(${JSON.stringify(
+                    { id: a.id, dias: a.dias, motivo: a.motivo }
+                  ).replace(/'/g, "&#39;")}, ${userId}, ${JSON.stringify(userName).replace(/'/g, "&#39;")})'>✎</button>
+                  <button class="action-btn btn-delete" style="padding:2px 8px;" onclick="borrarAjusteDias(${a.id}, ${userId}, '${userName.replace(/'/g, "\\'")}')">✕</button>
+                </td>
               </tr>`
               )
               .join("")
@@ -1442,6 +1447,50 @@
           ajustarDiasCompensatorios(userId, userName);
         } catch (error) {
           Swal.fire("Error", `No se pudo eliminar: ${error.message}`, "error");
+        }
+      }
+
+      async function editarAjusteDias(ajuste, userId, userName) {
+        const { value } = await Swal.fire({
+          title: "Editar ajuste",
+          html: `
+            <div style="display:flex;gap:.5rem;align-items:center;margin:.3rem 0;">
+              <input id="swal-edit-dias" type="number" step="1" value="${ajuste.dias}" class="swal2-input" style="width:90px;margin:0;">
+              <span style="font-size:0.85em;color:#666;">día(s)</span>
+            </div>
+            <textarea id="swal-edit-motivo" class="swal2-textarea" style="margin:0;">${escaparHtml(ajuste.motivo)}</textarea>
+          `,
+          focusConfirm: false,
+          showCancelButton: true,
+          confirmButtonText: "Guardar",
+          cancelButtonText: "Cancelar",
+          preConfirm: () => {
+            const dias = parseInt(document.getElementById("swal-edit-dias").value, 10);
+            const motivo = document.getElementById("swal-edit-motivo").value.trim();
+            if (!Number.isInteger(dias) || dias === 0) {
+              Swal.showValidationMessage("Introduce un número entero distinto de 0.");
+              return false;
+            }
+            if (!motivo) {
+              Swal.showValidationMessage("El motivo es obligatorio.");
+              return false;
+            }
+            return { dias, motivo };
+          },
+        });
+        if (!value) return;
+        try {
+          const res = await fetch(`/api/ajustes-dias/${ajuste.id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+            body: JSON.stringify(value),
+          });
+          const d = await res.json();
+          if (!res.ok) throw new Error(d.message);
+          loadUsers();
+          ajustarDiasCompensatorios(userId, userName);
+        } catch (error) {
+          Swal.fire("Error", `No se pudo editar: ${error.message}`, "error");
         }
       }
       async function generarInformeMensual() {
