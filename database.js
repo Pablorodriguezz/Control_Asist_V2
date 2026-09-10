@@ -144,6 +144,30 @@ const init = async () => {
         `);
         console.log('Tabla "faltas" asegurada.');
 
+        // --- Historial de ajustes de días (compensatorios por festivos, correcciones, etc.) ---
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS ajustes_dias (
+                id SERIAL PRIMARY KEY,
+                usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+                dias INTEGER NOT NULL,
+                motivo TEXT NOT NULL,
+                fecha TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                admin_id INTEGER REFERENCES usuarios(id) ON DELETE SET NULL
+            );
+        `);
+        // Migración: si la tabla está vacía, vuelca el saldo actual de dias_compensatorios
+        // como primera fila de cada trabajador para no perder días ya concedidos.
+        const resAjustes = await pool.query('SELECT COUNT(*)::int AS n FROM ajustes_dias');
+        if (resAjustes.rows[0].n === 0) {
+            await pool.query(`
+                INSERT INTO ajustes_dias (usuario_id, dias, motivo)
+                SELECT id, dias_compensatorios, 'Saldo inicial (migración)'
+                FROM usuarios WHERE dias_compensatorios <> 0
+            `);
+            console.log('Tabla "ajustes_dias" creada y saldo compensatorio migrado.');
+        }
+        console.log('Tabla "ajustes_dias" asegurada.');
+
         await pool.query(`
             CREATE TABLE IF NOT EXISTS nominas (
                 id SERIAL PRIMARY KEY,

@@ -13,9 +13,9 @@ const crypto = require('crypto');
 // En server.js, pégalo después de la línea de 'crypto'
 
 const calcularBalance = async (usuarioId, anioActual) => {
-    const resUsuario = await db.query('SELECT dias_vacaciones_anuales, dias_compensatorios, fecha_contratacion FROM usuarios WHERE id = $1', [usuarioId]);
+    const resUsuario = await db.query('SELECT dias_vacaciones_anuales, fecha_contratacion FROM usuarios WHERE id = $1', [usuarioId]);
     if (resUsuario.rowCount === 0) throw new Error('Usuario no encontrado');
-    
+
     const usuario = resUsuario.rows[0];
     let diasAnualesBase = usuario.dias_vacaciones_anuales || 20;
 
@@ -30,7 +30,9 @@ const calcularBalance = async (usuarioId, anioActual) => {
         diasAnualesBase = Math.round(diasProrrateados * 2) / 2;
     }
 
-    const compensatorios = usuario.dias_compensatorios || 0;
+    // Días compensatorios = suma del historial de ajustes (no caducan).
+    const resComp = await db.query('SELECT COALESCE(SUM(dias), 0)::int AS total FROM ajustes_dias WHERE usuario_id = $1', [usuarioId]);
+    const compensatorios = resComp.rows[0].total || 0;
     const diasTotales = diasAnualesBase + compensatorios;
     return diasTotales;
 };
@@ -390,7 +392,10 @@ app.get('/api/usuarios', authenticateToken, async (req, res) => {
     }
     
     try {
-        let sql = "SELECT id, nombre, usuario, rol, dias_vacaciones_anuales, dias_compensatorios, fecha_contratacion, departamento FROM usuarios";
+        let sql = `SELECT u.id, u.nombre, u.usuario, u.rol, u.dias_vacaciones_anuales,
+                          COALESCE((SELECT SUM(a.dias) FROM ajustes_dias a WHERE a.usuario_id = u.id), 0)::int AS dias_compensatorios,
+                          u.fecha_contratacion, u.departamento
+                   FROM usuarios u`;
         const params = [];
 
         // Lógica de permisos para gestores de vacaciones específicos
@@ -418,17 +423,53 @@ app.get('/api/usuarios', authenticateToken, async (req, res) => {
     }
 });
 
-// En server.js (NUEVA RUTA)
-app.put('/api/usuarios/:id/dias-compensatorios', authenticateToken, async (req, res) => {
+// Añade un ajuste de días al historial (delta: +1 festivo trabajado, -1 corrección...).
+app.post('/api/usuarios/:id/ajustes-dias', authenticateToken, async (req, res) => {
     if (req.user.rol !== 'admin' && req.user.rol !== 'gestor_vacaciones') return res.sendStatus(403);
     const { id } = req.params;
     const { dias, motivo } = req.body;
-    if (typeof dias !== 'number' || !Number.isInteger(dias) || dias < 0) return res.status(400).json({ message: 'El número de días debe ser un entero no negativo.' });
+    if (!Number.isInteger(dias) || dias === 0) return res.status(400).json({ message: 'Los días deben ser un entero distinto de 0 (ej: 1 o -1).' });
+    if (!motivo || !motivo.trim()) return res.status(400).json({ message: 'El motivo es obligatorio.' });
     try {
-        const result = await db.query('UPDATE usuarios SET dias_compensatorios = $1 WHERE id = $2', [dias, id]);
-        if (result.rowCount === 0) return res.status(404).json({ message: 'Usuario no encontrado.' });
-        res.json({ message: `Días compensatorios actualizados a ${dias}. Motivo: ${motivo || 'No especificado'}` });
-    } catch (err) { res.status(500).json({ message: 'Error al actualizar los días.' }); }
+        const u = await db.query('SELECT 1 FROM usuarios WHERE id = $1', [id]);
+        if (u.rowCount === 0) return res.status(404).json({ message: 'Usuario no encontrado.' });
+        await db.query(
+            'INSERT INTO ajustes_dias (usuario_id, dias, motivo, admin_id) VALUES ($1, $2, $3, $4)',
+            [id, dias, motivo.trim(), req.user.id]
+        );
+        const { rows } = await db.query('SELECT COALESCE(SUM(dias), 0)::int AS total FROM ajustes_dias WHERE usuario_id = $1', [id]);
+        res.status(201).json({ message: `Ajuste registrado (${dias > 0 ? '+' : ''}${dias}). Saldo compensatorio: ${rows[0].total} días.`, total: rows[0].total });
+    } catch (err) {
+        console.error('Error al registrar ajuste de días:', err);
+        res.status(500).json({ message: 'Error al registrar el ajuste.' });
+    }
+});
+
+// Historial de ajustes de un trabajador + saldo actual.
+app.get('/api/usuarios/:id/ajustes-dias', authenticateToken, async (req, res) => {
+    if (req.user.rol !== 'admin' && req.user.rol !== 'gestor_vacaciones') return res.sendStatus(403);
+    const { id } = req.params;
+    try {
+        const { rows } = await db.query(
+            `SELECT a.id, a.dias, a.motivo, a.fecha, u.nombre AS admin_nombre
+             FROM ajustes_dias a LEFT JOIN usuarios u ON u.id = a.admin_id
+             WHERE a.usuario_id = $1 ORDER BY a.fecha DESC`, [id]);
+        const total = rows.reduce((s, r) => s + r.dias, 0);
+        res.json({ total, ajustes: rows });
+    } catch (err) {
+        console.error('Error al obtener historial de ajustes:', err);
+        res.status(500).json({ message: 'Error al obtener el historial.' });
+    }
+});
+
+// Borra un ajuste del historial (corrige un error de registro).
+app.delete('/api/ajustes-dias/:ajusteId', authenticateToken, async (req, res) => {
+    if (req.user.rol !== 'admin' && req.user.rol !== 'gestor_vacaciones') return res.sendStatus(403);
+    try {
+        const result = await db.query('DELETE FROM ajustes_dias WHERE id = $1', [req.params.ajusteId]);
+        if (result.rowCount === 0) return res.status(404).json({ message: 'Ajuste no encontrado.' });
+        res.json({ message: 'Ajuste eliminado.' });
+    } catch (err) { res.status(500).json({ message: 'Error al eliminar el ajuste.' }); }
 });
 
 // --- NOVEDAD: RUTA PARA ACTUALIZAR EL DEPARTAMENTO DE UN USUARIO ---
