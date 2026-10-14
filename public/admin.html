@@ -210,8 +210,17 @@
           <h2><i class="bi bi-person-dash-fill"></i> Empleados sin fichar</h2>
           <p style="color:#555;margin:0 0 12px;">
             Días laborables (L-V) en los que un empleado no fichó y no estaba de
-            vacaciones ni de falta.
+            vacaciones ni de falta. Los días festivos no se tienen en cuenta.
           </p>
+          <div style="background:#f6f6f8;border:1px solid #e0e0e6;border-radius:8px;padding:12px 14px;margin-bottom:16px;">
+            <strong style="display:block;margin-bottom:8px;"><i class="bi bi-calendar-event"></i> Días festivos</strong>
+            <form id="formFestivo" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:0;">
+              <input type="date" id="festivoFecha" required style="width:auto;margin:0;" />
+              <input type="text" id="festivoDescripcion" placeholder="Descripción (opcional)" style="width:auto;flex:1;min-width:160px;margin:0;" />
+              <button type="submit" style="width:auto;">Marcar festivo</button>
+            </form>
+            <div id="listaFestivos" style="margin-top:10px;"></div>
+          </div>
           <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:15px;">
             <label for="diasSinFichar" style="margin:0;">Ver últimos:</label>
             <select id="diasSinFichar" style="width:auto;margin:0;">
@@ -1158,6 +1167,67 @@
           win.document.close();
         } catch (error) {
           Swal.fire("Error", `No se pudo generar: ${error.message}`, "error");
+        }
+      }
+      async function cargarFestivos() {
+        const cont = document.getElementById("listaFestivos");
+        try {
+          const res = await fetch("/api/festivos", {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (!res.ok) throw new Error("No se pudieron cargar los festivos.");
+          const festivos = await res.json();
+          if (festivos.length === 0) {
+            cont.innerHTML =
+              '<span style="color:#888;font-size:13px;">No hay festivos marcados.</span>';
+            return;
+          }
+          cont.innerHTML = "";
+          festivos.forEach((f) => {
+            const fecha = new Date(f.fecha + "T00:00:00").toLocaleDateString(
+              "es-ES",
+              { weekday: "short", day: "2-digit", month: "short", year: "numeric" }
+            );
+            const chip = document.createElement("span");
+            chip.style.cssText =
+              "display:inline-flex;align-items:center;gap:6px;background:#fff;border:1px solid #d0d0d8;border-radius:16px;padding:3px 6px 3px 12px;margin:0 6px 6px 0;font-size:13px;";
+            const texto = document.createElement("span");
+            texto.textContent = f.descripcion ? `${fecha} · ${f.descripcion}` : fecha;
+            const btn = document.createElement("button");
+            btn.textContent = "✕";
+            btn.title = "Quitar festivo";
+            btn.style.cssText =
+              "width:auto;padding:0 6px;background:#e74c3c;border-radius:50%;font-size:12px;line-height:18px;";
+            btn.addEventListener("click", () => eliminarFestivo(f.id, fecha));
+            chip.append(texto, btn);
+            cont.appendChild(chip);
+          });
+        } catch (error) {
+          cont.innerHTML = `<span style="color:#c0392b;font-size:13px;">${error.message}</span>`;
+        }
+      }
+      async function eliminarFestivo(id, fecha) {
+        const result = await Swal.fire({
+          title: "¿Quitar festivo?",
+          text: `Se quitará el festivo del ${fecha}.`,
+          icon: "warning",
+          showCancelButton: true,
+          confirmButtonColor: "#d33",
+          confirmButtonText: "Sí, quitar",
+          cancelButtonText: "Cancelar",
+        });
+        if (!result.isConfirmed) return;
+        try {
+          const res = await fetch(`/api/festivos/${id}`, {
+            method: "DELETE",
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.message);
+          cargarFestivos();
+          cargarSinFichar();
+        } catch (error) {
+          Swal.fire("Error", `No se pudo quitar: ${error.message}`, "error");
         }
       }
       async function cargarSinFichar() {
@@ -2165,12 +2235,38 @@ async function mostrarDiasRestantes() {
         poblarSelectorUsuarios("faltasUsuario");
         cargarFaltas();
         cargarSinFichar();
+        cargarFestivos();
         document
           .getElementById("diasSinFichar")
           .addEventListener("change", cargarSinFichar);
         document
           .getElementById("deptoSinFichar")
           .addEventListener("change", cargarSinFichar);
+        document
+          .getElementById("formFestivo")
+          .addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const fecha = document.getElementById("festivoFecha").value;
+            const descripcion = document.getElementById("festivoDescripcion").value;
+            if (!fecha) {
+              Swal.fire("Atención", "Elige una fecha.", "warning");
+              return;
+            }
+            try {
+              const res = await fetch("/api/festivos", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ fecha, descripcion }),
+              });
+              const data = await res.json();
+              if (!res.ok) throw new Error(data.message);
+              e.target.reset();
+              cargarFestivos();
+              cargarSinFichar();
+            } catch (error) {
+              Swal.fire("Error", `No se pudo marcar: ${error.message}`, "error");
+            }
+          });
         document
           .getElementById("formFaltas")
           .addEventListener("submit", async (e) => {

@@ -144,6 +144,15 @@ const init = async () => {
         `);
         console.log('Tabla "faltas" asegurada.');
 
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS festivos (
+                id SERIAL PRIMARY KEY,
+                fecha DATE UNIQUE NOT NULL,
+                descripcion TEXT
+            );
+        `);
+        console.log('Tabla "festivos" asegurada.');
+
         // --- Historial de ajustes de días (compensatorios por festivos, correcciones, etc.) ---
         await pool.query(`
             CREATE TABLE IF NOT EXISTS ajustes_dias (

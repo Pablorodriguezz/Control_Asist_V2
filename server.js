@@ -351,10 +351,17 @@ app.get('/api/no-fichados', authenticateToken, async (req, res) => {
             [ids, inicio, fin]);
         fal.forEach(f => marcarRango(f.usuario_id, f.ini, f.fin));
 
-        // Días laborables del periodo, más reciente primero
+        // Días festivos del periodo (se saltan: ese día nadie cuenta como "sin fichar")
+        const { rows: fests } = await db.query(
+            `SELECT to_char(fecha,'YYYY-MM-DD') AS fecha FROM festivos WHERE fecha BETWEEN $1 AND $2`,
+            [inicio, fin]);
+        const festivos = new Set(fests.map(f => f.fecha));
+
+        // Días laborables del periodo (sin festivos), más reciente primero
         const dias = [];
         for (let d = DateTime.fromISO(fin); d >= DateTime.fromISO(inicio); d = d.minus({ days: 1 })) {
-            if (d.weekday <= 5) dias.push(d.toISODate());
+            const iso = d.toISODate();
+            if (d.weekday <= 5 && !festivos.has(iso)) dias.push(iso);
         }
 
         const resultado = [];
@@ -382,6 +389,46 @@ app.get('/api/no-fichados', authenticateToken, async (req, res) => {
     } catch (err) {
         console.error("Error en no-fichados:", err);
         res.status(500).json({ message: 'Error al obtener los no fichados.' });
+    }
+});
+
+// --- GESTIÓN DE DÍAS FESTIVOS ---
+app.get('/api/festivos', authenticateToken, async (req, res) => {
+    if (req.user.rol !== 'admin') return res.status(403).json({ message: 'Acceso denegado.' });
+    try {
+        const { rows } = await db.query(
+            "SELECT id, to_char(fecha,'YYYY-MM-DD') AS fecha, descripcion FROM festivos ORDER BY fecha DESC");
+        res.json(rows);
+    } catch (err) {
+        console.error("Error al obtener festivos:", err);
+        res.status(500).json({ message: 'Error al obtener los festivos.' });
+    }
+});
+
+app.post('/api/festivos', authenticateToken, async (req, res) => {
+    if (req.user.rol !== 'admin') return res.status(403).json({ message: 'Acceso denegado.' });
+    const { fecha, descripcion } = req.body;
+    if (!fecha) return res.status(400).json({ message: 'La fecha es obligatoria.' });
+    try {
+        await db.query(
+            'INSERT INTO festivos (fecha, descripcion) VALUES ($1, $2) ON CONFLICT (fecha) DO UPDATE SET descripcion = EXCLUDED.descripcion',
+            [fecha, (descripcion || '').trim() || null]);
+        res.status(201).json({ message: 'Festivo guardado correctamente.' });
+    } catch (err) {
+        console.error("Error al guardar festivo:", err);
+        res.status(500).json({ message: 'Error al guardar el festivo.' });
+    }
+});
+
+app.delete('/api/festivos/:id', authenticateToken, async (req, res) => {
+    if (req.user.rol !== 'admin') return res.status(403).json({ message: 'Acceso denegado.' });
+    try {
+        const result = await db.query('DELETE FROM festivos WHERE id = $1', [req.params.id]);
+        if (result.rowCount === 0) return res.status(404).json({ message: 'Festivo no encontrado.' });
+        res.json({ message: 'Festivo eliminado correctamente.' });
+    } catch (err) {
+        console.error("Error al eliminar festivo:", err);
+        res.status(500).json({ message: 'Error al eliminar el festivo.' });
     }
 });
 // --- NOVEDAD: RUTA DE USUARIOS ACTUALIZADA CON LÓGICA DE DEPARTAMENTOS ---
