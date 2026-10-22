@@ -561,6 +561,22 @@ app.put('/api/usuarios/:id/departamento', authenticateToken, async (req, res) =>
     }
 });
 
+app.put('/api/usuarios/:id/fecha-contratacion', authenticateToken, async (req, res) => {
+    if (req.user.rol !== 'admin') return res.status(403).json({ message: 'Acceso denegado.' });
+    const { fechaContratacion } = req.body;
+    if (!fechaContratacion || !/^\d{4}-\d{2}-\d{2}$/.test(fechaContratacion)) {
+        return res.status(400).json({ message: 'Fecha no válida.' });
+    }
+    try {
+        const result = await db.query('UPDATE usuarios SET fecha_contratacion = $1 WHERE id = $2', [fechaContratacion, req.params.id]);
+        if (result.rowCount === 0) return res.status(404).json({ message: 'Usuario no encontrado.' });
+        res.json({ message: 'Fecha de contratación actualizada. Las vacaciones se recalculan automáticamente.' });
+    } catch (err) {
+        console.error("Error al actualizar fecha de contratación:", err);
+        res.status(500).json({ message: 'Error del servidor.' });
+    }
+});
+
 // --- NOVEDAD: CREACIÓN DE USUARIO AHORA INCLUYE DEPARTAMENTO ---
 app.post('/api/usuarios', authenticateToken, async (req, res) => {
     if (req.user.rol !== 'admin') return res.status(403).json({ message: 'Acceso denegado.' });

@@ -950,16 +950,18 @@
             const diasCompensatorios = user.dias_compensatorios || 0;
             const departamentoDisplay = user.departamento ? user.departamento.charAt(0).toUpperCase() + user.departamento.slice(1) : '<em>Sin asignar</em>';
             const departamentoActual = user.departamento || '';
-            const contratacion = user.fecha_contratacion
-              ? user.fecha_contratacion.slice(0, 10).split("-").reverse().join("/")
+            const isoContratacion = user.fecha_contratacion ? user.fecha_contratacion.slice(0, 10) : '';
+            const contratacion = isoContratacion
+              ? isoContratacion.split("-").reverse().join("/")
               : '<em>Sin fecha</em>';
+            const nombreEsc = user.nombre.replace(/'/g, "\\'");
 
             tr.innerHTML = `
                 <td>${user.nombre}</td>
                 <td>${user.usuario}</td>
                 <td>${user.rol}</td>
                 <td>${departamentoDisplay}</td>
-                <td>${contratacion}</td>
+                <td>${contratacion} <button class="action-btn btn-reset" style="padding:1px 6px;font-size:11px;" onclick="editarFechaContratacion(${user.id}, '${nombreEsc}', '${isoContratacion}')" title="Editar fecha">✏️</button></td>
                 <td>
                     <button class="action-btn" onclick="editarDepartamentoUsuario(${user.id}, '${user.nombre}', '${departamentoActual}')">Depto.</button>
                     <button class="action-btn" style="background-color: #3498db;" onclick="ajustarDiasCompensatorios(${user.id}, '${user.nombre.replace(/'/g, "\\'")}')">Días (${diasCompensatorios})</button>
@@ -970,6 +972,38 @@
           });
         } catch (error) {
           console.error("Error en loadUsers:", error);
+        }
+      }
+      async function editarFechaContratacion(id, nombre, actual) {
+        const { value: fecha } = await Swal.fire({
+          title: `Fecha de contratación de ${nombre}`,
+          html: `<input id="swal-fc" type="date" class="swal2-input" value="${actual}">`,
+          focusConfirm: false,
+          showCancelButton: true,
+          confirmButtonText: "Guardar",
+          cancelButtonText: "Cancelar",
+          preConfirm: () => {
+            const v = document.getElementById("swal-fc").value;
+            if (!v) {
+              Swal.showValidationMessage("Elige una fecha.");
+              return false;
+            }
+            return v;
+          },
+        });
+        if (!fecha) return;
+        try {
+          const res = await fetch(`/api/usuarios/${id}/fecha-contratacion`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ fechaContratacion: fecha }),
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.message);
+          Swal.fire("¡Actualizado!", data.message, "success");
+          loadUsers();
+        } catch (error) {
+          Swal.fire("Error", `No se pudo actualizar: ${error.message}`, "error");
         }
       }
       async function editarDepartamentoUsuario(userId, userName, currentDepartment) {
