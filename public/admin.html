@@ -375,6 +375,9 @@
             <label for="mesImprimirVacaciones" style="margin:0;">Vacaciones del mes:</label>
             <input type="month" id="mesImprimirVacaciones" style="width:auto;margin:0;" />
             <button type="button" id="btnImprimirVacaciones" style="width:auto;">🖨️ Imprimir / PDF</button>
+            <select id="registroUsuario" style="width:auto;margin:0;">
+              <option value="">Todos</option>
+            </select>
             <button type="button" id="btnRegistroVacaciones" style="width:auto;background:#16a085;">📄 Registro para firmar</button>
           </div>
           <div id="calendarioVacaciones"></div>
@@ -1110,8 +1113,12 @@
         const esc = (s) =>
           String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
         const fmt = (iso) => (iso ? iso.split("-").reverse().join("/") : "");
+        const usuarioId = document.getElementById("registroUsuario").value;
+        const url = usuarioId
+          ? `/api/registro-vacaciones?usuarioId=${usuarioId}`
+          : "/api/registro-vacaciones";
         try {
-          const res = await fetch("/api/registro-vacaciones", {
+          const res = await fetch(url, {
             headers: { Authorization: `Bearer ${token}` },
           });
           if (!res.ok) throw new Error("No se pudo generar el registro.");
@@ -2350,6 +2357,7 @@ async function mostrarDiasRestantes() {
         document
           .getElementById("btnImprimirVacaciones")
           .addEventListener("click", imprimirVacacionesMes);
+        poblarSelectorUsuarios("registroUsuario");
         document
           .getElementById("btnRegistroVacaciones")
           .addEventListener("click", generarRegistroVacaciones);
