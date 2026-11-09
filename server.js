@@ -1194,6 +1194,37 @@ app.get('/api/usuarios/:id/vacaciones-restantes', authenticateToken, async (req,
     } catch (err) { res.status(500).json({ message: 'Error al calcular días restantes: ' + err.message }); }
 });
 
+// Datos para el "Registro de vacaciones del trabajador" (uno por empleado, para firmar)
+app.get('/api/registro-vacaciones', authenticateToken, async (req, res) => {
+    if (req.user.rol !== 'admin') return res.status(403).json({ message: 'Acceso denegado.' });
+    const anio = parseInt(req.query.anio, 10) || new Date().getFullYear();
+    try {
+        const { rows: empleados } = await db.query(
+            "SELECT id, nombre FROM usuarios WHERE rol = 'empleado' ORDER BY nombre");
+        const trabajadores = [];
+        for (const emp of empleados) {
+            const diasTotales = await calcularBalance(emp.id, anio);
+            const { rows: vacs } = await db.query(
+                `SELECT to_char(fecha_inicio,'YYYY-MM-DD') AS desde, to_char(fecha_fin,'YYYY-MM-DD') AS hasta
+                 FROM vacaciones WHERE usuario_id = $1 AND estado = 'aprobada' AND EXTRACT(YEAR FROM fecha_inicio) = $2
+                 ORDER BY fecha_inicio`, [emp.id, anio]);
+            const periodos = vacs.map(v => ({ desde: v.desde, hasta: v.hasta, dias: calcularDiasLaborables(v.desde, v.hasta) }));
+            const disfrutados = periodos.reduce((t, p) => t + p.dias, 0);
+            trabajadores.push({
+                nombre: emp.nombre,
+                diasAnuales: parseFloat(diasTotales.toFixed(2)),
+                periodos,
+                disfrutados,
+                pendientes: parseFloat((diasTotales - disfrutados).toFixed(2)),
+            });
+        }
+        res.json({ anio, empresa: 'HOSTEL CLEANING 2011, S.L.', trabajadores });
+    } catch (err) {
+        console.error("Error en registro-vacaciones:", err);
+        res.status(500).json({ message: 'Error al generar el registro.' });
+    }
+});
+
 // MODIFICADO: (EMPLEADO) El empleado solicita vacaciones con nuevas reglas
 app.post('/api/solicitar-vacaciones', authenticateToken, async (req, res) => {
     const { fechaInicio, fechaFin } = req.body;
