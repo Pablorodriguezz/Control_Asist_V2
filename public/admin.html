@@ -275,6 +275,7 @@
             <label for="horasAnio" style="margin:0;">Año:</label>
             <select id="horasAnio" style="width:auto;margin:0;"></select>
             <button type="button" id="btnHorasMensuales" style="width:auto;">Ver horas</button>
+            <button type="button" id="btnImprimirHoras" style="width:auto;">🖨️ Imprimir / PDF</button>
           </div>
           <div id="horasMensualesContainer"></div>
         </section>
@@ -1414,6 +1415,67 @@
           cont.innerHTML = `<p style="color:#c0392b;">Error: ${error.message}</p>`;
         }
       }
+      async function imprimirHorasMensuales() {
+        const sel = document.getElementById("horasUsuario");
+        const usuarioId = sel.value;
+        const anio = document.getElementById("horasAnio").value;
+        if (!usuarioId) {
+          Swal.fire("Atención", "Selecciona un trabajador.", "warning");
+          return;
+        }
+        const nombre = sel.options[sel.selectedIndex].text;
+        const esc = (s) =>
+          String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+        try {
+          const res = await fetch(`/api/horas-mensuales?usuarioId=${usuarioId}&anio=${anio}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (!res.ok) throw new Error("No se pudo generar.");
+          const data = await res.json();
+          const meses = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+          const fmt = (s) => {
+            const h = Math.floor(s / 3600);
+            const m = Math.floor((s % 3600) / 60);
+            return `${h} h ${String(m).padStart(2, "0")} min`;
+          };
+          const filas = data.meses
+            .map((seg, i) => `<tr><td>${meses[i]}</td><td class="r">${seg > 0 ? fmt(seg) : "—"}</td></tr>`)
+            .join("");
+          const html = `<!doctype html><html lang="es"><head><meta charset="utf-8">
+            <title>Horas ${esc(nombre)} ${data.anio}</title>
+            <style>
+              body{font-family:Arial,Helvetica,sans-serif;margin:30px;color:#111;}
+              h1{font-size:20px;margin:0 0 2px;}
+              .sub{color:#555;margin:0 0 20px;font-size:13px;}
+              table{width:100%;border-collapse:collapse;font-size:15px;max-width:480px;}
+              th,td{border:1px solid #999;padding:8px 12px;text-align:left;}
+              th{background:#333;color:#fff;}
+              td.r,th.r{text-align:right;}
+              tr:nth-child(even) td{background:#fafafa;}
+              tfoot td{font-weight:bold;background:#eee;}
+              @media print{ .noprint{display:none !important;} }
+            </style></head><body>
+            <h1>Horas trabajadas · ${esc(nombre)}</h1>
+            <p class="sub">Hostel Cleaning · Año ${data.anio}</p>
+            <table>
+              <thead><tr><th>Mes</th><th class="r">Horas trabajadas</th></tr></thead>
+              <tbody>${filas}</tbody>
+              <tfoot><tr><td>Total del año</td><td class="r">${fmt(data.totalAnual)}</td></tr></tfoot>
+            </table>
+            ${data.incidencias > 0 ? `<p style="color:#b9770e;font-size:12px;margin-top:10px;">⚠️ ${data.incidencias} fichaje(s) incompleto(s) este año no se han contado.</p>` : ""}
+            <button class="noprint" onclick="window.print()" style="display:block;margin:24px 0 0;padding:12px 24px;font-size:16px;cursor:pointer;">🖨️ Imprimir</button>
+            </body></html>`;
+          const win = window.open("", "_blank");
+          if (!win) {
+            Swal.fire("Atención", "Permite las ventanas emergentes para imprimir.", "warning");
+            return;
+          }
+          win.document.write(html);
+          win.document.close();
+        } catch (error) {
+          Swal.fire("Error", `No se pudo generar: ${error.message}`, "error");
+        }
+      }
       async function cargarSinFichar() {
         const dias = document.getElementById("diasSinFichar").value;
         const depto = document.getElementById("deptoSinFichar").value;
@@ -2428,6 +2490,9 @@ async function mostrarDiasRestantes() {
         document
           .getElementById("btnHorasMensuales")
           .addEventListener("click", cargarHorasMensuales);
+        document
+          .getElementById("btnImprimirHoras")
+          .addEventListener("click", imprimirHorasMensuales);
         document
           .getElementById("btnImprimirDiario")
           .addEventListener("click", imprimirInformeDiario);
