@@ -737,6 +737,31 @@ app.get('/api/informe-mensual', authenticateToken, async (req, res) => {
     }
 });
 
+// Horas totales trabajadas por mes natural (1 al último día) de un trabajador en un año
+app.get('/api/horas-mensuales', authenticateToken, async (req, res) => {
+    if (req.user.rol !== 'admin') return res.status(403).json({ message: 'Acceso denegado.' });
+    const anio = parseInt(req.query.anio, 10) || new Date().getFullYear();
+    const usuarioId = req.query.usuarioId;
+    if (!usuarioId) return res.status(400).json({ message: 'Falta el trabajador.' });
+    try {
+        const { rows } = await db.query(
+            `SELECT fecha_hora, tipo FROM registros
+             WHERE usuario_id = $1 AND EXTRACT(YEAR FROM fecha_hora) = $2
+             ORDER BY fecha_hora ASC`, [usuarioId, anio]);
+        const { segundosPorDia, incidencias } = procesarFichajes(rows);
+        const meses = Array(12).fill(0); // segundos por mes (0 = enero)
+        for (const dia in segundosPorDia) {
+            const m = parseInt(dia.slice(5, 7), 10) - 1;
+            meses[m] += segundosPorDia[dia];
+        }
+        const totalAnual = meses.reduce((t, s) => t + s, 0);
+        res.json({ anio, meses, totalAnual, incidencias: incidencias.length });
+    } catch (err) {
+        console.error("Error en horas mensuales:", err);
+        res.status(500).json({ message: 'Error al calcular las horas mensuales.' });
+    }
+});
+
 
 // REEMPLAZA TAMBIÉN LA RUTA DE EXPORTACIÓN CON LA MISMA LÓGICA MEJORADA
 app.get('/api/exportar-csv', authenticateToken, async (req, res) => {

@@ -66,6 +66,11 @@
               >
             </li>
             <li>
+              <a href="#horas-mensuales"
+                ><i class="bi bi-clock-history"></i> Horas por Mes</a
+              >
+            </li>
+            <li>
               <a href="#gestion-usuarios"
                 ><i class="bi bi-people-fill"></i> Gestión Usuarios</a
               >
@@ -259,6 +264,19 @@
             </button>
           </div>
           <div id="informeMensualContainer" style="margin-top: 20px"></div>
+        </section>
+        <hr />
+        <section id="horas-mensuales">
+          <h2><i class="bi bi-clock-history"></i> Horas totales por mes</h2>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:15px;">
+            <select id="horasUsuario" required>
+              <option value="">-- Selecciona un trabajador --</option>
+            </select>
+            <label for="horasAnio" style="margin:0;">Año:</label>
+            <select id="horasAnio" style="width:auto;margin:0;"></select>
+            <button type="button" id="btnHorasMensuales" style="width:auto;">Ver horas</button>
+          </div>
+          <div id="horasMensualesContainer"></div>
         </section>
         <hr />
         <section id="gestion-usuarios">
@@ -1358,6 +1376,44 @@
           Swal.fire("Error", `No se pudo quitar: ${error.message}`, "error");
         }
       }
+      async function cargarHorasMensuales() {
+        const usuarioId = document.getElementById("horasUsuario").value;
+        const anio = document.getElementById("horasAnio").value;
+        const cont = document.getElementById("horasMensualesContainer");
+        if (!usuarioId) {
+          Swal.fire("Atención", "Selecciona un trabajador.", "warning");
+          return;
+        }
+        cont.innerHTML = "<p>Cargando...</p>";
+        try {
+          const res = await fetch(`/api/horas-mensuales?usuarioId=${usuarioId}&anio=${anio}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (!res.ok) throw new Error("No se pudo cargar el informe.");
+          const data = await res.json();
+          const meses = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+          const fmt = (s) => {
+            const h = Math.floor(s / 3600);
+            const m = Math.floor((s % 3600) / 60);
+            return `${h} h ${String(m).padStart(2, "0")} min`;
+          };
+          let filas = "";
+          data.meses.forEach((seg, i) => {
+            filas += `<tr><td>${meses[i]}</td><td style="text-align:right;">${seg > 0 ? fmt(seg) : "—"}</td></tr>`;
+          });
+          cont.innerHTML =
+            `<div class="table-container"><table>
+               <thead><tr><th>Mes ${data.anio}</th><th style="text-align:right;">Horas trabajadas</th></tr></thead>
+               <tbody>${filas}</tbody>
+               <tfoot><tr><th>Total del año</th><th style="text-align:right;">${fmt(data.totalAnual)}</th></tr></tfoot>
+             </table></div>` +
+            (data.incidencias > 0
+              ? `<p style="color:#e67e22;margin-top:10px;">⚠️ ${data.incidencias} fichaje(s) incompleto(s) este año no se han contado. Revísalos en "Informe Mensual" o "Sin Fichar".</p>`
+              : "");
+        } catch (error) {
+          cont.innerHTML = `<p style="color:#c0392b;">Error: ${error.message}</p>`;
+        }
+      }
       async function cargarSinFichar() {
         const dias = document.getElementById("diasSinFichar").value;
         const depto = document.getElementById("deptoSinFichar").value;
@@ -2361,6 +2417,17 @@ async function mostrarDiasRestantes() {
         document
           .getElementById("btnRegistroVacaciones")
           .addEventListener("click", generarRegistroVacaciones);
+        poblarSelectorUsuarios("horasUsuario");
+        const horasAnioSel = document.getElementById("horasAnio");
+        for (let y = hoy.getFullYear(); y >= hoy.getFullYear() - 3; y--) {
+          const o = document.createElement("option");
+          o.value = y;
+          o.textContent = y;
+          horasAnioSel.appendChild(o);
+        }
+        document
+          .getElementById("btnHorasMensuales")
+          .addEventListener("click", cargarHorasMensuales);
         document
           .getElementById("btnImprimirDiario")
           .addEventListener("click", imprimirInformeDiario);
